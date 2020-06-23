@@ -21,7 +21,7 @@ typedef struct my_mutator {
 } my_mutator_t;
 static my_mutator_t *data = NULL;
 
-// JSON generator
+// JSON generator - extracted from F1 fuzzer
 int max_depth = 3;
 
 void gen_init__();
@@ -108,8 +108,9 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
   }
 
   // Randomly generate a JSON string
-  mutated_size = 0;
-  gen_init__();
+  mutated_size = 0; // reset the buffer
+  max_depth = random() % 10 + 1; // randomly pick a `max_depth` within [1, 10]
+  gen_init__(); // write generated test cases into a buffer, see function `out`
 
   *out_buf = mutated_out;
   return mutated_size;
