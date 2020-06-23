@@ -39,7 +39,7 @@ void out(const char s) {
       return;
 
   if (unlikely(mutated_size >= data->fuzz_size)) {
-    mutated_out = maybe_grow(BUF_PARAMS(data, fuzz), 1);
+    mutated_out = maybe_grow(BUF_PARAMS(data, fuzz), mutated_size + 1);
   }
 
   mutated_out[mutated_size++] = s;
@@ -109,7 +109,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
 
   // Randomly generate a JSON string
   mutated_size = 0; // reset the buffer
-  max_depth = random() % 10 + 1; // randomly pick a `max_depth` within [1, 10]
+  max_depth = random() % 15 + 1; // randomly pick a `max_depth` within [1, 15]
   gen_init__(); // write generated test cases into a buffer, see function `out`
 
   *out_buf = mutated_out;

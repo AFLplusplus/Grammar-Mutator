@@ -59,6 +59,7 @@ int main(int argc, char const *argv[]) {
   for (int i = 0; i < 100; ++i) {
     buf_size = mutator->afl_custom_fuzz(
       mutator->data, NULL, 0, &buf, NULL, 0, 4096);
+    printf("=====%d=====\n", i + 1);
     dump_test_case(buf, buf_size);
   }
 
