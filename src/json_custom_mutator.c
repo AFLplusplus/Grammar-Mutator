@@ -1,13 +1,16 @@
 #define _LARGEFILE64_SOURCE
 #define _FILE_OFFSET_BITS 64
 
-#include "custom_mutator_helpers.h"
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+
+// AFL++
+#include <alloc-inl.h>
+
+#include "common.h"
 
 #define INIT_SIZE (100)
 

@@ -74,19 +74,11 @@ class Sanitize:
 
 class CTrans(Sanitize):
     def split_tokens(self, t, grammar):
-        if t in grammar: return [t]
+        if t in grammar:
+            return [t]
         my_tokens = []
-        esc = {
-           '\r': '\\r',
-           '\n': '\\n',
-           '\t': '\\t',
-           '\\': '\\\\',
-        }
         for i in t:
-            #if i in esc:
-            #    my_tokens.append(esc[i])
-            #else:
-                my_tokens.append(i)
+            my_tokens.append(i)
         return my_tokens
 
 
@@ -226,6 +218,7 @@ class PyCompiledFuzzer(PooledFuzzer):
         t = t.replace('\b', '\\b')
         t = t.replace('\v', '\\v')
         t = t.replace("'", "\\'")
+        t = t.replace('"', '\\"')
         return t
 
     def k_to_s(self, k): return k[1:-1].replace('-', '_')
@@ -370,14 +363,21 @@ class CFuzzer(PyRecCompiledFuzzer):
     def gen_rule_src(self, rule, key, i):
         res = []
         for token in rule:
+            print("[h1994st]")
+            print(rule)
+            print(token)
             if token in self.grammar:
                 res.append('gen_%s(depth +1);' % self.k_to_s(token))
             else:
-                res.append("out('%s');" % self.esc_char(token))
+                esc_token_chars = [self.esc_char(c) for c in token]
+                esc_token = ''.join(esc_token_chars)
+                res.append("out(\"%s\", %d);" % (esc_token, len(esc_token_chars)))
         return '\n        '.join(res)
 
     def gen_alt_src(self, k):
         rules = self.grammar[k]
+        print("rules:")
+        print(rules)
         cheap_strings = self.pool_of_strings[k]
         result = ['''
 void gen_%(name)s(int depth) {
@@ -385,9 +385,7 @@ void gen_%(name)s(int depth) {
         int val = map(%(num_cheap_strings)d);
         const char* str = pool_%(name)s[val];
         const int str_l = pool_l_%(name)s[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -433,8 +431,8 @@ int map(int v) {
  '''
     def fn_out_def(self):
         return '''
-void out(const char s) {
-    fputc(s, stdout);
+void out(const char* str, const int str_l) {
+    fprintf(stdout, "%.*s", str_l, str);
 }
  '''
 
@@ -448,7 +446,7 @@ void out(const char s) {
 
     def fuzz_out_var_defs(self):
         return '''
-void out(const char s);'''
+void out(const char* str, const int str_l);'''
 
     def fuzz_rand_var_defs(self):
         return '''
@@ -510,7 +508,7 @@ void gen_init__();'''
         return '''
 void gen_init__() {
     gen_start(0);
-    out('\\n');
+    out("\\n", 1);
     return;
 }'''
 
@@ -545,7 +543,13 @@ void gen_init__() {
 
 
 def main(grammar, name):
-    c_grammar = CTrans(grammar).translate()
+    # print(grammar)
+    # print('==========')
+    # c_grammar = CTrans(grammar).translate()
+    # print(c_grammar)
+    # print('==========')
+
+    c_grammar = grammar
 
     main_src, fuzz_src = CFuzzer(c_grammar).fuzz_src()
     with open(name + '_c_fuzz.c', 'w') as f:
