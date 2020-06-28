@@ -38,15 +38,17 @@ int map(int v) {
 size_t mutated_size_max = 0;
 size_t mutated_size = 0;
 uint8_t *mutated_out = NULL;
-void out(const char s) {
+void out(const char* str, const int str_l) {
   if (mutated_size >= mutated_size_max)
       return;
 
   if (unlikely(mutated_size >= data->fuzz_size)) {
-    mutated_out = maybe_grow(BUF_PARAMS(data, fuzz), mutated_size + 1);
+    mutated_out = maybe_grow(BUF_PARAMS(data, fuzz), mutated_size + str_l);
   }
 
-  mutated_out[mutated_size++] = s;
+  memcpy(mutated_out + mutated_size, str, str_l);
+
+  mutated_size += str_l;
 }
 
 /**

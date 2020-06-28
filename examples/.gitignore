@@ -1,0 +1,6 @@
+# F1 fuzzer
+*_c_fuzz.c
+*_c_main.c
+
+# any directories
+*/*

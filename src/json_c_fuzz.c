@@ -5,7 +5,7 @@
 #include <string.h>
 
 
-void out(const char s);
+void out(const char* str, const int str_l);
 
 int map(int v);
 
@@ -45,16 +45,16 @@ const char* pool_start[] =  {"null", "true", "false"};
 const int pool_l_start[] =  {4, 4, 5};
 
 
-const char* pool_json[] =  {"false", "true", "null"};
-const int pool_l_json[] =  {5, 4, 4};
+const char* pool_json[] =  {"null", "false", "true"};
+const int pool_l_json[] =  {4, 5, 4};
 
 
-const char* pool_element[] =  {"true", "false", "null"};
-const int pool_l_element[] =  {4, 5, 4};
+const char* pool_element[] =  {"true", "null", "false"};
+const int pool_l_element[] =  {4, 4, 5};
 
 
-const char* pool_value[] =  {"true", "false", "null"};
-const int pool_l_value[] =  {4, 5, 4};
+const char* pool_value[] =  {"false", "true", "null"};
+const int pool_l_value[] =  {5, 4, 4};
 
 
 const char* pool_object[] =  {"{}"};
@@ -65,16 +65,16 @@ const char* pool_members[] =  {"\"\":true", "\"\":null", "\"\":false"};
 const int pool_l_members[] =  {7, 7, 8};
 
 
-const char* pool_member[] =  {"\"\":null", "\"\":false", "\"\":true"};
-const int pool_l_member[] =  {7, 8, 7};
+const char* pool_member[] =  {"\"\":false", "\"\":null", "\"\":true"};
+const int pool_l_member[] =  {8, 7, 7};
 
 
 const char* pool_array[] =  {"[]"};
 const int pool_l_array[] =  {2};
 
 
-const char* pool_elements[] =  {"false", "null", "true"};
-const int pool_l_elements[] =  {5, 4, 4};
+const char* pool_elements[] =  {"null", "true", "false"};
+const int pool_l_elements[] =  {4, 4, 5};
 
 
 const char* pool_string[] =  {"\"\""};
@@ -85,15 +85,15 @@ const char* pool_characters[] =  {""};
 const int pool_l_characters[] =  {0};
 
 
-const char* pool_character[] =  {"v", "d", "H", "r", "w", "4", "F", ",", ":", "8", "N", "a", "x", "[", "]", "k", "f", "l", "2", "i", "|", "K", "b", "#", "*", "~", "y", "`", "Y", "Q", "<", "e", "+", "j", "&", "J", "C", "M", "s", "S", "$", ".", "=", "/", "\"", ")", "L", "P", "^", "u", "@", "5", "I", "G", "h", "}", "n", "9", "o", "U", "W", " ", "Z", "g", "p", "E", "q", "T", "7", "0", "?", "D", "-", "%", "!", "A", "O", "6", "_", "c", "t", "B", "3", "V", "{", ";", ">", "X", "1", "R", "(", "m", "z"};
+const char* pool_character[] =  {"^", "N", "S", "5", "l", "B", ",", "\"", "m", "Z", "6", "%", "q", "t", "h", "4", "T", "Q", "k", "8", "e", "x", ";", "s", "V", "_", "P", "G", "2", "D", "z", "-", "r", "`", "o", ".", " ", ":", "v", "y", "=", "g", "j", "w", "J", "U", "p", "1", "u", "K", "[", "!", "C", "]", "?", "M", "W", "}", "(", "@", "|", "#", "X", "*", "n", "O", "R", "9", "{", "b", ")", ">", "f", "A", "$", "&", "+", "E", "3", "F", "Y", "/", "H", "I", "a", "<", "c", "L", "d", "7", "0", "~", "i"};
 const int pool_l_character[] =  {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 
-const char* pool_esc[] =  {"\\\\", "\\\"", "\\r", "\\n", "\\t", "\\f", "\\b"};
+const char* pool_esc[] =  {"\\\"", "\\n", "\\\\", "\\b", "\\r", "\\t", "\\f"};
 const int pool_l_esc[] =  {2, 2, 2, 2, 2, 2, 2};
 
 
-const char* pool_escc[] =  {"n", "\"", "\\", "t", "b", "r", "f"};
+const char* pool_escc[] =  {"b", "\"", "\\", "t", "r", "f", "n"};
 const int pool_l_escc[] =  {1, 1, 1, 1, 1, 1, 1};
 
 
@@ -113,7 +113,7 @@ const char* pool_digit[] =  {"0"};
 const int pool_l_digit[] =  {1};
 
 
-const char* pool_onenine[] =  {"9", "8", "3", "7", "5", "1", "2", "6", "4"};
+const char* pool_onenine[] =  {"9", "1", "2", "3", "6", "8", "5", "7", "4"};
 const int pool_l_onenine[] =  {1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 
@@ -125,24 +125,24 @@ const char* pool_exp[] =  {""};
 const int pool_l_exp[] =  {0};
 
 
-const char* pool_sign[] =  {"-", "", "+"};
-const int pool_l_sign[] =  {1, 0, 1};
+const char* pool_sign[] =  {"-", "+", ""};
+const int pool_l_sign[] =  {1, 1, 0};
 
 
 const char* pool_ws[] =  {""};
 const int pool_l_ws[] =  {0};
 
 
-const char* pool_sp1[] =  {"\t", "\r", "\n", " "};
+const char* pool_sp1[] =  {"\n", "\t", " ", "\r"};
 const int pool_l_sp1[] =  {1, 1, 1, 1};
 
 
-const char* pool_symbol[] =  {",\"\":null", ",\"\":false", ",\"\":true"};
-const int pool_l_symbol[] =  {8, 9, 8};
+const char* pool_symbol[] =  {",\"\":true", ",\"\":null", ",\"\":false"};
+const int pool_l_symbol[] =  {8, 8, 9};
 
 
-const char* pool_symbol_1[] =  {",null", ",false", ",true"};
-const int pool_l_symbol_1[] =  {5, 6, 5};
+const char* pool_symbol_1[] =  {",null", ",true", ",false"};
+const int pool_l_symbol_1[] =  {5, 5, 6};
 
 
 const char* pool_symbol_2[] =  {""};
@@ -166,9 +166,7 @@ void gen_start(int depth) {
         int val = map(3);
         const char* str = pool_start[val];
         const int str_l = pool_l_start[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -188,9 +186,7 @@ void gen_json(int depth) {
         int val = map(3);
         const char* str = pool_json[val];
         const int str_l = pool_l_json[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -210,9 +206,7 @@ void gen_element(int depth) {
         int val = map(3);
         const char* str = pool_element[val];
         const int str_l = pool_l_element[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -234,9 +228,7 @@ void gen_value(int depth) {
         int val = map(3);
         const char* str = pool_value[val];
         const int str_l = pool_l_value[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -244,25 +236,15 @@ void gen_value(int depth) {
     switch(val) {
 
     case 0:
-        out('f');
-        out('a');
-        out('l');
-        out('s');
-        out('e');
+        out("false", 5);
         break;
 
     case 1:
-        out('n');
-        out('u');
-        out('l');
-        out('l');
+        out("null", 4);
         break;
 
     case 2:
-        out('t');
-        out('r');
-        out('u');
-        out('e');
+        out("true", 4);
         break;
 
     case 3:
@@ -290,9 +272,7 @@ void gen_object(int depth) {
         int val = map(1);
         const char* str = pool_object[val];
         const int str_l = pool_l_object[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -300,15 +280,15 @@ void gen_object(int depth) {
     switch(val) {
 
     case 0:
-        out('{');
+        out("{", 1);
         gen_ws(depth +1);
-        out('}');
+        out("}", 1);
         break;
 
     case 1:
-        out('{');
+        out("{", 1);
         gen_members(depth +1);
-        out('}');
+        out("}", 1);
         break;
 
     }
@@ -320,9 +300,7 @@ void gen_members(int depth) {
         int val = map(3);
         const char* str = pool_members[val];
         const int str_l = pool_l_members[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -343,9 +321,7 @@ void gen_member(int depth) {
         int val = map(3);
         const char* str = pool_member[val];
         const int str_l = pool_l_member[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -356,7 +332,7 @@ void gen_member(int depth) {
         gen_ws(depth +1);
         gen_string(depth +1);
         gen_ws(depth +1);
-        out(':');
+        out(":", 1);
         gen_element(depth +1);
         break;
 
@@ -369,9 +345,7 @@ void gen_array(int depth) {
         int val = map(1);
         const char* str = pool_array[val];
         const int str_l = pool_l_array[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -379,15 +353,15 @@ void gen_array(int depth) {
     switch(val) {
 
     case 0:
-        out('[');
+        out("[", 1);
         gen_ws(depth +1);
-        out(']');
+        out("]", 1);
         break;
 
     case 1:
-        out('[');
+        out("[", 1);
         gen_elements(depth +1);
-        out(']');
+        out("]", 1);
         break;
 
     }
@@ -399,9 +373,7 @@ void gen_elements(int depth) {
         int val = map(3);
         const char* str = pool_elements[val];
         const int str_l = pool_l_elements[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -422,9 +394,7 @@ void gen_string(int depth) {
         int val = map(1);
         const char* str = pool_string[val];
         const int str_l = pool_l_string[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -432,9 +402,9 @@ void gen_string(int depth) {
     switch(val) {
 
     case 0:
-        out('"');
+        out("\"", 1);
         gen_characters(depth +1);
-        out('"');
+        out("\"", 1);
         break;
 
     }
@@ -446,9 +416,7 @@ void gen_characters(int depth) {
         int val = map(1);
         const char* str = pool_characters[val];
         const int str_l = pool_l_characters[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -468,9 +436,7 @@ void gen_character(int depth) {
         int val = map(93);
         const char* str = pool_character[val];
         const int str_l = pool_l_character[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -478,375 +444,375 @@ void gen_character(int depth) {
     switch(val) {
 
     case 0:
-        out(' ');
+        out(" ", 1);
         break;
 
     case 1:
-        out('!');
+        out("!", 1);
         break;
 
     case 2:
-        out('"');
+        out("\"", 1);
         break;
 
     case 3:
-        out('#');
+        out("#", 1);
         break;
 
     case 4:
-        out('$');
+        out("$", 1);
         break;
 
     case 5:
-        out('%');
+        out("%", 1);
         break;
 
     case 6:
-        out('&');
+        out("&", 1);
         break;
 
     case 7:
-        out('(');
+        out("(", 1);
         break;
 
     case 8:
-        out(')');
+        out(")", 1);
         break;
 
     case 9:
-        out('*');
+        out("*", 1);
         break;
 
     case 10:
-        out('+');
+        out("+", 1);
         break;
 
     case 11:
-        out(',');
+        out(",", 1);
         break;
 
     case 12:
-        out('-');
+        out("-", 1);
         break;
 
     case 13:
-        out('.');
+        out(".", 1);
         break;
 
     case 14:
-        out('/');
+        out("/", 1);
         break;
 
     case 15:
-        out('0');
+        out("0", 1);
         break;
 
     case 16:
-        out('1');
+        out("1", 1);
         break;
 
     case 17:
-        out('2');
+        out("2", 1);
         break;
 
     case 18:
-        out('3');
+        out("3", 1);
         break;
 
     case 19:
-        out('4');
+        out("4", 1);
         break;
 
     case 20:
-        out('5');
+        out("5", 1);
         break;
 
     case 21:
-        out('6');
+        out("6", 1);
         break;
 
     case 22:
-        out('7');
+        out("7", 1);
         break;
 
     case 23:
-        out('8');
+        out("8", 1);
         break;
 
     case 24:
-        out('9');
+        out("9", 1);
         break;
 
     case 25:
-        out(':');
+        out(":", 1);
         break;
 
     case 26:
-        out(';');
+        out(";", 1);
         break;
 
     case 27:
-        out('<');
+        out("<", 1);
         break;
 
     case 28:
-        out('=');
+        out("=", 1);
         break;
 
     case 29:
-        out('>');
+        out(">", 1);
         break;
 
     case 30:
-        out('?');
+        out("?", 1);
         break;
 
     case 31:
-        out('@');
+        out("@", 1);
         break;
 
     case 32:
-        out('A');
+        out("A", 1);
         break;
 
     case 33:
-        out('B');
+        out("B", 1);
         break;
 
     case 34:
-        out('C');
+        out("C", 1);
         break;
 
     case 35:
-        out('D');
+        out("D", 1);
         break;
 
     case 36:
-        out('E');
+        out("E", 1);
         break;
 
     case 37:
-        out('F');
+        out("F", 1);
         break;
 
     case 38:
-        out('G');
+        out("G", 1);
         break;
 
     case 39:
-        out('H');
+        out("H", 1);
         break;
 
     case 40:
-        out('I');
+        out("I", 1);
         break;
 
     case 41:
-        out('J');
+        out("J", 1);
         break;
 
     case 42:
-        out('K');
+        out("K", 1);
         break;
 
     case 43:
-        out('L');
+        out("L", 1);
         break;
 
     case 44:
-        out('M');
+        out("M", 1);
         break;
 
     case 45:
-        out('N');
+        out("N", 1);
         break;
 
     case 46:
-        out('O');
+        out("O", 1);
         break;
 
     case 47:
-        out('P');
+        out("P", 1);
         break;
 
     case 48:
-        out('Q');
+        out("Q", 1);
         break;
 
     case 49:
-        out('R');
+        out("R", 1);
         break;
 
     case 50:
-        out('S');
+        out("S", 1);
         break;
 
     case 51:
-        out('T');
+        out("T", 1);
         break;
 
     case 52:
-        out('U');
+        out("U", 1);
         break;
 
     case 53:
-        out('V');
+        out("V", 1);
         break;
 
     case 54:
-        out('W');
+        out("W", 1);
         break;
 
     case 55:
-        out('X');
+        out("X", 1);
         break;
 
     case 56:
-        out('Y');
+        out("Y", 1);
         break;
 
     case 57:
-        out('Z');
+        out("Z", 1);
         break;
 
     case 58:
-        out('[');
+        out("[", 1);
         break;
 
     case 59:
-        out(']');
+        out("]", 1);
         break;
 
     case 60:
-        out('^');
+        out("^", 1);
         break;
 
     case 61:
-        out('_');
+        out("_", 1);
         break;
 
     case 62:
-        out('`');
+        out("`", 1);
         break;
 
     case 63:
-        out('a');
+        out("a", 1);
         break;
 
     case 64:
-        out('b');
+        out("b", 1);
         break;
 
     case 65:
-        out('c');
+        out("c", 1);
         break;
 
     case 66:
-        out('d');
+        out("d", 1);
         break;
 
     case 67:
-        out('e');
+        out("e", 1);
         break;
 
     case 68:
-        out('f');
+        out("f", 1);
         break;
 
     case 69:
-        out('g');
+        out("g", 1);
         break;
 
     case 70:
-        out('h');
+        out("h", 1);
         break;
 
     case 71:
-        out('i');
+        out("i", 1);
         break;
 
     case 72:
-        out('j');
+        out("j", 1);
         break;
 
     case 73:
-        out('k');
+        out("k", 1);
         break;
 
     case 74:
-        out('l');
+        out("l", 1);
         break;
 
     case 75:
-        out('m');
+        out("m", 1);
         break;
 
     case 76:
-        out('n');
+        out("n", 1);
         break;
 
     case 77:
-        out('o');
+        out("o", 1);
         break;
 
     case 78:
-        out('p');
+        out("p", 1);
         break;
 
     case 79:
-        out('q');
+        out("q", 1);
         break;
 
     case 80:
-        out('r');
+        out("r", 1);
         break;
 
     case 81:
-        out('s');
+        out("s", 1);
         break;
 
     case 82:
-        out('t');
+        out("t", 1);
         break;
 
     case 83:
-        out('u');
+        out("u", 1);
         break;
 
     case 84:
-        out('v');
+        out("v", 1);
         break;
 
     case 85:
-        out('w');
+        out("w", 1);
         break;
 
     case 86:
-        out('x');
+        out("x", 1);
         break;
 
     case 87:
-        out('y');
+        out("y", 1);
         break;
 
     case 88:
-        out('z');
+        out("z", 1);
         break;
 
     case 89:
-        out('{');
+        out("{", 1);
         break;
 
     case 90:
-        out('|');
+        out("|", 1);
         break;
 
     case 91:
-        out('}');
+        out("}", 1);
         break;
 
     case 92:
-        out('~');
+        out("~", 1);
         break;
 
     case 93:
@@ -862,9 +828,7 @@ void gen_esc(int depth) {
         int val = map(7);
         const char* str = pool_esc[val];
         const int str_l = pool_l_esc[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -872,7 +836,7 @@ void gen_esc(int depth) {
     switch(val) {
 
     case 0:
-        out('\\');
+        out("\\", 1);
         gen_escc(depth +1);
         break;
 
@@ -885,9 +849,7 @@ void gen_escc(int depth) {
         int val = map(7);
         const char* str = pool_escc[val];
         const int str_l = pool_l_escc[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -895,31 +857,31 @@ void gen_escc(int depth) {
     switch(val) {
 
     case 0:
-        out('"');
+        out("\"", 1);
         break;
 
     case 1:
-        out('\\');
+        out("\\", 1);
         break;
 
     case 2:
-        out('b');
+        out("b", 1);
         break;
 
     case 3:
-        out('f');
+        out("f", 1);
         break;
 
     case 4:
-        out('n');
+        out("n", 1);
         break;
 
     case 5:
-        out('r');
+        out("r", 1);
         break;
 
     case 6:
-        out('t');
+        out("t", 1);
         break;
 
     }
@@ -931,9 +893,7 @@ void gen_number(int depth) {
         int val = map(1);
         const char* str = pool_number[val];
         const int str_l = pool_l_number[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -955,9 +915,7 @@ void gen_int(int depth) {
         int val = map(1);
         const char* str = pool_int[val];
         const int str_l = pool_l_int[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -969,12 +927,12 @@ void gen_int(int depth) {
         break;
 
     case 1:
-        out('-');
+        out("-", 1);
         gen_digits(depth +1);
         break;
 
     case 2:
-        out('-');
+        out("-", 1);
         gen_onenine(depth +1);
         gen_digits(depth +1);
         break;
@@ -993,9 +951,7 @@ void gen_digits(int depth) {
         int val = map(1);
         const char* str = pool_digits[val];
         const int str_l = pool_l_digits[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1015,9 +971,7 @@ void gen_digit(int depth) {
         int val = map(1);
         const char* str = pool_digit[val];
         const int str_l = pool_l_digit[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1025,7 +979,7 @@ void gen_digit(int depth) {
     switch(val) {
 
     case 0:
-        out('0');
+        out("0", 1);
         break;
 
     case 1:
@@ -1041,9 +995,7 @@ void gen_onenine(int depth) {
         int val = map(9);
         const char* str = pool_onenine[val];
         const int str_l = pool_l_onenine[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1051,39 +1003,39 @@ void gen_onenine(int depth) {
     switch(val) {
 
     case 0:
-        out('1');
+        out("1", 1);
         break;
 
     case 1:
-        out('2');
+        out("2", 1);
         break;
 
     case 2:
-        out('3');
+        out("3", 1);
         break;
 
     case 3:
-        out('4');
+        out("4", 1);
         break;
 
     case 4:
-        out('5');
+        out("5", 1);
         break;
 
     case 5:
-        out('6');
+        out("6", 1);
         break;
 
     case 6:
-        out('7');
+        out("7", 1);
         break;
 
     case 7:
-        out('8');
+        out("8", 1);
         break;
 
     case 8:
-        out('9');
+        out("9", 1);
         break;
 
     }
@@ -1095,9 +1047,7 @@ void gen_frac(int depth) {
         int val = map(1);
         const char* str = pool_frac[val];
         const int str_l = pool_l_frac[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1109,7 +1059,7 @@ void gen_frac(int depth) {
         break;
 
     case 1:
-        out('.');
+        out(".", 1);
         gen_digits(depth +1);
         break;
 
@@ -1122,9 +1072,7 @@ void gen_exp(int depth) {
         int val = map(1);
         const char* str = pool_exp[val];
         const int str_l = pool_l_exp[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1136,13 +1084,13 @@ void gen_exp(int depth) {
         break;
 
     case 1:
-        out('E');
+        out("E", 1);
         gen_sign(depth +1);
         gen_digits(depth +1);
         break;
 
     case 2:
-        out('e');
+        out("e", 1);
         gen_sign(depth +1);
         gen_digits(depth +1);
         break;
@@ -1156,9 +1104,7 @@ void gen_sign(int depth) {
         int val = map(3);
         const char* str = pool_sign[val];
         const int str_l = pool_l_sign[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1170,11 +1116,11 @@ void gen_sign(int depth) {
         break;
 
     case 1:
-        out('+');
+        out("+", 1);
         break;
 
     case 2:
-        out('-');
+        out("-", 1);
         break;
 
     }
@@ -1186,9 +1132,7 @@ void gen_ws(int depth) {
         int val = map(1);
         const char* str = pool_ws[val];
         const int str_l = pool_l_ws[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1213,9 +1157,7 @@ void gen_sp1(int depth) {
         int val = map(4);
         const char* str = pool_sp1[val];
         const int str_l = pool_l_sp1[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1223,19 +1165,19 @@ void gen_sp1(int depth) {
     switch(val) {
 
     case 0:
-        out('\t');
+        out("\t", 1);
         break;
 
     case 1:
-        out('\n');
+        out("\n", 1);
         break;
 
     case 2:
-        out('\r');
+        out("\r", 1);
         break;
 
     case 3:
-        out(' ');
+        out(" ", 1);
         break;
 
     }
@@ -1247,9 +1189,7 @@ void gen_symbol(int depth) {
         int val = map(3);
         const char* str = pool_symbol[val];
         const int str_l = pool_l_symbol[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1257,7 +1197,7 @@ void gen_symbol(int depth) {
     switch(val) {
 
     case 0:
-        out(',');
+        out(",", 1);
         gen_members(depth +1);
         break;
 
@@ -1270,9 +1210,7 @@ void gen_symbol_1(int depth) {
         int val = map(3);
         const char* str = pool_symbol_1[val];
         const int str_l = pool_l_symbol_1[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1280,7 +1218,7 @@ void gen_symbol_1(int depth) {
     switch(val) {
 
     case 0:
-        out(',');
+        out(",", 1);
         gen_elements(depth +1);
         break;
 
@@ -1293,9 +1231,7 @@ void gen_symbol_2(int depth) {
         int val = map(1);
         const char* str = pool_symbol_2[val];
         const int str_l = pool_l_symbol_2[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1320,9 +1256,7 @@ void gen_symbol_1_1(int depth) {
         int val = map(1);
         const char* str = pool_symbol_1_1[val];
         const int str_l = pool_l_symbol_1_1[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1347,9 +1281,7 @@ void gen_character_1(int depth) {
         int val = map(1);
         const char* str = pool_character_1[val];
         const int str_l = pool_l_character_1[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1374,9 +1306,7 @@ void gen_digit_1(int depth) {
         int val = map(1);
         const char* str = pool_digit_1[val];
         const int str_l = pool_l_digit_1[val];
-        for (int i = 0; i < str_l; i++) {
-            out(str[i]);
-        }
+        out(str, str_l);
         return;
     }
 
@@ -1398,6 +1328,6 @@ void gen_digit_1(int depth) {
 
 void gen_init__() {
     gen_start(0);
-    out('\n');
+    out("\n", 1);
     return;
 }

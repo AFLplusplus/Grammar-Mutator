@@ -10,7 +10,7 @@ static void usage(const char *name) {
 }
 
 static void dump_test_case(u8 *buf, size_t buf_size) {
-  printf("%.*s", (int) buf_size, buf);
+  printf("%.*s\n", (int) buf_size, buf);
 }
 
 int main(int argc, char const *argv[]) {
