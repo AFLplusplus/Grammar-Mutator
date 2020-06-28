@@ -26,28 +26,9 @@ void _node_to_buf(parsing_tree_t *tree, node_t *node) {
     return;
   }
 
-  // LIST_FOREACH(&node->subnodes, node_t, {
-  //   _node_to_buf(tree, el);
-  // });
-
-  do {
-
-    list_t *   li = (&node->subnodes);
-    element_t *head = get_head((li));
-    element_t *el_box = (head)->next;
-    if (!el_box)
-      FATAL("foreach over uninitialized list");
-    while (el_box != head) {
-
-      node_t *el = (node_t *)((el_box)->data);
-      /* get next so el_box can be unlinked */
-      element_t *next = el_box->next;
-      _node_to_buf(tree, el);
-      el_box = next;
-
-    }
-
-  } while (0);
+  LIST_FOREACH(&node->subnodes, node_t, {
+    _node_to_buf(tree, el);
+  });
 }
 
 void tree_to_buf(parsing_tree_t *tree) {

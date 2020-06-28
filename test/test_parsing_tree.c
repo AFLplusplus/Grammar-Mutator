@@ -47,8 +47,10 @@ int main() {
 
   tree_to_buf(&tree);
 
-  if (memcmp("true", tree.data_buf, tree.data_size) != 0)
+  if (memcmp(" true", tree.data_buf, tree.data_len) != 0) {
+    fprintf(stderr, "%.*s\n", (int)tree.data_len, tree.data_buf);
     return 1;
+  }
 
   return 0;
 }
