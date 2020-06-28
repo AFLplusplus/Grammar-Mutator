@@ -1,0 +1,8 @@
+{
+    "<start>": [["<json>"]],
+    "<json>": [["<element>"]],
+    "<element>": [["<ws>", "<value>", "<ws>"]],
+    "<value>": [["true"], ["false"], ["null"]],
+    "<ws>": [["<sp1>", "<ws>"], []],
+    "<sp1>": [[" "],["\n"],["\t"],["\r"]]
+}

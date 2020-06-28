@@ -30,18 +30,26 @@ typedef struct tree_node {
 node_t *node_create();
 
 /**
- * Destroy the node and recursively free all memory
- * @param node The node
- */
-void node_free(node_t *node);
-
-/**
  * Create a node and allocate the memory with a given value
  * @param  val_buf  The buffer of the attached value
  * @param  val_size The size of the attached value
  * @return          A newly created node
  */
 node_t *node_create_with_val(const uint8_t *val_buf, size_t val_size);
+
+/**
+ * Destroy the node and recursively free all memory
+ * @param node The node
+ */
+void node_free(node_t *node);
+
+/**
+ * Set the concrete value for the node
+ * @param node     The node
+ * @param val_buf  The buffer of the attached value
+ * @param val_size The size of the attached value
+ */
+void node_set_val(node_t *node, const uint8_t *val_buf, size_t val_size);
 
 /**
  * Append a child node `subnode` to a parent node `node`

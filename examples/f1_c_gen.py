@@ -364,27 +364,33 @@ class CFuzzer(PyRecCompiledFuzzer):
         res = []
         for token in rule:
             if token in self.grammar:
-                res.append('gen_%s(depth +1);' % self.k_to_s(token))
+                res.append('subnode = gen_%s(depth +1);' % self.k_to_s(token))
+                res.append("node_append_subnode(node, subnode);")
             else:
                 esc_token_chars = [self.esc_char(c) for c in token]
                 esc_token = ''.join(esc_token_chars)
-                res.append("out(\"%s\", %d);" % (esc_token, len(esc_token_chars)))
+                res.append(
+                    "node_set_val(node, \"%s\", %d);" % (
+                        esc_token, len(esc_token_chars)))
         return '\n        '.join(res)
 
     def gen_alt_src(self, k):
         rules = self.grammar[k]
         cheap_strings = self.pool_of_strings[k]
         result = ['''
-void gen_%(name)s(int depth) {
+node_t *gen_%(name)s(int depth) {
+    node_t *node = node_create();
+
     if (depth > max_depth) {
         int val = map(%(num_cheap_strings)d);
         const char* str = pool_%(name)s[val];
         const int str_l = pool_l_%(name)s[val];
-        out(str, str_l);
-        return;
+        node_set_val(node, str, str_l);
+        return node;
     }
 
     int val = map(%(nrules)d);
+    node_t *subnode = NULL;
     switch(val) {''' % {'name':self.k_to_s(k), 'nrules':len(rules),
                         'num_cheap_strings': len(cheap_strings),
                        }]
@@ -395,6 +401,8 @@ void gen_%(name)s(int depth) {
         break;''' % (i, self.gen_rule_src(rule, k, i)))
         result.append('''
     }
+
+    return node;
 }
     ''')
         return '\n'.join(result)
@@ -415,19 +423,13 @@ const int pool_l_%(k)s[] =  {%(cheap_strings_len)s};
     def fn_fuzz_decs(self):
         result = []
         for k in self.grammar:
-            result.append('''void gen_%s(int depth);''' % self.k_to_s(k))
+            result.append('''node_t *gen_%s(int depth);''' % self.k_to_s(k))
         return '\n'.join(result)
 
     def fn_map_def(self):
         return '''
 int map(int v) {
     return random() % v;
-}
- '''
-    def fn_out_def(self):
-        return '''
-void out(const char* str, const int str_l) {
-    fprintf(stdout, "%.*s", str_l, str);
 }
  '''
 
@@ -437,11 +439,10 @@ void out(const char* str, const int str_l) {
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+
+#include "parsing_tree.h"
 '''
 
-    def fuzz_out_var_defs(self):
-        return '''
-void out(const char* str, const int str_l);'''
 
     def fuzz_rand_var_defs(self):
         return '''
@@ -451,7 +452,7 @@ int map(int v);'''
 extern int max_depth;'''
 
     def fuzz_var_defs(self):
-        return '\n'.join([self.fuzz_out_var_defs(), self.fuzz_rand_var_defs(), self.fuzz_stack_var_defs()])
+        return '\n'.join([self.fuzz_rand_var_defs(), self.fuzz_stack_var_defs()])
 
     def fn_main_input_frag(self):
         return '''
@@ -466,7 +467,10 @@ extern int max_depth;'''
     def fn_main_loop_frag(self):
         return '''
     for(int i=0; i < max_num; i++) {
-        gen_init__();
+        parsing_tree_t *tree = gen_init__();
+        tree_to_buf(tree);
+        printf("%.*s\\n", (int)tree->data_len, tree->data_buf);
+        tree_free(tree);
     }'''
 
     def fn_main_def(self):
@@ -474,7 +478,6 @@ extern int max_depth;'''
 int main(int argc, char** argv) {
     int seed, max_num;
 %(input_frag)s
-    //srandom(time(0));
     srandom(seed);
 %(loop_frag)s
     return 0;
@@ -488,7 +491,7 @@ int max_depth = 0;'''
 
     def main_init_var_defs(self):
         return '''
-void gen_init__();'''
+parsing_tree_t *gen_init__();'''
 
     def main_var_defs(self):
         return '\n'.join([self.main_stack_var_defs(), self.main_init_var_defs()])
@@ -501,10 +504,10 @@ void gen_init__();'''
 
     def fuzz_entry(self):
         return '''
-void gen_init__() {
-    gen_start(0);
-    out("\\n", 1);
-    return;
+parsing_tree_t *gen_init__() {
+    parsing_tree_t *tree = tree_create();
+    tree->root = gen_start(0);
+    return tree;
 }'''
 
     def main_hdefs(self):
@@ -516,13 +519,14 @@ void gen_init__() {
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+
+#include "parsing_tree.h"
 '''
 
     def gen_main_src(self):
         return '\n'.join([self.main_hdefs(),
                           self.main_var_defs(),
                           self.fn_map_def(),
-                          self.fn_out_def(),
                           self.fn_main_def()])
 
     def gen_fuzz_src(self):

@@ -10,8 +10,7 @@ inline node_t *node_create() {
 node_t *node_create_with_val(const uint8_t *val_buf, size_t val_size) {
   node_t *node = node_create();
 
-  node->val_buf = malloc(val_size * sizeof(uint8_t));
-  memcpy(node->val_buf, val_buf, val_size);
+  node_set_val(node, val_buf, val_size);
 
   return node;
 }
@@ -32,6 +31,12 @@ void node_free(node_t *node) {
   }
 
   free(node);
+}
+
+void node_set_val(node_t *node, const uint8_t *val_buf, size_t val_size) {
+  node->val_buf = malloc(val_size * sizeof(uint8_t));
+  node->val_size = val_size;
+  memcpy(node->val_buf, val_buf, val_size);
 }
 
 inline void node_append_subnode(node_t *node, node_t *subnode) {
