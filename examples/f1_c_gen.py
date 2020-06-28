@@ -363,9 +363,6 @@ class CFuzzer(PyRecCompiledFuzzer):
     def gen_rule_src(self, rule, key, i):
         res = []
         for token in rule:
-            print("[h1994st]")
-            print(rule)
-            print(token)
             if token in self.grammar:
                 res.append('gen_%s(depth +1);' % self.k_to_s(token))
             else:
@@ -376,8 +373,6 @@ class CFuzzer(PyRecCompiledFuzzer):
 
     def gen_alt_src(self, k):
         rules = self.grammar[k]
-        print("rules:")
-        print(rules)
         cheap_strings = self.pool_of_strings[k]
         result = ['''
 void gen_%(name)s(int depth) {
