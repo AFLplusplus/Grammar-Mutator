@@ -8,18 +8,19 @@
 #include <string.h>
 
 // AFL++
+#include <afl-fuzz.h>
 #include <alloc-inl.h>
 
-#include "common.h"
+#include "helpers.h"
 
 #define INIT_SIZE (100)
 
 typedef struct my_mutator {
 
-  afl_t *afl;
+  afl_state_t *afl;
 
   // Reused buffers:
-  BUF_VAR(u8, fuzz);
+  BUF_VAR(uint8_t, fuzz);
 
 } my_mutator_t;
 static my_mutator_t *data = NULL;
@@ -36,7 +37,7 @@ int map(int v) {
 
 size_t mutated_size_max = 0;
 size_t mutated_size = 0;
-u8 *mutated_out = NULL;
+uint8_t *mutated_out = NULL;
 void out(const char s) {
   if (mutated_size >= mutated_size_max)
       return;
@@ -59,7 +60,7 @@ void out(const char s) {
  *         There may be multiple instances of this mutator in one afl-fuzz run!
  *         Return NULL on error.
  */
-my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
+my_mutator_t *afl_custom_init(afl_state_t *afl, unsigned int seed) {
 
   srandom(seed);
 
@@ -94,7 +95,7 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
  * @return Size of the mutated output.
  */
 size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
-                       u8 **out_buf, uint8_t *add_buf,
+                       uint8_t **out_buf, uint8_t *add_buf,
                        size_t add_buf_size,  // add_buf can be NULL
                        size_t max_size) {
 
