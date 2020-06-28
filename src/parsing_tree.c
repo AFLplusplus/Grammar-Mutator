@@ -2,7 +2,39 @@
 
 #define TREE_BUF_PREALLOC_SIZE (64)
 
-void inline node_append_subnode(node_t *node, node_t *subnode) {
+
+inline node_t *node_create() {
+  return calloc(1, sizeof(node_t));
+}
+
+node_t *node_create_with_val(const uint8_t *val_buf, size_t val_size) {
+  node_t *node = node_create();
+
+  node->val_buf = malloc(val_size * sizeof(uint8_t));
+  memcpy(node->val_buf, val_buf, val_size);
+
+  return node;
+}
+
+void node_free(node_t *node) {
+  // val buf
+  if (node->val_buf) {
+    free(node->val_buf);
+    node->val_buf = NULL;
+    node->val_size = 0;
+  }
+
+  // subnodes
+  if (node->subnode_count != 0) {
+    LIST_FOREACH(&node->subnodes, node_t, {
+      node_free(el);
+    });
+  }
+
+  free(node);
+}
+
+inline void node_append_subnode(node_t *node, node_t *subnode) {
   list_append(&node->subnodes, subnode);
   ++node->subnode_count;
 }
@@ -29,6 +61,27 @@ void _node_to_buf(parsing_tree_t *tree, node_t *node) {
   LIST_FOREACH(&node->subnodes, node_t, {
     _node_to_buf(tree, el);
   });
+}
+
+
+
+inline parsing_tree_t *tree_create() {
+  return calloc(1, sizeof(parsing_tree_t));
+}
+
+void tree_free(parsing_tree_t *tree) {
+  // root node
+  node_free(tree->root);
+  tree->root = NULL;
+
+  // data buf
+  if (tree->data_buf) {
+    free(tree->data_buf);
+    tree->data_buf = NULL;
+    tree->data_size = 0;
+  }
+
+  free(tree);
 }
 
 void tree_to_buf(parsing_tree_t *tree) {

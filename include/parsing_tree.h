@@ -18,11 +18,39 @@ typedef struct tree_node {
   // size_t   val_size;
   BUF_VAR(uint8_t, val);
 
+  // TODO: the initial size of `list_t` may be too large
   list_t subnodes;
   size_t subnode_count;
 } node_t;
 
+/**
+ * Create a node and allocate the memory
+ * @return A newly created node
+ */
+node_t *node_create();
+
+/**
+ * Destroy the node and recursively free all memory
+ * @param node The node
+ */
+void node_free(node_t *node);
+
+/**
+ * Create a node and allocate the memory with a given value
+ * @param  val_buf  The buffer of the attached value
+ * @param  val_size The size of the attached value
+ * @return          A newly created node
+ */
+node_t *node_create_with_val(const uint8_t *val_buf, size_t val_size);
+
+/**
+ * Append a child node `subnode` to a parent node `node`
+ * @param node    The parent node
+ * @param subnode The child node
+ */
 void node_append_subnode(node_t *node, node_t *subnode);
+
+
 
 typedef struct parsing_tree {
   node_t *root;
@@ -33,6 +61,18 @@ typedef struct parsing_tree {
   BUF_VAR(uint8_t, data);
   size_t data_len;  // data_len <= data_size
 } parsing_tree_t;
+
+/**
+ * Create a tree and allocate the memory
+ * @return A newly created tree
+ */
+parsing_tree_t *tree_create();
+
+/**
+ * Destroy the tree and free all memory
+ * @param tree The parsing tree
+ */
+void tree_free(parsing_tree_t *tree);
 
 /**
  * Convert a parsing tree into a concrete test case stored in the data buffer
