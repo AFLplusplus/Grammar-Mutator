@@ -88,4 +88,12 @@ void tree_free(parsing_tree_t *tree);
  */
 void tree_to_buf(parsing_tree_t *tree);
 
+/**
+ * Parse the given buffer to construct a parsing tree
+ * @param  data_buf  The buffer of serialized data
+ * @param  data_size The size of the buffer
+ * @return           A newly created tree
+ */
+parsing_tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size);
+
 #endif
