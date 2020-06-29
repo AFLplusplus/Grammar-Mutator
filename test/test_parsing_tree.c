@@ -1,8 +1,5 @@
 #include "parsing_tree.h"
 
-// AFL++
-#include <list.h>
-
 int main() {
   int ret = 0;
   parsing_tree_t *tree = tree_create();

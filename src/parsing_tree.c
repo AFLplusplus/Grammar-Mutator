@@ -25,9 +25,15 @@ void node_free(node_t *node) {
 
   // subnodes
   if (node->subnode_count != 0) {
-    LIST_FOREACH(&node->subnodes, node_t, {
-      node_free(el);
-    });
+    node_t *subnode = node->subnodes; // subnode linked list
+    node_t *tmp = NULL;
+    while (subnode) {
+      tmp = subnode->next;
+      node_free(subnode);
+      subnode = tmp;
+    }
+    node->subnode_count = 0;
+    node->subnode_last = NULL;
   }
 
   free(node);
@@ -40,7 +46,15 @@ void node_set_val(node_t *node, const uint8_t *val_buf, size_t val_size) {
 }
 
 inline void node_append_subnode(node_t *node, node_t *subnode) {
-  list_append(&node->subnodes, subnode);
+  if (!node->subnodes) {
+    // initialize
+    node->subnodes = subnode;
+    node->subnode_last = subnode;
+  } else {
+    node->subnode_last->next = subnode;
+    node->subnode_last = subnode;
+  }
+
   ++node->subnode_count;
 }
 
@@ -63,9 +77,14 @@ void _node_to_buf(parsing_tree_t *tree, node_t *node) {
     return;
   }
 
-  LIST_FOREACH(&node->subnodes, node_t, {
-    _node_to_buf(tree, el);
-  });
+  // subnodes
+  node_t *subnode = node->subnodes; // subnode linked list
+  node_t *tmp = NULL;
+  while (subnode) {
+    tmp = subnode->next;
+    _node_to_buf(tree, subnode);
+    subnode = tmp;
+  }
 }
 
 

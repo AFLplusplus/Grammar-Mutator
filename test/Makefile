@@ -1,5 +1,3 @@
-AFLPP_ROOT ?= $(abspath ../../AFLplusplus)
-
 all: test_json_custom_mutator test_parsing_tree
 
 # Test case 1:
@@ -7,7 +5,7 @@ all: test_json_custom_mutator test_parsing_tree
 # grammar
 test_custom_mutator: test_custom_mutator.c
 	@$(MAKE) -C ../src libjsonmutator.so
-	@$(CC) $(CFLAGS) -g -I"$(AFLPP_ROOT)/include" $^ -ldl -o $@
+	@$(CC) $(CFLAGS) -g -I../include $^ -ldl -o $@
 
 test_json_custom_mutator: test_custom_mutator
 	@./test_custom_mutator $(abspath ../src/libjsonmutator.so) \
@@ -16,7 +14,7 @@ test_json_custom_mutator: test_custom_mutator
 # Test case 2:
 # test the parsing tree APIs
 test_parsing_tree: test_parsing_tree.c ../src/parsing_tree.c
-	@$(CC) $(CFLAGS) -g -I"$(AFLPP_ROOT)/include" -I../include $^ -o $@
+	@$(CC) $(CFLAGS) -g -I../include $^ -o $@
 	@./$@ && echo "test_parsing_tree: success!"
 
 clean:

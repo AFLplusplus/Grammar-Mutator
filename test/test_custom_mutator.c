@@ -1,15 +1,43 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <dlfcn.h>
 
-#include <afl-fuzz.h>
+#include "custom_mutator.h"
+
+struct custom_mutator {
+
+  const char *name;
+  void *      dh;
+  uint8_t *        post_process_buf;
+  size_t      post_process_size;
+  uint8_t          stacked_custom_prob, stacked_custom;
+
+  void *data;
+  void *(*afl_custom_init)(afl_t *afl, unsigned int seed);
+  size_t (*afl_custom_fuzz)(void *data, uint8_t *buf, size_t buf_size, uint8_t **out_buf,
+                            uint8_t *add_buf, size_t add_buf_size, size_t max_size);
+  size_t (*afl_custom_post_process)(void *data, uint8_t *buf, size_t buf_size,
+                                    uint8_t **out_buf);
+  size_t (*afl_custom_init_trim)(void *data, uint8_t *buf, size_t buf_size);
+  size_t (*afl_custom_trim)(void *data, uint8_t **out_buf);
+  size_t (*afl_custom_post_trim)(void *data, uint8_t success);
+  size_t (*afl_custom_havoc_mutation)(void *data, uint8_t *buf, size_t buf_size,
+                                      uint8_t **out_buf, size_t max_size);
+  uint8_t (*afl_custom_havoc_mutation_probability)(void *data);
+  uint8_t (*afl_custom_queue_get)(void *data, const uint8_t *filename);
+  void (*afl_custom_queue_new_entry)(void *data, const uint8_t *filename_new_queue,
+                                     const uint8_t *filename_orig_queue);
+  void (*afl_custom_deinit)(void *data);
+
+};
 
 static void usage(const char *name) {
   printf(
     "\n%s /path/to/custom/mutator/library\n\n", name);
 }
 
-static void dump_test_case(u8 *buf, size_t buf_size) {
+static void dump_test_case(uint8_t *buf, size_t buf_size) {
   printf("%.*s\n", (int) buf_size, buf);
 }
 
@@ -23,7 +51,7 @@ int main(int argc, char const *argv[]) {
   void *dh = NULL;
   void *afl = NULL;
   struct custom_mutator *mutator = NULL;
-  u8 *buf = NULL;
+  uint8_t *buf = NULL;
   size_t buf_size = 0;
 
   // Load the custom mutator library
@@ -56,7 +84,7 @@ int main(int argc, char const *argv[]) {
   // Initialize the custom mutator
   mutator->data = mutator->afl_custom_init(afl, 0); // fixed random seed
 
-  for (int i = 0; i < 100; ++i) {
+  for (int i = 0; i < 10; ++i) {
     buf_size = mutator->afl_custom_fuzz(
       mutator->data, NULL, 0, &buf, NULL, 0, 4096);
     printf("=====%d=====\n", i + 1);
@@ -67,6 +95,7 @@ int main(int argc, char const *argv[]) {
   mutator->afl_custom_deinit(mutator->data);
 
   dlclose(dh);
+  free(mutator);
 
   exit(EXIT_SUCCESS);
 }

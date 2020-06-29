@@ -7,22 +7,10 @@
 #include <time.h>
 #include <string.h>
 
-// AFL++
-#include <afl-fuzz.h>
-#include <alloc-inl.h>
-
 #include "helpers.h"
+#include "custom_mutator.h"
 
-#define INIT_SIZE (100)
 
-typedef struct my_mutator {
-
-  afl_state_t *afl;
-
-  // Reused buffers:
-  BUF_VAR(uint8_t, fuzz);
-
-} my_mutator_t;
 static my_mutator_t *data = NULL;
 
 // JSON generator - extracted from F1 fuzzer
@@ -62,7 +50,7 @@ void out(const char* str, const int str_l) {
  *         There may be multiple instances of this mutator in one afl-fuzz run!
  *         Return NULL on error.
  */
-my_mutator_t *afl_custom_init(afl_state_t *afl, unsigned int seed) {
+my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
 
   srandom(seed);
 

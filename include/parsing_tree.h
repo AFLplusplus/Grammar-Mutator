@@ -7,21 +7,20 @@
 #include <time.h>
 #include <string.h>
 
-// AFL++
-#include <list.h>
-#include <alloc-inl.h>
-
 #include "helpers.h"
 
-typedef struct tree_node {
+typedef struct tree_node node_t;
+struct tree_node {
   // uint8_t *val_buf;
   // size_t   val_size;
   BUF_VAR(uint8_t, val);
 
-  // TODO: the initial size of `list_t` may be too large
-  list_t subnodes;
+  node_t *subnodes;
+  node_t *subnode_last; // last subnode
   size_t subnode_count;
-} node_t;
+
+  node_t *next;
+};
 
 /**
  * Create a node and allocate the memory
