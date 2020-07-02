@@ -33,6 +33,11 @@ typedef struct my_mutator {
 
   afl_t *afl;
 
+  const uint8_t *filename_cur;
+  parsing_tree_t *tree_cur;
+
+  parsing_tree_t *tree_mutated;
+
   // Reused buffers:
   BUF_VAR(uint8_t, fuzz);
 

@@ -7,12 +7,6 @@
 
 struct custom_mutator {
 
-  const char *name;
-  void *      dh;
-  uint8_t *        post_process_buf;
-  size_t      post_process_size;
-  uint8_t          stacked_custom_prob, stacked_custom;
-
   void *data;
   void *(*afl_custom_init)(afl_t *afl, unsigned int seed);
   size_t (*afl_custom_fuzz)(void *data, uint8_t *buf, size_t buf_size, uint8_t **out_buf,
@@ -95,7 +89,9 @@ int main(int argc, char const *argv[]) {
   mutator->afl_custom_deinit(mutator->data);
 
   dlclose(dh);
+  dh = NULL;
   free(mutator);
+  mutator = NULL;
 
   exit(EXIT_SUCCESS);
 }
