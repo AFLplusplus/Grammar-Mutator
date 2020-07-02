@@ -383,14 +383,14 @@ node_t *gen_%(name)s(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(%(num_cheap_strings)d);
+        int val = map_rand(%(num_cheap_strings)d);
         const char* str = pool_%(name)s[val];
         const int str_l = pool_l_%(name)s[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(%(nrules)d);
+    int val = map_rand(%(nrules)d);
     node_t *subnode = NULL;
     switch(val) {''' % {'name':self.k_to_s(k), 'nrules':len(rules),
                         'num_cheap_strings': len(cheap_strings),
@@ -429,7 +429,7 @@ const int pool_l_%(k)s[] =  {%(cheap_strings_len)s};
 
     def fn_map_def(self):
         return '''
-int map(int v) {
+int map_rand(int v) {
     return random() % v;
 }
  '''
@@ -447,7 +447,7 @@ int map(int v) {
 
     def fuzz_rand_var_defs(self):
         return '''
-int map(int v);'''
+int map_rand(int v);'''
     def fuzz_stack_var_defs(self):
         return '''
 extern int max_depth;'''

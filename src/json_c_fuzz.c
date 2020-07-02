@@ -7,7 +7,7 @@
 #include "parsing_tree.h"
 
 
-int map(int v);
+int map_rand(int v);
 
 extern int max_depth;
 node_t *gen_start(int depth);
@@ -41,20 +41,20 @@ node_t *gen_symbol_1_1(int depth);
 node_t *gen_character_1(int depth);
 node_t *gen_digit_1(int depth);
 
-const char* pool_start[] =  {"true", "null", "false"};
-const int pool_l_start[] =  {4, 4, 5};
+const char* pool_start[] =  {"null", "false", "true"};
+const int pool_l_start[] =  {4, 5, 4};
 
 
 const char* pool_json[] =  {"null", "true", "false"};
 const int pool_l_json[] =  {4, 4, 5};
 
 
-const char* pool_element[] =  {"true", "null", "false"};
-const int pool_l_element[] =  {4, 4, 5};
+const char* pool_element[] =  {"false", "null", "true"};
+const int pool_l_element[] =  {5, 4, 4};
 
 
-const char* pool_value[] =  {"false", "true", "null"};
-const int pool_l_value[] =  {5, 4, 4};
+const char* pool_value[] =  {"null", "false", "true"};
+const int pool_l_value[] =  {4, 5, 4};
 
 
 const char* pool_object[] =  {"{}"};
@@ -85,15 +85,15 @@ const char* pool_characters[] =  {""};
 const int pool_l_characters[] =  {0};
 
 
-const char* pool_character[] =  {"s", "4", "w", "u", "A", "Y", ":", "c", "f", "B", "m", "&", ";", "J", "\"", "0", "9", "@", "<", "p", "U", "S", "i", ")", "5", "+", "n", "Q", "8", "k", "R", "3", "T", "7", "/", "}", "~", "I", "*", "F", "V", "-", "K", "G", "v", "C", "a", "2", "#", "P", "`", "O", "b", "M", "x", "y", "Z", "d", "(", "D", ",", "X", ">", "!", "t", "z", "E", "g", "N", "|", "W", "=", "o", " ", "e", "$", "^", "H", "_", "6", "h", "q", "L", ".", "r", "?", "l", "j", "]", "{", "%", "1", "["};
+const char* pool_character[] =  {"3", "g", "2", "+", "/", ",", "R", "]", "~", ".", ">", "-", "6", "S", "0", "G", "^", "q", "E", "Y", "%", "s", "v", "?", "$", "x", "7", "[", "4", "M", "#", "C", "L", "1", "U", ":", "I", "j", "!", "u", "V", "a", "P", "8", "|", "&", "{", "H", "W", "A", "5", "z", "y", "d", "f", "m", "n", "\"", "Q", "l", "K", "J", "t", ")", "B", "Z", "N", "w", "c", "*", "D", "o", "}", "b", "9", "i", "<", "T", "(", "X", "@", "_", ";", "`", "k", "e", "p", "h", "=", "r", "F", " ", "O"};
 const int pool_l_character[] =  {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 
-const char* pool_esc[] =  {"\\\"", "\\t", "\\r", "\\\\", "\\b", "\\n", "\\f"};
+const char* pool_esc[] =  {"\\t", "\\f", "\\n", "\\\"", "\\\\", "\\b", "\\r"};
 const int pool_l_esc[] =  {2, 2, 2, 2, 2, 2, 2};
 
 
-const char* pool_escc[] =  {"n", "\\", "r", "t", "f", "\"", "b"};
+const char* pool_escc[] =  {"r", "n", "t", "\\", "\"", "f", "b"};
 const int pool_l_escc[] =  {1, 1, 1, 1, 1, 1, 1};
 
 
@@ -113,7 +113,7 @@ const char* pool_digit[] =  {"0"};
 const int pool_l_digit[] =  {1};
 
 
-const char* pool_onenine[] =  {"3", "4", "9", "8", "1", "5", "7", "2", "6"};
+const char* pool_onenine[] =  {"5", "3", "1", "8", "9", "7", "2", "6", "4"};
 const int pool_l_onenine[] =  {1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 
@@ -133,12 +133,12 @@ const char* pool_ws[] =  {""};
 const int pool_l_ws[] =  {0};
 
 
-const char* pool_sp1[] =  {"\t", " ", "\n", "\r"};
+const char* pool_sp1[] =  {"\r", "\n", "\t", " "};
 const int pool_l_sp1[] =  {1, 1, 1, 1};
 
 
-const char* pool_symbol[] =  {",\"\":false", ",\"\":null", ",\"\":true"};
-const int pool_l_symbol[] =  {9, 8, 8};
+const char* pool_symbol[] =  {",\"\":null", ",\"\":true", ",\"\":false"};
+const int pool_l_symbol[] =  {8, 8, 9};
 
 
 const char* pool_symbol_1[] =  {",false", ",null", ",true"};
@@ -165,14 +165,14 @@ node_t *gen_start(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_start[val];
         const int str_l = pool_l_start[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -191,14 +191,14 @@ node_t *gen_json(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_json[val];
         const int str_l = pool_l_json[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -217,14 +217,14 @@ node_t *gen_element(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_element[val];
         const int str_l = pool_l_element[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -247,14 +247,14 @@ node_t *gen_value(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_value[val];
         const int str_l = pool_l_value[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(7);
+    int val = map_rand(7);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -303,14 +303,14 @@ node_t *gen_object(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_object[val];
         const int str_l = pool_l_object[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(2);
+    int val = map_rand(2);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -342,14 +342,14 @@ node_t *gen_members(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_members[val];
         const int str_l = pool_l_members[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -370,14 +370,14 @@ node_t *gen_member(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_member[val];
         const int str_l = pool_l_member[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -404,14 +404,14 @@ node_t *gen_array(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_array[val];
         const int str_l = pool_l_array[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(2);
+    int val = map_rand(2);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -443,14 +443,14 @@ node_t *gen_elements(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_elements[val];
         const int str_l = pool_l_elements[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -471,14 +471,14 @@ node_t *gen_string(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_string[val];
         const int str_l = pool_l_string[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -501,14 +501,14 @@ node_t *gen_characters(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_characters[val];
         const int str_l = pool_l_characters[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -527,14 +527,14 @@ node_t *gen_character(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(93);
+        int val = map_rand(93);
         const char* str = pool_character[val];
         const int str_l = pool_l_character[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(94);
+    int val = map_rand(94);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1018,14 +1018,14 @@ node_t *gen_esc(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(7);
+        int val = map_rand(7);
         const char* str = pool_esc[val];
         const int str_l = pool_l_esc[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1046,14 +1046,14 @@ node_t *gen_escc(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(7);
+        int val = map_rand(7);
         const char* str = pool_escc[val];
         const int str_l = pool_l_escc[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(7);
+    int val = map_rand(7);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1102,14 +1102,14 @@ node_t *gen_number(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_number[val];
         const int str_l = pool_l_number[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1132,14 +1132,14 @@ node_t *gen_int(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_int[val];
         const int str_l = pool_l_int[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(4);
+    int val = map_rand(4);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1181,14 +1181,14 @@ node_t *gen_digits(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_digits[val];
         const int str_l = pool_l_digits[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1207,14 +1207,14 @@ node_t *gen_digit(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_digit[val];
         const int str_l = pool_l_digit[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(2);
+    int val = map_rand(2);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1238,14 +1238,14 @@ node_t *gen_onenine(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(9);
+        int val = map_rand(9);
         const char* str = pool_onenine[val];
         const int str_l = pool_l_onenine[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(9);
+    int val = map_rand(9);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1304,14 +1304,14 @@ node_t *gen_frac(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_frac[val];
         const int str_l = pool_l_frac[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(2);
+    int val = map_rand(2);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1336,14 +1336,14 @@ node_t *gen_exp(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_exp[val];
         const int str_l = pool_l_exp[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(3);
+    int val = map_rand(3);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1379,14 +1379,14 @@ node_t *gen_sign(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_sign[val];
         const int str_l = pool_l_sign[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(3);
+    int val = map_rand(3);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1414,14 +1414,14 @@ node_t *gen_ws(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_ws[val];
         const int str_l = pool_l_ws[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(2);
+    int val = map_rand(2);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1446,14 +1446,14 @@ node_t *gen_sp1(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(4);
+        int val = map_rand(4);
         const char* str = pool_sp1[val];
         const int str_l = pool_l_sp1[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(4);
+    int val = map_rand(4);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1487,14 +1487,14 @@ node_t *gen_symbol(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_symbol[val];
         const int str_l = pool_l_symbol[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1515,14 +1515,14 @@ node_t *gen_symbol_1(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(3);
+        int val = map_rand(3);
         const char* str = pool_symbol_1[val];
         const int str_l = pool_l_symbol_1[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(1);
+    int val = map_rand(1);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1543,14 +1543,14 @@ node_t *gen_symbol_2(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_symbol_2[val];
         const int str_l = pool_l_symbol_2[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(2);
+    int val = map_rand(2);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1575,14 +1575,14 @@ node_t *gen_symbol_1_1(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_symbol_1_1[val];
         const int str_l = pool_l_symbol_1_1[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(2);
+    int val = map_rand(2);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1607,14 +1607,14 @@ node_t *gen_character_1(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_character_1[val];
         const int str_l = pool_l_character_1[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(2);
+    int val = map_rand(2);
     node_t *subnode = NULL;
     switch(val) {
 
@@ -1639,14 +1639,14 @@ node_t *gen_digit_1(int depth) {
     node_t *node = node_create();
 
     if (depth > max_depth) {
-        int val = map(1);
+        int val = map_rand(1);
         const char* str = pool_digit_1[val];
         const int str_l = pool_l_digit_1[val];
         node_set_val(node, str, str_l);
         return node;
     }
 
-    int val = map(2);
+    int val = map_rand(2);
     node_t *subnode = NULL;
     switch(val) {
 
