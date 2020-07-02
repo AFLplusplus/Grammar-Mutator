@@ -84,7 +84,7 @@ int main(int argc, char const *argv[]) {
   // Initialize the custom mutator
   mutator->data = mutator->afl_custom_init(afl, 0); // fixed random seed
 
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < 100; ++i) {
     buf_size = mutator->afl_custom_fuzz(
       mutator->data, NULL, 0, &buf, NULL, 0, 4096);
     printf("=====%d=====\n", i + 1);

@@ -8,36 +8,16 @@
 #include <string.h>
 
 #include "helpers.h"
+#include "parsing_tree.h"
 #include "custom_mutator.h"
 
 
-static my_mutator_t *data = NULL;
-
 // JSON generator - extracted from F1 fuzzer
 int max_depth = 3;
-
-void gen_init__();
-
 int map(int v) {
     return random() % v;
 }
 
-
-size_t mutated_size_max = 0;
-size_t mutated_size = 0;
-uint8_t *mutated_out = NULL;
-void out(const char* str, const int str_l) {
-  if (mutated_size >= mutated_size_max)
-      return;
-
-  if (unlikely(mutated_size >= data->fuzz_size)) {
-    mutated_out = maybe_grow(BUF_PARAMS(data, fuzz), mutated_size + str_l);
-  }
-
-  memcpy(mutated_out + mutated_size, str, str_l);
-
-  mutated_size += str_l;
-}
 
 /**
  * Initialize this custom mutator
@@ -54,7 +34,7 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
 
   srandom(seed);
 
-  data = calloc(1, sizeof(my_mutator_t));
+  my_mutator_t *data = calloc(1, sizeof(my_mutator_t));
   if (!data) {
 
     perror("afl_custom_init alloc");
@@ -89,10 +69,15 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
                        size_t add_buf_size,  // add_buf can be NULL
                        size_t max_size) {
 
-  mutated_size_max = max_size;
+  // Randomly generate a JSON string
+  max_depth = random() % 15 + 1; // randomly pick a `max_depth` within [1, 15]
+  parsing_tree_t *tree = gen_init__();
+  tree_to_buf(tree);
+
+  size_t mutated_size = tree->data_len <= max_size ? tree->data_len : max_size;
 
   // maybe_grow is optimized to be quick for reused buffers.
-  mutated_out = maybe_grow(BUF_PARAMS(data, fuzz), INIT_SIZE);
+  uint8_t *mutated_out = maybe_grow(BUF_PARAMS(data, fuzz), mutated_size);
   if (!mutated_out) {
 
     *out_buf = NULL;
@@ -101,10 +86,8 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
 
   }
 
-  // Randomly generate a JSON string
-  mutated_size = 0; // reset the buffer
-  max_depth = random() % 15 + 1; // randomly pick a `max_depth` within [1, 15]
-  gen_init__(); // write generated test cases into a buffer, see function `out`
+  memcpy(mutated_out, tree->data_buf, mutated_size);
+  tree_free(tree);
 
   *out_buf = mutated_out;
   return mutated_size;
