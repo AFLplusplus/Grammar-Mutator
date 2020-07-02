@@ -1,0 +1,1 @@
+option(ENABLE_DEBUG     "Turn on debug output" ON)
