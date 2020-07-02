@@ -40,6 +40,8 @@ void node_free(node_t *node) {
 }
 
 void node_set_val(node_t *node, const uint8_t *val_buf, size_t val_size) {
+  if (val_size == 0) return;
+
   node->val_buf = malloc(val_size * sizeof(uint8_t));
   node->val_size = val_size;
   memcpy(node->val_buf, val_buf, val_size);

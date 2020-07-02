@@ -370,8 +370,9 @@ class CFuzzer(PyRecCompiledFuzzer):
                 esc_token_chars = [self.esc_char(c) for c in token]
                 esc_token = ''.join(esc_token_chars)
                 res.append(
-                    "node_set_val(node, \"%s\", %d);" % (
+                    "subnode = node_create_with_val(\"%s\", %d);" % (
                         esc_token, len(esc_token_chars)))
+                res.append("node_append_subnode(node, subnode);")
         return '\n        '.join(res)
 
     def gen_alt_src(self, k):
