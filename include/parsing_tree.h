@@ -9,6 +9,10 @@
 
 #include "helpers.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct tree_node node_t;
 struct tree_node {
   // uint8_t *val_buf;
@@ -94,5 +98,9 @@ void tree_to_buf(parsing_tree_t *tree);
  * @return           A newly created tree
  */
 parsing_tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

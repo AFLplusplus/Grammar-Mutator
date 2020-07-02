@@ -1,10 +1,6 @@
 #ifndef __CUSTOM_MUTATOR_H__
 #define __CUSTOM_MUTATOR_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef _LARGEFILE64_SOURCE
 #define _LARGEFILE64_SOURCE
 #endif
@@ -18,8 +14,16 @@ extern "C" {
 #include <string.h>
 
 #include "helpers.h"
+#include "parsing_tree.h"
 
-#define INIT_SIZE (100)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// JSON generator - extracted from F1 fuzzer
+extern int max_depth;
+parsing_tree_t *gen_init__();
+int map(int v);
 
 typedef struct afl {
 
