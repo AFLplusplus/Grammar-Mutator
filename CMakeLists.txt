@@ -46,7 +46,6 @@ message(STATUS "Using C++ compiler: ${CMAKE_CXX_COMPILER}")
 include_directories(include)
 
 add_subdirectory(src)
-add_subdirectory(examples)
 
 if (ENABLE_TESTING)
   add_subdirectory(test)
