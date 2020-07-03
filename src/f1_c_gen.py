@@ -441,7 +441,7 @@ int map_rand(int v) {
 #include <time.h>
 #include <string.h>
 
-#include "parsing_tree.h"
+#include "tree.h"
 '''
 
 
@@ -468,7 +468,7 @@ extern int max_depth;'''
     def fn_main_loop_frag(self):
         return '''
     for(int i=0; i < max_num; i++) {
-        parsing_tree_t *tree = gen_init__();
+        tree_t *tree = gen_init__();
         tree_to_buf(tree);
         printf("%.*s\\n", (int)tree->data_len, tree->data_buf);
         tree_free(tree);
@@ -492,7 +492,7 @@ int max_depth = 0;'''
 
     def main_init_var_defs(self):
         return '''
-parsing_tree_t *gen_init__();'''
+tree_t *gen_init__();'''
 
     def main_var_defs(self):
         return '\n'.join([self.main_stack_var_defs(), self.main_init_var_defs()])
@@ -505,8 +505,8 @@ parsing_tree_t *gen_init__();'''
 
     def fuzz_entry(self):
         return '''
-parsing_tree_t *gen_init__() {
-    parsing_tree_t *tree = tree_create();
+tree_t *gen_init__() {
+    tree_t *tree = tree_create();
     tree->root = gen_start(0);
     return tree;
 }'''
@@ -521,7 +521,7 @@ parsing_tree_t *gen_init__() {
 #include <time.h>
 #include <string.h>
 
-#include "parsing_tree.h"
+#include "tree.h"
 '''
 
     def gen_main_src(self):

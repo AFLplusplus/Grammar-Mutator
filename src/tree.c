@@ -1,4 +1,4 @@
-#include "parsing_tree.h"
+#include "tree.h"
 
 #define TREE_BUF_PREALLOC_SIZE (64)
 
@@ -124,7 +124,7 @@ bool node_equal(node_t *node_a, node_t *node_b) {
   return true;
 }
 
-void _node_to_buf(parsing_tree_t *tree, node_t *node) {
+void _node_to_buf(tree_t *tree, node_t *node) {
   // dump `val` if this is a leaf node
   if (node->subnode_count == 0) {
     if (node->val_len == 0) return;
@@ -155,11 +155,11 @@ void _node_to_buf(parsing_tree_t *tree, node_t *node) {
 
 
 
-inline parsing_tree_t *tree_create() {
-  return calloc(1, sizeof(parsing_tree_t));
+inline tree_t *tree_create() {
+  return calloc(1, sizeof(tree_t));
 }
 
-void tree_free(parsing_tree_t *tree) {
+void tree_free(tree_t *tree) {
   // root node
   node_free(tree->root);
   tree->root = NULL;
@@ -177,19 +177,19 @@ void tree_free(parsing_tree_t *tree) {
   free(tree);
 }
 
-void tree_to_buf(parsing_tree_t *tree) {
+void tree_to_buf(tree_t *tree) {
   maybe_grow(BUF_PARAMS(tree, data), TREE_BUF_PREALLOC_SIZE);
   tree->data_len = 0;
 
   _node_to_buf(tree, tree->root);
 }
 
-parsing_tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
+tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
   return NULL; // TODO: implement this function
 }
 
-parsing_tree_t *tree_clone(parsing_tree_t *tree) {
-  parsing_tree_t *new_tree = tree_create();
+tree_t *tree_clone(tree_t *tree) {
+  tree_t *new_tree = tree_create();
   new_tree->root = node_clone(tree->root);
   new_tree->depth = tree->depth;
 
@@ -201,7 +201,7 @@ parsing_tree_t *tree_clone(parsing_tree_t *tree) {
   return new_tree;
 }
 
-inline bool tree_equal(parsing_tree_t *tree_a, parsing_tree_t *tree_b) {
+inline bool tree_equal(tree_t *tree_a, tree_t *tree_b) {
   if (tree_a == tree_b) return true;
   if (!tree_a || !tree_b) return false;
   return node_equal(tree_a->root, tree_b->root);

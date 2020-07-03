@@ -84,7 +84,7 @@ bool node_equal(node_t *node_a, node_t *node_b);
 
 
 
-typedef struct parsing_tree {
+typedef struct tree {
   node_t *root;
   size_t depth;
 
@@ -92,25 +92,25 @@ typedef struct parsing_tree {
   // size_t   data_size;
   BUF_VAR(uint8_t, data);
   size_t data_len;  // data_len <= data_size
-} parsing_tree_t;
+} tree_t;
 
 /**
  * Create a tree and allocate the memory
  * @return A newly created tree
  */
-parsing_tree_t *tree_create();
+tree_t *tree_create();
 
 /**
  * Destroy the tree and free all memory
  * @param tree The parsing tree
  */
-void tree_free(parsing_tree_t *tree);
+void tree_free(tree_t *tree);
 
 /**
  * Convert a parsing tree into a concrete test case stored in the data buffer
  * @param  tree    The parsing tree
  */
-void tree_to_buf(parsing_tree_t *tree);
+void tree_to_buf(tree_t *tree);
 
 /**
  * Parse the given buffer to construct a parsing tree
@@ -118,14 +118,14 @@ void tree_to_buf(parsing_tree_t *tree);
  * @param  data_size The size of the buffer
  * @return           A newly created tree
  */
-parsing_tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size);
+tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size);
 
 /**
  * Clone a parsing tree
  * @param  tree The parsing tree
  * @return      A newly created tree with the same data as `tree`
  */
-parsing_tree_t *tree_clone(parsing_tree_t *tree);
+tree_t *tree_clone(tree_t *tree);
 
 /**
  * Compare whether two parsing trees have the same architecture, and
@@ -134,7 +134,7 @@ parsing_tree_t *tree_clone(parsing_tree_t *tree);
  * @param  tree_b Another parsing tree
  * @return        True (1) if two trees are the same; otherwise, false (0)
  */
-bool tree_equal(parsing_tree_t *tree_a, parsing_tree_t *tree_b);
+bool tree_equal(tree_t *tree_a, tree_t *tree_b);
 
 #ifdef __cplusplus
 }

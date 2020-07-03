@@ -47,12 +47,12 @@ add_test(
 
 # Test case 2:
 # test the parsing tree APIs
-add_executable(test_parsing_tree
-  test_parsing_tree.cpp
-  ${CMAKE_SOURCE_DIR}/src/parsing_tree.c
+add_executable(test_tree
+  test_tree.cpp
+  ${CMAKE_SOURCE_DIR}/src/tree.c
 )
-target_link_libraries(test_parsing_tree PRIVATE gtest_main)
+target_link_libraries(test_tree PRIVATE gtest_main)
 add_test(
-  NAME test_parsing_tree
-  COMMAND test_parsing_tree
+  NAME test_tree
+  COMMAND test_tree
 )

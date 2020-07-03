@@ -10,12 +10,12 @@
 #include <string>
 
 #include "helpers.h"
-#include "parsing_tree.h"
+#include "tree.h"
 #include "custom_mutator.h"
 
 using namespace std;
 
-map<string, parsing_tree_t*> parsing_trees;
+map<string, tree_t*> trees;
 
 // JSON generator - extracted from F1 fuzzer
 int max_depth = 3;
@@ -42,7 +42,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
                        uint8_t **out_buf, uint8_t *add_buf,
                        size_t add_buf_size,  // add_buf can be NULL
                        size_t max_size) {
-  parsing_tree_t *tree = NULL;
+  tree_t *tree = NULL;
 
   if (data->tree_mutated) {
     /* `data->tree_mutated` is NULL, meaning that this is not an interesting
@@ -88,8 +88,8 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   string fn((const char *) filename);
   data->filename_cur = filename;
 
-  if (parsing_trees.find(fn) != parsing_trees.end())
-    data->tree_cur = parsing_trees[fn];
+  if (trees.find(fn) != trees.end())
+    data->tree_cur = trees[fn];
 
   if (data->tree_cur) return 1;
 
@@ -106,7 +106,7 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
 
   string fn((const char *) filename_new_queue);
 
-  parsing_trees[fn] = data->tree_mutated;
+  trees[fn] = data->tree_mutated;
 
   /* Once the test case is added into the queue, we will clear `tree_mutated`
     pointer. In this case, we will store the parsing tree instead destroying it
@@ -118,8 +118,8 @@ void afl_custom_deinit(my_mutator_t *data) {
   if (data->tree_mutated)
     tree_free(data->tree_mutated);
 
-  // parsing_trees
-  for (auto &kv : parsing_trees) {
+  // trees
+  for (auto &kv : trees) {
     tree_free(kv.second);
   }
 

@@ -1,9 +1,9 @@
-#include "parsing_tree.h"
+#include "tree.h"
 
 #include "gtest/gtest.h"
 
 TEST(ParsingTreeTest, DumpTreeToBuffer) {
-  parsing_tree_t *tree = tree_create();
+  tree_t *tree = tree_create();
   node_t *root = node_create(0);
   tree->root = root;
 
@@ -37,7 +37,7 @@ TEST(ParsingTreeTest, DumpTreeToBuffer) {
 }
 
 TEST(ParsingTreeTest, ClonedTreeShouldEqual) {
-  parsing_tree_t *tree = tree_create();
+  tree_t *tree = tree_create();
   node_t *root = node_create(0);
   tree->root = root;
 
@@ -63,7 +63,7 @@ TEST(ParsingTreeTest, ClonedTreeShouldEqual) {
   node_append_subnode(ws_1, sp1_1);
   node_append_subnode(ws_1, ws_3);
 
-  parsing_tree_t *new_tree = tree_clone(tree);
+  tree_t *new_tree = tree_clone(tree);
 
   ASSERT_TRUE(tree_equal(tree, new_tree));
 
@@ -72,7 +72,7 @@ TEST(ParsingTreeTest, ClonedTreeShouldEqual) {
 }
 
 TEST(ParsingTreeTest, ClonedTreeHaveIdenticalDataBuffer) {
-  parsing_tree_t *tree = tree_create();
+  tree_t *tree = tree_create();
   node_t *root = node_create(0);
   tree->root = root;
 
@@ -98,7 +98,7 @@ TEST(ParsingTreeTest, ClonedTreeHaveIdenticalDataBuffer) {
   node_append_subnode(ws_1, sp1_1);
   node_append_subnode(ws_1, ws_3);
 
-  parsing_tree_t *new_tree = tree_clone(tree);
+  tree_t *new_tree = tree_clone(tree);
 
   tree_to_buf(tree);
   tree_to_buf(new_tree);
@@ -111,7 +111,7 @@ TEST(ParsingTreeTest, ClonedTreeHaveIdenticalDataBuffer) {
 }
 
 TEST(ParsingTreeTest, TreeEqualIsNodeEqual) {
-  parsing_tree_t *tree = tree_create();
+  tree_t *tree = tree_create();
   node_t *root = node_create(0);
   tree->root = root;
 
@@ -137,7 +137,7 @@ TEST(ParsingTreeTest, TreeEqualIsNodeEqual) {
   node_append_subnode(ws_1, sp1_1);
   node_append_subnode(ws_1, ws_3);
 
-  parsing_tree_t *new_tree = tree_clone(tree);
+  tree_t *new_tree = tree_clone(tree);
 
   ASSERT_EQ(tree_equal(nullptr, nullptr), node_equal(nullptr, nullptr));
   ASSERT_EQ(tree_equal(tree, new_tree), node_equal(tree->root, new_tree->root));

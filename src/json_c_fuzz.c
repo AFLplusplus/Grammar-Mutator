@@ -4,7 +4,7 @@
 #include <time.h>
 #include <string.h>
 
-#include "parsing_tree.h"
+#include "tree.h"
 
 
 int map_rand(int v);
@@ -1668,8 +1668,8 @@ node_t *gen_digit_1(int depth) {
 }
 
 
-parsing_tree_t *gen_init__() {
-    parsing_tree_t *tree = tree_create();
+tree_t *gen_init__() {
+    tree_t *tree = tree_create();
     tree->root = gen_start(0);
     return tree;
 }

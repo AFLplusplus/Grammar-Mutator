@@ -14,7 +14,7 @@
 #include <string.h>
 
 #include "helpers.h"
-#include "parsing_tree.h"
+#include "tree.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,7 +22,7 @@ extern "C" {
 
 // JSON generator - extracted from F1 fuzzer
 extern int max_depth;
-parsing_tree_t *gen_init__();
+tree_t *gen_init__();
 int map_rand(int v);
 
 typedef struct afl {
@@ -34,9 +34,9 @@ typedef struct my_mutator {
   afl_t *afl;
 
   const uint8_t *filename_cur;
-  parsing_tree_t *tree_cur;
+  tree_t *tree_cur;
 
-  parsing_tree_t *tree_mutated;
+  tree_t *tree_mutated;
 
   // Reused buffers:
   BUF_VAR(uint8_t, fuzz);
