@@ -48,24 +48,25 @@ add_test(
 # Test case 2:
 # test the tree APIs
 add_executable(test_tree
-        test_tree.cpp
-        ${CMAKE_SOURCE_DIR}/src/tree.c
-        )
+  test_tree.cpp
+  ${CMAKE_SOURCE_DIR}/src/tree.c
+  )
 target_link_libraries(test_tree PRIVATE gtest_main)
 add_test(
-        NAME test_tree
-        COMMAND test_tree
+  NAME test_tree
+  COMMAND test_tree
 )
 
 # Test case 3:
 # test the tree mutation APIs
 add_executable(test_tree_mutation
-        test_tree_mutation.cpp
-        ${CMAKE_SOURCE_DIR}/src/tree.c
-        ${CMAKE_SOURCE_DIR}/src/tree_mutation.c
-        )
+  test_tree_mutation.cpp
+  ${CMAKE_SOURCE_DIR}/src/tree.c
+  ${CMAKE_SOURCE_DIR}/src/tree_mutation.c
+  ${CMAKE_SOURCE_DIR}/src/json_c_fuzz.c
+  )
 target_link_libraries(test_tree_mutation PRIVATE gtest_main)
 add_test(
-        NAME test_tree_mutation
-        COMMAND test_tree_mutation
+  NAME test_tree_mutation
+  COMMAND test_tree_mutation
 )
