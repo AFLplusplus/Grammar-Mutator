@@ -20,11 +20,6 @@
 extern "C" {
 #endif
 
-// JSON generator - extracted from F1 fuzzer
-extern int max_depth;
-tree_t *gen_init__();
-int map_rand(int v);
-
 typedef struct afl {
 
 } afl_t;

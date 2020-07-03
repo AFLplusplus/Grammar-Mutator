@@ -1,6 +1,7 @@
 #include "tree_mutation.h"
+#include "json_c_fuzz.h"
 
-node_t *_pick_node(node_t *root, size_t tree_size) {
+node_t *_pick_node(node_t *root) {
   return NULL;
 }
 
@@ -8,7 +9,7 @@ tree_t *random_mutation(tree_t *tree) {
   tree_t *mutated_tree = tree_clone(tree);
 
   // Randomly pick a node in the tree
-  node_t *node = _pick_node(mutated_treea);
+  node_t *node = _pick_node(mutated_tree->root);
   node_t *parent = node->parent;
 
   // Generate a new node

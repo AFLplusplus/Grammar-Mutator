@@ -17,12 +17,6 @@ using namespace std;
 
 map<string, tree_t*> trees;
 
-// JSON generator - extracted from F1 fuzzer
-int max_depth = 3;
-int map_rand(int v) {
-    return random() % v;
-}
-
 
 my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   srandom(seed);

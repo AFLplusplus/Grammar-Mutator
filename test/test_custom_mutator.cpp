@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 
-#include "custom_mutator.h"
-
 #include "gtest/gtest.h"
 
 typedef void *(*afl_custom_init_t)(void *afl, unsigned int seed);

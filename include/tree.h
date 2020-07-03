@@ -98,12 +98,20 @@ size_t node_get_size(node_t *node);
  * @param subnode      A subnode or the root node
  * @param replace_node A new subnode that will be added
  */
-void node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode);
-
+/**
+ * Replace `subnode` in a subtree (`root`) with `new_subnode`. Note that, this
+ * function will not destroy `subnode` and free its memory.
+ * @param root         The root node of a tree/subtree
+ * @param subnode      A subnode or the root node
+ * @param replace_node A new subnode that will be added
+ * @return             True (1) if the subnode has been successfully replaced;
+ *                     otherwise, false (0)
+ */
+bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode);
 
 typedef struct tree {
   node_t *root;
-  size_t depth;
+  size_t  depth;
 
   // uint8_t *data_buf;
   // size_t   data_size;

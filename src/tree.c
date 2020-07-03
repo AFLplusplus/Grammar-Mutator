@@ -150,7 +150,9 @@ size_t node_get_size(node_t *node) {
   return ret;
 }
 
-void node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
+bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
+  if (subnode->id != new_subnode->id) return false;
+
   node_t *cur, *next, *prev = NULL;
   cur = root->subnodes;
   while (cur) {
@@ -172,12 +174,14 @@ void node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
       cur->next = NULL;
       cur->parent = NULL;
 
-      return;
+      return true;
     }
 
     prev = cur;
     cur = next;
   }
+
+  return false;
 }
 
 void _node_to_buf(tree_t *tree, node_t *node) {
