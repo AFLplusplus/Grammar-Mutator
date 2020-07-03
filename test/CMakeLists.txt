@@ -33,10 +33,17 @@ add_subdirectory(
 # run a custom mutator library, which generates test cases for a specific
 # grammar
 add_executable(test_custom_mutator
-  test_custom_mutator.c
+  test_custom_mutator.cpp
 )
-
-target_link_libraries(test_custom_mutator PRIVATE dl)
+add_dependencies(test_custom_mutator jsonmutator)
+target_link_libraries(test_custom_mutator
+  PRIVATE dl
+  PRIVATE gtest_main
+)
+add_test(
+  NAME test_json_custom_mutator
+  COMMAND test_custom_mutator ${CMAKE_BINARY_DIR}/src/libjsonmutator.so
+)
 
 # Test case 2:
 # test the parsing tree APIs

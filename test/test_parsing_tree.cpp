@@ -2,7 +2,7 @@
 
 #include "gtest/gtest.h"
 
-TEST(parsing_tree_test, dump_tree_to_buffer) {
+TEST(ParsingTreeTest, DumpTreeToBuffer) {
   parsing_tree_t *tree = tree_create();
   node_t *root = node_create(0);
   tree->root = root;
