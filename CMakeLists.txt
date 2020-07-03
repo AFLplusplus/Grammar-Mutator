@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.10.0 FATAL_ERROR)
 project(Grammar-Mutator)
 
 # Undocumented options
@@ -46,4 +46,8 @@ message(STATUS "Using C++ compiler: ${CMAKE_CXX_COMPILER}")
 include_directories(include)
 
 add_subdirectory(src)
-add_subdirectory(test)
+add_subdirectory(examples)
+
+if (ENABLE_TESTING)
+  add_subdirectory(test)
+endif()
