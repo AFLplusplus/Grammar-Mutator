@@ -84,19 +84,25 @@ node_t *node_clone(node_t *node) {
     node_append_subnode(new_node, node_clone(subnode));
     subnode = tmp;
   }
+
+  return new_node;
 }
 
 bool node_equal(node_t *node_a, node_t *node_b) {
-  if (node_a->id != node_b->id)
-    return false;
+  if (node_a == node_b) return true;
 
-  if (node_a->val_len != node_b->val_len)
-    return false;
+  if (!node_a || !node_b) return false;
+
+  if (node_a->id != node_b->id) return false;
+
+  if (node_a->val_len != node_b->val_len) return false;
 
   if (memcmp(node_a->val_buf, node_b->val_buf, node_a->val_len) != 0)
     return false;
 
   // subnodes
+  if (node_a->subnode_count != node_b->subnode_count) return false;
+
   node_t *subnode_a = node_a->subnodes;
   node_t *tmp_a = NULL;
   node_t *subnode_b = node_b->subnodes;
@@ -196,5 +202,7 @@ parsing_tree_t *tree_clone(parsing_tree_t *tree) {
 }
 
 inline bool tree_equal(parsing_tree_t *tree_a, parsing_tree_t *tree_b) {
+  if (tree_a == tree_b) return true;
+  if (!tree_a || !tree_b) return false;
   return node_equal(tree_a->root, tree_b->root);
 }
