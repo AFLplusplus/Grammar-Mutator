@@ -1,5 +1,8 @@
 # Download and unpack googletest at configure time
-configure_file(googletest-download/CMakeLists.txt.in googletest-download/CMakeLists.txt)
+configure_file(
+  googletest-download/CMakeLists.txt.in
+  googletest-download/CMakeLists.txt
+)
 execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
   RESULT_VARIABLE result
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download )
@@ -19,9 +22,11 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 # Add googletest directly to our build. This defines
 # the gtest and gtest_main targets.
-add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
-                 ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
-                 EXCLUDE_FROM_ALL)
+add_subdirectory(
+  ${CMAKE_CURRENT_BINARY_DIR}/googletest-src
+  ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
+  EXCLUDE_FROM_ALL
+)
 
 
 # Test case 1:
@@ -36,6 +41,11 @@ target_link_libraries(test_custom_mutator PRIVATE dl)
 # Test case 2:
 # test the parsing tree APIs
 add_executable(test_parsing_tree
-  test_parsing_tree.c
+  test_parsing_tree.cpp
   ${CMAKE_SOURCE_DIR}/src/parsing_tree.c
+)
+target_link_libraries(test_parsing_tree PRIVATE gtest_main)
+add_test(
+  NAME test_parsing_tree
+  COMMAND test_parsing_tree
 )

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "helpers.h"
 
@@ -15,9 +16,12 @@ extern "C" {
 
 typedef struct tree_node node_t;
 struct tree_node {
+  uint32_t id; // node type
+
   // uint8_t *val_buf;
   // size_t   val_size;
   BUF_VAR(uint8_t, val);
+  size_t val_len;
 
   node_t *subnodes;
   node_t *subnode_last; // last subnode
@@ -28,17 +32,19 @@ struct tree_node {
 
 /**
  * Create a node and allocate the memory
- * @return A newly created node
+ * @param  id The type of the node
+ * @return    A newly created node
  */
-node_t *node_create();
+node_t *node_create(uint32_t id);
 
 /**
  * Create a node and allocate the memory with a given value
- * @param  val_buf  The buffer of the attached value
- * @param  val_size The size of the attached value
- * @return          A newly created node
+ * @param  id      The type of the node
+ * @param  val_buf The buffer of the attached value
+ * @param  val_len The size of the attached value
+ * @return         A newly created node
  */
-node_t *node_create_with_val(const uint8_t *val_buf, size_t val_size);
+node_t *node_create_with_val(uint32_t id, const void *val_buf, size_t val_len);
 
 /**
  * Destroy the node and recursively free all memory
@@ -48,11 +54,11 @@ void node_free(node_t *node);
 
 /**
  * Set the concrete value for the node
- * @param node     The node
- * @param val_buf  The buffer of the attached value
- * @param val_size The size of the attached value
+ * @param node    The node
+ * @param val_buf The buffer of the attached value
+ * @param val_len The size of the attached value
  */
-void node_set_val(node_t *node, const uint8_t *val_buf, size_t val_size);
+void node_set_val(node_t *node, const void *val_buf, size_t val_len);
 
 /**
  * Append a child node `subnode` to a parent node `node`
@@ -60,6 +66,21 @@ void node_set_val(node_t *node, const uint8_t *val_buf, size_t val_size);
  * @param subnode The child node
  */
 void node_append_subnode(node_t *node, node_t *subnode);
+
+/**
+ * Clone a node, including all subnodes
+ * @param  node The node
+ * @return      A newly created node with the same data as `node`
+ */
+node_t *node_clone(node_t *node);
+
+/**
+ * Compare recursively whether two nodes have the same values and subnodes
+ * @param  node_a One node
+ * @param  node_b Another node
+ * @return        True (1) if two nodes are the same; otherwise, false (0)
+ */
+bool node_equal(node_t *node_a, node_t *node_b);
 
 
 
@@ -98,6 +119,22 @@ void tree_to_buf(parsing_tree_t *tree);
  * @return           A newly created tree
  */
 parsing_tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size);
+
+/**
+ * Clone a parsing tree
+ * @param  tree The parsing tree
+ * @return      A newly created tree with the same data as `tree`
+ */
+parsing_tree_t *tree_clone(parsing_tree_t *tree);
+
+/**
+ * Compare whether two parsing trees have the same architecture, and
+ * corresponding nodes have the same values
+ * @param  tree_a One paring tree
+ * @param  tree_b Another parsing tree
+ * @return        True (1) if two trees are the same; otherwise, false (0)
+ */
+bool tree_equal(parsing_tree_t *tree_a, parsing_tree_t *tree_b);
 
 #ifdef __cplusplus
 }
