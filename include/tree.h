@@ -23,6 +23,8 @@ struct tree_node {
   BUF_VAR(uint8_t, val);
   size_t val_len;
 
+  node_t *parent; // parent node
+
   node_t *subnodes;
   node_t *subnode_last; // last subnode
   size_t subnode_count;
@@ -82,6 +84,21 @@ node_t *node_clone(node_t *node);
  */
 bool node_equal(node_t *node_a, node_t *node_b);
 
+/**
+ * Calculate the size of a given node/subtree.
+ * @param  node The node/subtree
+ * @return      The total number of nodes in this subtree
+ */
+size_t node_get_size(node_t *node);
+
+/**
+ * Replace `subnode` in a subtree (`root`) with `new_subnode`. Note that, this
+ * function will not destroy `subnode` and free its memory.
+ * @param root         The root node of a tree/subtree
+ * @param subnode      A subnode or the root node
+ * @param replace_node A new subnode that will be added
+ */
+void node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode);
 
 
 typedef struct tree {

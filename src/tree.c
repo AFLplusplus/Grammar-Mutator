@@ -26,6 +26,9 @@ void node_free(node_t *node) {
     node->val_len = 0;
   }
 
+  // parent node
+  node->parent = NULL;
+
   // subnodes
   if (node->subnode_count != 0) {
     node_t *subnode = node->subnodes; // subnode linked list
@@ -57,6 +60,10 @@ void node_set_val(node_t *node, const void *val_buf, size_t val_len) {
 }
 
 inline void node_append_subnode(node_t *node, node_t *subnode) {
+  // parent node
+  subnode->parent = node;
+
+  // subnodes
   if (!node->subnodes) {
     // initialize
     node->subnodes = subnode;
@@ -75,6 +82,8 @@ node_t *node_clone(node_t *node) {
   // val
   node_set_val(new_node, node->val_buf, node->val_len);
   new_node->val_len = node->val_len;
+
+  // Do not set the parent node for the cloned node
 
   // subnodes & next
   node_t *subnode = node->subnodes; // subnode linked list
@@ -100,6 +109,8 @@ bool node_equal(node_t *node_a, node_t *node_b) {
   if (memcmp(node_a->val_buf, node_b->val_buf, node_a->val_len) != 0)
     return false;
 
+  // Do not consider the parent node while comparing two nodes
+
   // subnodes
   if (node_a->subnode_count != node_b->subnode_count) return false;
 
@@ -122,6 +133,51 @@ bool node_equal(node_t *node_a, node_t *node_b) {
     return false;
 
   return true;
+}
+
+size_t node_get_size(node_t *node) {
+  if (node == NULL) return 0;
+
+  size_t ret = 1;
+  node_t *subnode = node->subnodes;
+  node_t *tmp = NULL;
+  while (subnode) {
+    tmp = subnode->next;
+    ret += node_get_size(subnode);
+    subnode = tmp;
+  }
+
+  return ret;
+}
+
+void node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
+  node_t *cur, *next, *prev = NULL;
+  cur = root->subnodes;
+  while (cur) {
+    next = cur->next;
+
+    if (cur == subnode) {
+      new_subnode->next = next;
+      if (cur == root->subnodes) {
+        root->subnodes = new_subnode;
+      } else {
+        prev->next = new_subnode;
+      }
+
+      if (cur == root->subnode_last) {
+        root->subnode_last = new_subnode;
+      }
+
+      // Detach `subnode` from the linked list and the parent
+      cur->next = NULL;
+      cur->parent = NULL;
+
+      return;
+    }
+
+    prev = cur;
+    cur = next;
+  }
 }
 
 void _node_to_buf(tree_t *tree, node_t *node) {
