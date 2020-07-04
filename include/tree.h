@@ -16,18 +16,18 @@ extern "C" {
 
 typedef struct tree_node node_t;
 struct tree_node {
-  uint32_t id; // node type
+  uint32_t id;  // node type
 
   // uint8_t *val_buf;
   // size_t   val_size;
   BUF_VAR(uint8_t, val);
   size_t val_len;
 
-  node_t *parent; // parent node
+  node_t *parent;  // parent node
 
   node_t *subnodes;
-  node_t *subnode_last; // last subnode
-  size_t subnode_count;
+  node_t *subnode_last;  // last subnode
+  size_t  subnode_count;
 
   node_t *next;
 };

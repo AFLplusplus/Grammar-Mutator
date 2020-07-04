@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
-#include <ctime>
 #include <cstring>
 #include <map>
 #include <string>
@@ -12,16 +11,17 @@
 #include "helpers.h"
 #include "tree.h"
 #include "custom_mutator.h"
+#include "json_c_fuzz.h"
+#include "tree_mutation.h"
 
 using namespace std;
 
-map<string, tree_t*> trees;
-
+map<string, tree_t *> trees;
 
 my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   srandom(seed);
 
-  my_mutator_t *data = (my_mutator_t *) calloc(1, sizeof(my_mutator_t));
+  my_mutator_t *data = (my_mutator_t *)calloc(1, sizeof(my_mutator_t));
   if (!data) {
     perror("afl_custom_init alloc");
     return NULL;
@@ -36,54 +36,56 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
                        uint8_t **out_buf, uint8_t *add_buf,
                        size_t add_buf_size,  // add_buf can be NULL
                        size_t max_size) {
-  tree_t *tree = NULL;
+  tree_t *tree = nullptr;
 
-  if (data->tree_mutated) {
-    /* `data->tree_mutated` is NULL, meaning that this is not an interesting
+  if (data->mutated_tree) {
+    /* `data->mutated_tree` is NULL, meaning that this is not an interesting
       mutation (`afl_custom_queue_new_entry` is not invoked). Therefore, we
       need to free the memory. */
-    tree_free(data->tree_mutated);
-    data->tree_mutated = NULL;
+    tree_free(data->mutated_tree);
+    data->mutated_tree = nullptr;
   }
 
   tree = data->tree_cur;
   if (!tree) {
     // Generation
     // Randomly generate a JSON string
-    max_depth = random() % 15 + 1; // randomly pick a `max_depth` within [1, 15]
+    max_depth =
+        random() % 15 + 1;  // randomly pick a `max_depth` within [1, 15]
     tree = gen_init__();
-    tree_to_buf(tree);
   } else {
     // Mutation
-    // TODO: add mutation here
+    tree = random_mutation(tree);
+    if (!tree) {
+      perror("random mutation");
+      return 0;
+    }
   }
 
-  // Store the new tree
-  data->tree_mutated = tree;
-
+  tree_to_buf(tree);
+  data->mutated_tree = tree;
   size_t mutated_size = tree->data_len <= max_size ? tree->data_len : max_size;
 
   // maybe_grow is optimized to be quick for reused buffers.
-  uint8_t *mutated_out = (uint8_t *) maybe_grow(
-    BUF_PARAMS(data, fuzz), mutated_size);
+  uint8_t *mutated_out =
+      (uint8_t *)maybe_grow(BUF_PARAMS(data, fuzz), mutated_size);
   if (!mutated_out) {
-    *out_buf = NULL;
+    *out_buf = nullptr;
     perror("custom mutator allocation (maybe_grow)");
-    return 0;            /* afl-fuzz will very likely error out after this. */
+    return 0; /* afl-fuzz will very likely error out after this. */
   }
 
   memcpy(mutated_out, tree->data_buf, mutated_size);
-
   *out_buf = mutated_out;
   return mutated_size;
 }
 
 uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
-  string fn((const char *) filename);
+  string fn((const char *)filename);
   data->filename_cur = filename;
+  data->tree_cur = nullptr;
 
-  if (trees.find(fn) != trees.end())
-    data->tree_cur = trees[fn];
+  if (trees.find(fn) != trees.end()) data->tree_cur = trees[fn];
 
   if (data->tree_cur) return 1;
 
@@ -98,27 +100,26 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
   // Skip if we read from initial test cases (i.e., from input directory)
   if (!filename_orig_queue) return;
 
-  string fn((const char *) filename_new_queue);
+  string fn((const char *)filename_new_queue);
 
-  trees[fn] = data->tree_mutated;
+  trees[fn] = data->mutated_tree;
 
-  /* Once the test case is added into the queue, we will clear `tree_mutated`
+  /* Once the test case is added into the queue, we will clear `mutated_tree`
     pointer. In this case, we will store the parsing tree instead destroying it
     in `afl_custom_fuzz`. */
-  data->tree_mutated = NULL;
+  data->mutated_tree = NULL;
 }
 
 void afl_custom_deinit(my_mutator_t *data) {
-  if (data->tree_mutated)
-    tree_free(data->tree_mutated);
+  if (data->mutated_tree) tree_free(data->mutated_tree);
 
   // trees
   for (auto &kv : trees) {
     tree_free(kv.second);
   }
+  trees.clear();
 
-  if (data->tree_cur)
-    tree_free(data->tree_cur);
+  // if (data->tree_cur) tree_free(data->tree_cur);
 
   free(data->fuzz_buf);
   free(data);

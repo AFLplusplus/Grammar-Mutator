@@ -38,7 +38,7 @@ target_link_libraries(test_custom_mutator
   PRIVATE gtest_main)
 add_test(
   NAME test_json_custom_mutator
-  COMMAND test_custom_mutator ${CMAKE_BINARY_DIR}/src/libjsonmutator.so)
+  COMMAND test_custom_mutator ${CMAKE_BINARY_DIR}/src/libjsonmutator.so 100)
 
 # Test case 2:
 # test the tree APIs

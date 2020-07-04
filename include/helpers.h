@@ -36,11 +36,8 @@ extern "C" {
  @return The rounded up power of 2 (if no overflow) or 0 on overflow.
 */
 static inline size_t next_pow2(size_t in) {
-
   if (in == 0 || in > (size_t)-1) {
-
-    return 0;                  /* avoid undefined behaviour under-/overflow */
-
+    return 0; /* avoid undefined behaviour under-/overflow */
   }
 
   size_t out = in - 1;
@@ -50,7 +47,6 @@ static inline size_t next_pow2(size_t in) {
   out |= out >> 8;
   out |= out >> 16;
   return out + 1;
-
 }
 
 /* This function makes sure *size is > size_needed after call.
@@ -61,7 +57,6 @@ static inline size_t next_pow2(size_t in) {
  @return For convenience, this function returns *buf.
  */
 static inline void *maybe_grow(void **buf, size_t *size, size_t size_needed) {
-
   /* No need to realloc */
   if (likely(size_needed && *size >= size_needed)) { return *buf; }
 
@@ -79,7 +74,6 @@ static inline void *maybe_grow(void **buf, size_t *size, size_t size_needed) {
   *size = *buf ? next_size : 0;
 
   return *buf;
-
 }
 
 #undef INITIAL_GROWTH_SIZE

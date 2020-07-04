@@ -31,7 +31,7 @@ typedef struct my_mutator {
   const uint8_t *filename_cur;
   tree_t *tree_cur;
 
-  tree_t *tree_mutated;
+  tree_t *mutated_tree;
 
   // Reused buffers:
   BUF_VAR(uint8_t, fuzz);

@@ -9,7 +9,8 @@ extern "C" {
 
 /**
  * Reference: "NAUTILUS: Fishing for Deep Bugs with Grammars", NDSS 2019
- * Link: https://www.syssec.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2018/12/17/NDSS19-Nautilus.pdf
+ * Link:
+ * https://www.syssec.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2018/12/17/NDSS19-Nautilus.pdf
  */
 /**
  * Pick a random node of a tree and replace it with a randomly-generated new

@@ -2,7 +2,6 @@
 
 #define TREE_BUF_PREALLOC_SIZE (64)
 
-
 inline node_t *node_create(uint32_t id) {
   node_t *node = calloc(1, sizeof(node_t));
   node->id = id;
@@ -31,7 +30,7 @@ void node_free(node_t *node) {
 
   // subnodes
   if (node->subnode_count != 0) {
-    node_t *subnode = node->subnodes; // subnode linked list
+    node_t *subnode = node->subnodes;  // subnode linked list
     node_t *tmp = NULL;
     while (subnode) {
       tmp = subnode->next;
@@ -86,7 +85,7 @@ node_t *node_clone(node_t *node) {
   // Do not set the parent node for the cloned node
 
   // subnodes & next
-  node_t *subnode = node->subnodes; // subnode linked list
+  node_t *subnode = node->subnodes;  // subnode linked list
   node_t *tmp = NULL;
   while (subnode) {
     tmp = subnode->next;
@@ -122,15 +121,13 @@ bool node_equal(node_t *node_a, node_t *node_b) {
     tmp_a = subnode_a->next;
     tmp_b = subnode_b->next;
 
-    if (!node_equal(subnode_a, subnode_b))
-      return false;
+    if (!node_equal(subnode_a, subnode_b)) return false;
 
     subnode_a = tmp_a;
     subnode_b = tmp_b;
   }
 
-  if (unlikely(subnode_a != subnode_b))
-    return false;
+  if (unlikely(subnode_a != subnode_b)) return false;
 
   return true;
 }
@@ -138,7 +135,7 @@ bool node_equal(node_t *node_a, node_t *node_b) {
 size_t node_get_size(node_t *node) {
   if (node == NULL) return 0;
 
-  size_t ret = 1;
+  size_t  ret = 1;
   node_t *subnode = node->subnodes;
   node_t *tmp = NULL;
   while (subnode) {
@@ -166,9 +163,7 @@ bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
         prev->next = new_subnode;
       }
 
-      if (cur == root->subnode_last) {
-        root->subnode_last = new_subnode;
-      }
+      if (cur == root->subnode_last) { root->subnode_last = new_subnode; }
 
       // Detach `subnode` from the linked list and the parent
       cur->next = NULL;
@@ -189,9 +184,9 @@ void _node_to_buf(tree_t *tree, node_t *node) {
   if (node->subnode_count == 0) {
     if (node->val_len == 0) return;
 
-    size_t data_len = tree->data_len;
-    uint8_t *data_buf = maybe_grow(
-      BUF_PARAMS(tree, data), data_len + node->val_len);
+    size_t   data_len = tree->data_len;
+    uint8_t *data_buf =
+        maybe_grow(BUF_PARAMS(tree, data), data_len + node->val_len);
     if (!data_buf) {
       perror("tree output buffer allocation (maybe_grow)");
       return;
@@ -204,7 +199,7 @@ void _node_to_buf(tree_t *tree, node_t *node) {
   }
 
   // subnodes
-  node_t *subnode = node->subnodes; // subnode linked list
+  node_t *subnode = node->subnodes;  // subnode linked list
   node_t *tmp = NULL;
   while (subnode) {
     tmp = subnode->next;
@@ -212,8 +207,6 @@ void _node_to_buf(tree_t *tree, node_t *node) {
     subnode = tmp;
   }
 }
-
-
 
 inline tree_t *tree_create() {
   return calloc(1, sizeof(tree_t));
@@ -245,7 +238,7 @@ void tree_to_buf(tree_t *tree) {
 }
 
 tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
-  return NULL; // TODO: implement this function
+  return NULL;  // TODO: implement this function
 }
 
 tree_t *tree_clone(tree_t *tree) {
