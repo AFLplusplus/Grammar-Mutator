@@ -1,21 +1,28 @@
 #include "tree_mutation.h"
 #include "json_c_fuzz.h"
 
-node_t *_pick_node(node_t *root) {
-  // !!!: This function may return NULL
-  // TODO: we should uniformly pick nodes in a tree to avoid returning NULL
-  if (random() % 2) return root;
+node_t *_pick_non_term_node(node_t *root) {
+  size_t non_term_size = root->non_term_size;
+  int    prob = random() % non_term_size;
+  if (prob < 1) return root;
+  prob -= 1;
 
   node_t *subnode = root->subnodes;
   node_t *tmp = NULL;
-  node_t *ret = NULL;
   while (subnode) {
     tmp = subnode->next;
-    ret = _pick_node(subnode);
-    if (ret) return ret;
+
+    if (subnode->id != TERM_NODE) {
+      if (prob < subnode->non_term_size)
+        return _pick_non_term_node(subnode);
+
+      prob -= subnode->non_term_size;
+    }
+
     subnode = tmp;
   }
 
+  // should not reach here
   return NULL;
 }
 
@@ -23,10 +30,12 @@ tree_t *random_mutation(tree_t *tree) {
   tree_t *mutated_tree = tree_clone(tree);
 
   // Randomly pick a node in the tree
-  node_t *node = _pick_node(mutated_tree->root);
-  // TODO: we need to delete the following line, if we update `_pick_node`
-  //  function
-  if (node == NULL) node = mutated_tree->root;
+  node_t *node = _pick_non_term_node(mutated_tree->root);
+  if (unlikely(node == NULL)) {
+    // BY design, _pick_non_term_node should not return NULL
+    perror("_pick_non_term_node returns NULL");
+    exit(EXIT_FAILURE);
+  }
   node_t *parent = node->parent;
 
   // Generate a new node

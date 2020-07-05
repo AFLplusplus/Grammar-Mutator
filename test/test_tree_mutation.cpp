@@ -5,6 +5,8 @@
 #include "gtest/gtest.h"
 
 TEST(TreeMutationTest, RandomMutation) {
+  srandom(0);  // Fix the random seed
+
   tree_t *tree = tree_create();
   node_t *start = node_create(START);
   tree->root = start;

@@ -42,7 +42,8 @@ node_t *   gen_digit_1(int depth);
 tree_t *gen_init__();
 
 enum json_node_type {
-  START = 0,
+  TERM_NODE = 0,  // the terminal node, a special type
+  START,
   JSON,
   ELEMENT,
   VALUE,
@@ -75,7 +76,7 @@ enum json_node_type {
 };
 
 typedef node_t *(*gen_func_t)(int depth);
-extern gen_func_t gen_funcs[30];
+extern gen_func_t gen_funcs[31];
 
 #ifdef __cplusplus
 }

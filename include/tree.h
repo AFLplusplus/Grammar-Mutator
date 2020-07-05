@@ -18,6 +18,8 @@ typedef struct tree_node node_t;
 struct tree_node {
   uint32_t id;  // node type
 
+  size_t non_term_size;  // the number of non-terminal nodes in the subtree
+
   // uint8_t *val_buf;
   // size_t   val_size;
   BUF_VAR(uint8_t, val);

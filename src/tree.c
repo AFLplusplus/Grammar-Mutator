@@ -5,6 +5,9 @@
 inline node_t *node_create(uint32_t id) {
   node_t *node = calloc(1, sizeof(node_t));
   node->id = id;
+  if (id != 0) {  // "0" means the terminal node
+    node->non_term_size = 1;
+  }
   return node;
 }
 
@@ -59,6 +62,15 @@ void node_set_val(node_t *node, const void *val_buf, size_t val_len) {
 }
 
 inline void node_append_subnode(node_t *node, node_t *subnode) {
+  // non_term_size
+  node->non_term_size += subnode->non_term_size;
+  // update the parent node until the root
+  node_t *parent = node->parent;
+  while (parent) {
+    parent->non_term_size += subnode->non_term_size;
+    parent = parent->parent;
+  }
+
   // parent node
   subnode->parent = node;
 
