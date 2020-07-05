@@ -193,3 +193,28 @@ TEST(TreeTest, ReplaceNode) {
   tree_free(tree);
   node_free(value);
 }
+
+TEST(TreeTest, PickNonTermNodeNeverNull) {
+  node_t *picked_node = nullptr;
+
+  node_t *start = node_create(START);
+  for (int i = 0; i < 100; ++i) {
+    picked_node = node_pick_non_term_subnode(start);
+    ASSERT_EQ(picked_node->non_term_size, 1);
+    ASSERT_NE(picked_node->id, TERM_NODE);
+    ASSERT_EQ(picked_node, start);
+  }
+
+  // start -> json
+  node_t *json = node_create(JSON);
+  node_append_subnode(start, json);
+  ASSERT_EQ(start->non_term_size, 2);
+
+  for (int i = 0; i < 100; ++i) {
+    picked_node = node_pick_non_term_subnode(start);
+    ASSERT_NE(picked_node->id, TERM_NODE);
+    ASSERT_TRUE(picked_node ==start || picked_node == json);
+  }
+
+  node_free(start);
+}

@@ -87,29 +87,36 @@ node_t *node_clone(node_t *node);
 bool node_equal(node_t *node_a, node_t *node_b);
 
 /**
- * Calculate the size of a given node/subtree.
- * @param  node The node/subtree
- * @return      The total number of nodes in this subtree
+ * Calculate the size of a given tree (i.e., the total number of non-terminal
+ * subnodes).
+ * @param  root The root node of a tree
+ * @return      The total number of non-terminal nodes in this tree
  */
-size_t node_get_size(node_t *node);
+size_t node_get_size(node_t *root);
 
 /**
- * Replace `subnode` in a subtree (`root`) with `new_subnode`. Note that, this
+ * Replace `subnode` in a stree (`root`) with `new_subnode`. Note that, this
  * function will not destroy `subnode` and free its memory.
- * @param root         The root node of a tree/subtree
- * @param subnode      A subnode or the root node
- * @param replace_node A new subnode that will be added
- */
-/**
- * Replace `subnode` in a subtree (`root`) with `new_subnode`. Note that, this
- * function will not destroy `subnode` and free its memory.
- * @param root         The root node of a tree/subtree
+ * @param root         The root node of a tree
  * @param subnode      A subnode or the root node
  * @param replace_node A new subnode that will be added
  * @return             True (1) if the subnode has been successfully replaced;
  *                     otherwise, false (0)
  */
 bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode);
+
+/**
+ * Uniformly pick a subnode in a tree (`root`). As we track the number of
+ * non-terminal nodes while adding the subnode (see `node_append_subnode`), for
+ * each root node in a tree, the probability of being selected is `1 / the
+ * number of non-terminal subnodes in the tree`.
+ *
+ * Alternative solution: We can first apply pre-order traversal on the tree
+ * and dump the tree to an array. Then, randomly pick an element in the array.
+ * @param root The root node of a tree
+ * @return     The randomly picked subnode
+ */
+node_t *node_pick_non_term_subnode(node_t *root);
 
 typedef struct tree {
   node_t *root;

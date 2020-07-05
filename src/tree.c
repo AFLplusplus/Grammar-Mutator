@@ -144,22 +144,14 @@ bool node_equal(node_t *node_a, node_t *node_b) {
   return true;
 }
 
-size_t node_get_size(node_t *node) {
-  if (node == NULL) return 0;
+inline size_t node_get_size(node_t *root) {
+  if (root == NULL) return 0;
 
-  size_t  ret = 1;
-  node_t *subnode = node->subnodes;
-  node_t *tmp = NULL;
-  while (subnode) {
-    tmp = subnode->next;
-    ret += node_get_size(subnode);
-    subnode = tmp;
-  }
-
-  return ret;
+  return root->non_term_size;
 }
 
 bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
+  if (!root || !subnode || !new_subnode) return false;
   if (subnode->id != new_subnode->id) return false;
 
   node_t *cur, *next, *prev = NULL;
@@ -189,6 +181,32 @@ bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
   }
 
   return false;
+}
+
+node_t *node_pick_non_term_subnode(node_t *root) {
+  size_t non_term_size = root->non_term_size;
+  int    prob = random() % non_term_size;
+
+  if (prob < 1) return root;
+  prob -= 1;
+
+  node_t *subnode = root->subnodes;
+  node_t *tmp = NULL;
+  while (subnode) {
+    tmp = subnode->next;
+
+    if (subnode->id != 0) {  // "0" means the terminal node
+      if (prob < subnode->non_term_size)
+        return node_pick_non_term_subnode(subnode);
+
+      prob -= subnode->non_term_size;
+    }
+
+    subnode = tmp;
+  }
+
+  // should not reach here
+  return NULL;
 }
 
 void _node_to_buf(tree_t *tree, node_t *node) {
