@@ -2,6 +2,16 @@
 #include "json_c_fuzz.h"
 
 node_t *_pick_non_term_node(node_t *root) {
+  /**
+   * As we track the number of non-terminal nodes while adding the subnode (see
+   * `node_append_subnode` in `tree.h`/`tree.c`), for each root node in a tree,
+   * the probability of being selected is `1 / the number of non-terminal
+   * subnodes in the tree`.
+   *
+   * Alternative solution: We can first apply pre-order traversal on the tree
+   * and dump the tree to an array. Then, randomly pick an element in the array.
+   */
+
   size_t non_term_size = root->non_term_size;
   int    prob = random() % non_term_size;
   if (prob < 1) return root;
@@ -13,8 +23,7 @@ node_t *_pick_non_term_node(node_t *root) {
     tmp = subnode->next;
 
     if (subnode->id != TERM_NODE) {
-      if (prob < subnode->non_term_size)
-        return _pick_non_term_node(subnode);
+      if (prob < subnode->non_term_size) return _pick_non_term_node(subnode);
 
       prob -= subnode->non_term_size;
     }
@@ -32,7 +41,7 @@ tree_t *random_mutation(tree_t *tree) {
   // Randomly pick a node in the tree
   node_t *node = _pick_non_term_node(mutated_tree->root);
   if (unlikely(node == NULL)) {
-    // BY design, _pick_non_term_node should not return NULL
+    // By design, _pick_non_term_node should not return NULL
     perror("_pick_non_term_node returns NULL");
     exit(EXIT_FAILURE);
   }
