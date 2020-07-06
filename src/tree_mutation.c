@@ -26,8 +26,11 @@ tree_t *random_mutation(tree_t *tree) {
     return mutated_tree;
   }
 
-  node_replace_subnode(parent, node, replace_node);
-  node_free(node);
+  if (node_replace_subnode(parent, node, replace_node)) {
+    node_free(node);
+  } else {
+    node_free(replace_node);
+  }
 
   return mutated_tree;
 }
@@ -36,8 +39,62 @@ tree_t *rules_mutation(tree_t *tree) {
   // TODO: finish these functions
 }
 
+node_t *_pick_recursive_node(node_t *root) {
+  // !!!: This function may return NULL
+  // TODO: we should uniformly pick recursive nodes in a tree to avoid returning NULL
+  if (root->recursive_subnode_size != 0 && random() % 2) return root;
+
+  node_t *subnode = root->subnodes;
+  node_t *tmp = NULL;
+  node_t *ret = NULL;
+  while (subnode) {
+    tmp = subnode->next;
+    ret = _pick_recursive_node(subnode);
+    if (ret) return ret;
+    subnode = tmp;
+  }
+
+  return NULL;	  return NULL;
+}
+
 tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
-  // TODO: finish these functions
+  // TODO: currently, we assume `n == 1`. We'd better dump the tree as in the
+  //  pre-order traversal way, so we can operate in the array. Then, we need to
+  //  convert the array back to a tree
+
+  tree_t *mutated_tree = tree_clone(tree);
+
+  node_t *node = _pick_recursive_node(mutated_tree->root);
+  if (node == NULL) {
+    // do not change anything
+    return mutated_tree;
+  }
+  int prob = random() % node->recursive_subnode_size;
+
+  node_t *subnode = node->subnodes;
+  node_t *tmp = NULL;
+  while (subnode) {
+    tmp = subnode->next;
+
+    if (subnode->id == node->id) {
+      if (prob == 0) {
+        // pick this subnode
+        node_t *replace_node = node_clone(node);
+        if (node_replace_subnode(node, subnode, replace_node)) {
+          node_free(subnode);
+        } else {
+          node_free(replace_node);
+        }
+        break;
+      }
+
+      prob -= 1;
+    }
+
+    subnode = tmp;
+  }
+
+  return mutated_tree;
 }
 
 tree_t *splicing_mutation(tree_t *tree, tree_t *other_tree) {

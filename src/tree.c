@@ -5,6 +5,7 @@
 inline node_t *node_create(uint32_t id) {
   node_t *node = calloc(1, sizeof(node_t));
   node->id = id;
+  node->recursive_subnode_size = 0;
   if (id != 0) {  // "0" means the terminal node
     node->non_term_size = 1;
   }
@@ -62,6 +63,12 @@ void node_set_val(node_t *node, const void *val_buf, size_t val_len) {
 }
 
 inline void node_append_subnode(node_t *node, node_t *subnode) {
+  if (!node || !subnode) return;
+
+  if (node->id == subnode->id) {
+    node->recursive_subnode_size += 1;
+  }
+
   // non_term_size
   node->non_term_size += subnode->non_term_size;
   // update the parent node until the root
@@ -210,6 +217,8 @@ node_t *node_pick_non_term_subnode(node_t *root) {
 }
 
 void _node_to_buf(tree_t *tree, node_t *node) {
+  if (!tree || !node) return;
+
   // dump `val` if this is a leaf node
   if (node->subnode_count == 0) {
     if (node->val_len == 0) return;
@@ -261,6 +270,8 @@ void tree_free(tree_t *tree) {
 }
 
 void tree_to_buf(tree_t *tree) {
+  if (!tree) return;
+
   maybe_grow(BUF_PARAMS(tree, data), TREE_BUF_PREALLOC_SIZE);
   tree->data_len = 0;
 

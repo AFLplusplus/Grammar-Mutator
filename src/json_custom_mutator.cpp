@@ -37,6 +37,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
                        size_t add_buf_size,  // add_buf can be NULL
                        size_t max_size) {
   tree_t *tree = nullptr;
+  size_t mutated_size = 0;
 
   if (data->mutated_tree) {
     /* `data->mutated_tree` is NULL, meaning that this is not an interesting
@@ -64,7 +65,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
 
   tree_to_buf(tree);
   data->mutated_tree = tree;
-  size_t mutated_size = tree->data_len <= max_size ? tree->data_len : max_size;
+  mutated_size = tree->data_len <= max_size ? tree->data_len : max_size;
 
   // maybe_grow is optimized to be quick for reused buffers.
   uint8_t *mutated_out =
@@ -105,9 +106,9 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
   trees[fn] = data->mutated_tree;
 
   /* Once the test case is added into the queue, we will clear `mutated_tree`
-    pointer. In this case, we will store the parsing tree instead destroying it
-    in `afl_custom_fuzz`. */
-  data->mutated_tree = NULL;
+    pointer. In this case, we will store the tree instead destroying it in
+    `afl_custom_fuzz`. */
+  data->mutated_tree = nullptr;
 }
 
 void afl_custom_deinit(my_mutator_t *data) {
