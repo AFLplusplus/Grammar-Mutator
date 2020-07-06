@@ -15,11 +15,15 @@ cd ..
 git clone https://github.com/AFLplusplus/Grammar-Mutator.git
 cd Grammar-Mutator
 git checkout dev
-export AFLPP_ROOT="/path/to/AFLplusplus"  # set the path
-make src
-cd examples/JSON
+mkdir build
+cd build
+cmake -DENABLE_TESTING=ON ../
+make && make test
+cd ../examples/JSON
 mkdir out
+export AFL_SKIP_CPUFREQ=1
+export AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
 export AFL_CUSTOM_MUTATOR_ONLY=1
-export AFL_CUSTOM_MUTATOR_LIBRARY=$(realpath ../../src/libjsonmutator.so)
+export AFL_CUSTOM_MUTATOR_LIBRARY=$(realpath ../../build/src/libjsonmutator.so)
 afl-fuzz -i in -o out -- ../../../json-parser/test_json @@
 ```
