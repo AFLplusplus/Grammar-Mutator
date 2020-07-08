@@ -44,17 +44,15 @@ node_t *_pick_recursive_node(node_t *root) {
   // TODO: we should uniformly pick recursive nodes in a tree to avoid returning NULL
   if (root->recursive_subnode_size != 0 && random() % 2) return root;
 
-  node_t *subnode = root->subnodes;
-  node_t *tmp = NULL;
+  node_t *subnode = NULL;
   node_t *ret = NULL;
-  while (subnode) {
-    tmp = subnode->next;
+  for (int i = 0; i < root->subnode_count; ++i) {
+    subnode = root->subnodes[i];
     ret = _pick_recursive_node(subnode);
     if (ret) return ret;
-    subnode = tmp;
   }
 
-  return NULL;	  return NULL;
+  return NULL;
 }
 
 tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
@@ -71,11 +69,9 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
   }
   int prob = random() % node->recursive_subnode_size;
 
-  node_t *subnode = node->subnodes;
-  node_t *tmp = NULL;
-  while (subnode) {
-    tmp = subnode->next;
-
+  node_t *subnode = NULL;
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = node->subnodes[i];
     if (subnode->id == node->id) {
       if (prob == 0) {
         // pick this subnode
@@ -90,8 +86,6 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
 
       prob -= 1;
     }
-
-    subnode = tmp;
   }
 
   return mutated_tree;

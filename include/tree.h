@@ -29,11 +29,8 @@ struct tree_node {
 
   node_t *parent;  // parent node
 
-  node_t *subnodes;
-  node_t *subnode_last;  // last subnode
-  size_t  subnode_count;
-
-  node_t *next;
+  node_t **subnodes;
+  size_t   subnode_count;
 };
 
 /**
@@ -65,13 +62,6 @@ void node_free(node_t *node);
  * @param val_len The size of the attached value
  */
 void node_set_val(node_t *node, const void *val_buf, size_t val_len);
-
-/**
- * Append a child node `subnode` to a parent node `node`
- * @param node    The parent node
- * @param subnode The child node
- */
-void node_append_subnode(node_t *node, node_t *subnode);
 
 /**
  * Clone a node, including all subnodes

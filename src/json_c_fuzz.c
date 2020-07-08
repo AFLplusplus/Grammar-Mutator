@@ -5,7 +5,7 @@
 #include "tree.h"
 #include "json_c_fuzz.h"
 
-int max_depth = 3;
+int max_depth = -1;
 
 static inline int map_rand(int v) {
   return random() % v;
@@ -14,29 +14,29 @@ static inline int map_rand(int v) {
 const char *pool_start[] = {"null", "false", "true"};
 const int   pool_l_start[] = {4, 5, 4};
 
-const char *pool_json[] = {"null", "true", "false"};
-const int   pool_l_json[] = {4, 4, 5};
+const char *pool_json[] = {"true", "false", "null"};
+const int   pool_l_json[] = {4, 5, 4};
 
-const char *pool_element[] = {"false", "null", "true"};
-const int   pool_l_element[] = {5, 4, 4};
+const char *pool_element[] = {"true", "false", "null"};
+const int   pool_l_element[] = {4, 5, 4};
 
-const char *pool_value[] = {"null", "false", "true"};
-const int   pool_l_value[] = {4, 5, 4};
+const char *pool_value[] = {"false", "true", "null"};
+const int   pool_l_value[] = {5, 4, 4};
 
 const char *pool_object[] = {"{}"};
 const int   pool_l_object[] = {2};
 
-const char *pool_members[] = {"\"\":null", "\"\":true", "\"\":false"};
-const int   pool_l_members[] = {7, 7, 8};
+const char *pool_members[] = {"\"\":true", "\"\":false", "\"\":null"};
+const int   pool_l_members[] = {7, 8, 7};
 
-const char *pool_member[] = {"\"\":null", "\"\":false", "\"\":true"};
-const int   pool_l_member[] = {7, 8, 7};
+const char *pool_member[] = {"\"\":true", "\"\":null", "\"\":false"};
+const int   pool_l_member[] = {7, 7, 8};
 
 const char *pool_array[] = {"[]"};
 const int   pool_l_array[] = {2};
 
-const char *pool_elements[] = {"true", "null", "false"};
-const int   pool_l_elements[] = {4, 4, 5};
+const char *pool_elements[] = {"false", "null", "true"};
+const int   pool_l_elements[] = {5, 4, 4};
 
 const char *pool_string[] = {"\"\""};
 const int   pool_l_string[] = {2};
@@ -45,23 +45,23 @@ const char *pool_characters[] = {""};
 const int   pool_l_characters[] = {0};
 
 const char *pool_character[] = {
-    "3", "g",  "2", "+", "/", ",", "R", "]", "~", ".", ">", "-", "6", "S",
-    "0", "G",  "^", "q", "E", "Y", "%", "s", "v", "?", "$", "x", "7", "[",
-    "4", "M",  "#", "C", "L", "1", "U", ":", "I", "j", "!", "u", "V", "a",
-    "P", "8",  "|", "&", "{", "H", "W", "A", "5", "z", "y", "d", "f", "m",
-    "n", "\"", "Q", "l", "K", "J", "t", ")", "B", "Z", "N", "w", "c", "*",
-    "D", "o",  "}", "b", "9", "i", "<", "T", "(", "X", "@", "_", ";", "`",
-    "k", "e",  "p", "h", "=", "r", "F", " ", "O"};
+    "9", "L", "o", "7", ".",  "0", "q", "r", "Y", "|", "D", "4", ",", "1",
+    "d", "b", "6", "2", "\"", "~", "u", "5", "@", "&", "G", " ", "K", "P",
+    "`", "$", "+", "-", "3",  "t", "!", "i", "Q", "^", "n", "<", "S", "X",
+    "g", "[", "k", "v", "{",  "j", "c", "?", "V", "f", "}", "T", "E", "e",
+    "J", "h", "x", "/", "U",  "s", "p", "I", "]", "z", "l", "w", ")", "M",
+    "C", "R", "A", "Z", "#",  ">", "O", "=", "H", "a", "B", "F", "%", "*",
+    "m", ";", "8", "y", ":",  "_", "W", "(", "N"};
 const int pool_l_character[] = {
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
-const char *pool_esc[] = {"\\t", "\\f", "\\n", "\\\"", "\\\\", "\\b", "\\r"};
+const char *pool_esc[] = {"\\\\", "\\f", "\\r", "\\t", "\\b", "\\n", "\\\""};
 const int   pool_l_esc[] = {2, 2, 2, 2, 2, 2, 2};
 
-const char *pool_escc[] = {"r", "n", "t", "\\", "\"", "f", "b"};
+const char *pool_escc[] = {"n", "f", "\"", "\\", "b", "r", "t"};
 const int   pool_l_escc[] = {1, 1, 1, 1, 1, 1, 1};
 
 const char *pool_number[] = {"0"};
@@ -76,7 +76,7 @@ const int   pool_l_digits[] = {1};
 const char *pool_digit[] = {"0"};
 const int   pool_l_digit[] = {1};
 
-const char *pool_onenine[] = {"5", "3", "1", "8", "9", "7", "2", "6", "4"};
+const char *pool_onenine[] = {"5", "4", "9", "8", "3", "7", "1", "2", "6"};
 const int   pool_l_onenine[] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 const char *pool_frac[] = {""};
@@ -85,20 +85,20 @@ const int   pool_l_frac[] = {0};
 const char *pool_exp[] = {""};
 const int   pool_l_exp[] = {0};
 
-const char *pool_sign[] = {"-", "+", ""};
-const int   pool_l_sign[] = {1, 1, 0};
+const char *pool_sign[] = {"", "-", "+"};
+const int   pool_l_sign[] = {0, 1, 1};
 
 const char *pool_ws[] = {""};
 const int   pool_l_ws[] = {0};
 
-const char *pool_sp1[] = {"\r", "\n", "\t", " "};
+const char *pool_sp1[] = {"\r", "\t", "\n", " "};
 const int   pool_l_sp1[] = {1, 1, 1, 1};
 
-const char *pool_symbol[] = {",\"\":null", ",\"\":true", ",\"\":false"};
+const char *pool_symbol[] = {",\"\":true", ",\"\":null", ",\"\":false"};
 const int   pool_l_symbol[] = {8, 8, 9};
 
-const char *pool_symbol_1[] = {",false", ",null", ",true"};
-const int   pool_l_symbol_1[] = {6, 5, 5};
+const char *pool_symbol_1[] = {",null", ",false", ",true"};
+const int   pool_l_symbol_1[] = {5, 6, 5};
 
 const char *pool_symbol_2[] = {""};
 const int   pool_l_symbol_2[] = {0};
@@ -127,8 +127,10 @@ node_t *gen_start(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_json(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -150,8 +152,10 @@ node_t *gen_json(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_element(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -173,12 +177,14 @@ node_t *gen_element(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = gen_ws(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_value(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = gen_ws(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
   }
 
@@ -200,38 +206,52 @@ node_t *gen_value(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "false", 5);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "null", 4);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 2:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "true", 4);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 3:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_array(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 4:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_object(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 5:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_number(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 6:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_string(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -253,21 +273,25 @@ node_t *gen_object(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = node_create_with_val(TERM_NODE, "{", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_ws(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "}", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = node_create_with_val(TERM_NODE, "{", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_members(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "}", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
   }
 
@@ -289,10 +313,12 @@ node_t *gen_members(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = gen_member(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_symbol_2(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -314,16 +340,18 @@ node_t *gen_member(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(5 * sizeof(node_t *));
+      node->subnode_count = 5;
       subnode = gen_ws(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_string(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = gen_ws(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       subnode = node_create_with_val(TERM_NODE, ":", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[3] = subnode;
       subnode = gen_element(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[4] = subnode;
       break;
   }
 
@@ -345,21 +373,25 @@ node_t *gen_array(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = node_create_with_val(TERM_NODE, "[", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_ws(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "]", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = node_create_with_val(TERM_NODE, "[", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_elements(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "]", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
   }
 
@@ -381,10 +413,12 @@ node_t *gen_elements(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = gen_element(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_symbol_1_1(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -406,12 +440,14 @@ node_t *gen_string(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = node_create_with_val(TERM_NODE, "\"", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_characters(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "\"", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
   }
 
@@ -433,8 +469,10 @@ node_t *gen_characters(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_character_1(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -456,473 +494,661 @@ node_t *gen_character(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, " ", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "!", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 2:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "\"", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 3:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "#", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 4:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "$", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 5:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "%", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 6:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "&", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 7:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "(", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 8:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, ")", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 9:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "*", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 10:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "+", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 11:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, ",", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 12:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "-", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 13:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, ".", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 14:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "/", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 15:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "0", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 16:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "1", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 17:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "2", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 18:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "3", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 19:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "4", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 20:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "5", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 21:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "6", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 22:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "7", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 23:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "8", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 24:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "9", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 25:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, ":", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 26:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, ";", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 27:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "<", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 28:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "=", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 29:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, ">", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 30:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "?", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 31:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "@", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 32:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "A", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 33:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "B", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 34:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "C", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 35:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "D", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 36:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "E", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 37:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "F", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 38:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "G", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 39:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "H", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 40:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "I", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 41:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "J", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 42:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "K", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 43:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "L", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 44:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "M", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 45:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "N", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 46:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "O", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 47:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "P", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 48:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "Q", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 49:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "R", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 50:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "S", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 51:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "T", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 52:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "U", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 53:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "V", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 54:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "W", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 55:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "X", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 56:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "Y", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 57:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "Z", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 58:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "[", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 59:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "]", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 60:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "^", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 61:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "_", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 62:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "`", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 63:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "a", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 64:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "b", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 65:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "c", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 66:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "d", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 67:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "e", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 68:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "f", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 69:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "g", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 70:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "h", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 71:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "i", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 72:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "j", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 73:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "k", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 74:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "l", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 75:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "m", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 76:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "n", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 77:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "o", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 78:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "p", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 79:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "q", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 80:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "r", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 81:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "s", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 82:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "t", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 83:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "u", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 84:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "v", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 85:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "w", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 86:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "x", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 87:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "y", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 88:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "z", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 89:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "{", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 90:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "|", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 91:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "}", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 92:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "~", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 93:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_esc(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -944,10 +1170,12 @@ node_t *gen_esc(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = node_create_with_val(TERM_NODE, "\\", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_escc(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -969,38 +1197,52 @@ node_t *gen_escc(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "\"", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "\\", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 2:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "b", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 3:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "f", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 4:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "n", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 5:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "r", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 6:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "t", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -1022,12 +1264,14 @@ node_t *gen_number(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = gen_int(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_frac(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = gen_exp(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
   }
 
@@ -1049,31 +1293,39 @@ node_t *gen_int(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_digit(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = node_create_with_val(TERM_NODE, "-", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_digits(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       break;
 
     case 2:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = node_create_with_val(TERM_NODE, "-", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_onenine(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = gen_digits(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
 
     case 3:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = gen_onenine(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_digits(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -1095,8 +1347,10 @@ node_t *gen_digits(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_digit_1(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -1118,13 +1372,17 @@ node_t *gen_digit(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "0", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_onenine(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -1146,48 +1404,66 @@ node_t *gen_onenine(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "1", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "2", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 2:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "3", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 3:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "4", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 4:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "5", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 5:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "6", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 6:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "7", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 7:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "8", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 8:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "9", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -1209,14 +1485,17 @@ node_t *gen_frac(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
-
+      node->subnodes = (node_t **)malloc(0 * sizeof(node_t *));
+      node->subnode_count = 0;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = node_create_with_val(TERM_NODE, ".", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_digits(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -1238,25 +1517,30 @@ node_t *gen_exp(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
-
+      node->subnodes = (node_t **)malloc(0 * sizeof(node_t *));
+      node->subnode_count = 0;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = node_create_with_val(TERM_NODE, "E", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_sign(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = gen_digits(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
 
     case 2:
+      node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+      node->subnode_count = 3;
       subnode = node_create_with_val(TERM_NODE, "e", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_sign(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       subnode = gen_digits(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[2] = subnode;
       break;
   }
 
@@ -1278,17 +1562,22 @@ node_t *gen_sign(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
-
+      node->subnodes = (node_t **)malloc(0 * sizeof(node_t *));
+      node->subnode_count = 0;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "+", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 2:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "-", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -1310,14 +1599,18 @@ node_t *gen_ws(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
-
+      node->subnodes = (node_t **)malloc(0 * sizeof(node_t *));
+      node->subnode_count = 0;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = gen_sp1(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_ws(depth + 1);
-      node_append_subnode(node, subnode);
+      node->recursive_subnode_size += 1;
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -1339,23 +1632,31 @@ node_t *gen_sp1(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "\t", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "\n", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 2:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, "\r", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 3:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = node_create_with_val(TERM_NODE, " ", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
   }
 
@@ -1377,10 +1678,12 @@ node_t *gen_symbol(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = node_create_with_val(TERM_NODE, ",", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_members(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -1402,10 +1705,12 @@ node_t *gen_symbol_1(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = node_create_with_val(TERM_NODE, ",", 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_elements(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -1427,14 +1732,18 @@ node_t *gen_symbol_2(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
-
+      node->subnodes = (node_t **)malloc(0 * sizeof(node_t *));
+      node->subnode_count = 0;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = gen_symbol(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_symbol_2(depth + 1);
-      node_append_subnode(node, subnode);
+      node->recursive_subnode_size += 1;
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -1456,14 +1765,18 @@ node_t *gen_symbol_1_1(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
-
+      node->subnodes = (node_t **)malloc(0 * sizeof(node_t *));
+      node->subnode_count = 0;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = gen_symbol_1(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_symbol_1_1(depth + 1);
-      node_append_subnode(node, subnode);
+      node->recursive_subnode_size += 1;
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -1485,14 +1798,18 @@ node_t *gen_character_1(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
-
+      node->subnodes = (node_t **)malloc(0 * sizeof(node_t *));
+      node->subnode_count = 0;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = gen_character(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_character_1(depth + 1);
-      node_append_subnode(node, subnode);
+      node->recursive_subnode_size += 1;
+      node->subnodes[1] = subnode;
       break;
   }
 
@@ -1514,15 +1831,20 @@ node_t *gen_digit_1(int depth) {
   node_t *subnode = NULL;
   switch (val) {
     case 0:
+      node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+      node->subnode_count = 1;
       subnode = gen_digit(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       break;
 
     case 1:
+      node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+      node->subnode_count = 2;
       subnode = gen_digit(depth + 1);
-      node_append_subnode(node, subnode);
+      node->subnodes[0] = subnode;
       subnode = gen_digit_1(depth + 1);
-      node_append_subnode(node, subnode);
+      node->recursive_subnode_size += 1;
+      node->subnodes[1] = subnode;
       break;
   }
 

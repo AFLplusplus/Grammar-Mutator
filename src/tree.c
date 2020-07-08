@@ -34,17 +34,17 @@ void node_free(node_t *node) {
 
   // subnodes
   if (node->subnode_count != 0) {
-    node_t *subnode = node->subnodes;  // subnode linked list
-    node_t *tmp = NULL;
-    while (subnode) {
-      tmp = subnode->next;
+    node_t *subnode = NULL;
+    for (int i = 0; i < node->subnode_count; ++i) {
+      subnode = node->subnodes[i];
       node_free(subnode);
-      subnode = tmp;
     }
-    node->subnodes = NULL;
-    node->subnode_last = NULL;
+
     node->subnode_count = 0;
   }
+
+  if (node->subnodes)
+    free(node->subnodes);
 
   free(node);
 }
@@ -62,38 +62,6 @@ void node_set_val(node_t *node, const void *val_buf, size_t val_len) {
   memcpy(buf, val_buf, val_len);
 }
 
-inline void node_append_subnode(node_t *node, node_t *subnode) {
-  if (!node || !subnode) return;
-
-  if (node->id == subnode->id) {
-    node->recursive_subnode_size += 1;
-  }
-
-  // non_term_size
-  node->non_term_size += subnode->non_term_size;
-  // update the parent node until the root
-  node_t *parent = node->parent;
-  while (parent) {
-    parent->non_term_size += subnode->non_term_size;
-    parent = parent->parent;
-  }
-
-  // parent node
-  subnode->parent = node;
-
-  // subnodes
-  if (!node->subnodes) {
-    // initialize
-    node->subnodes = subnode;
-    node->subnode_last = subnode;
-  } else {
-    node->subnode_last->next = subnode;
-    node->subnode_last = subnode;
-  }
-
-  ++node->subnode_count;
-}
-
 node_t *node_clone(node_t *node) {
   node_t *new_node = node_create(node->id);
 
@@ -101,15 +69,14 @@ node_t *node_clone(node_t *node) {
   node_set_val(new_node, node->val_buf, node->val_len);
   new_node->val_len = node->val_len;
 
-  // Do not set the parent node for the cloned node
-
-  // subnodes & next
-  node_t *subnode = node->subnodes;  // subnode linked list
-  node_t *tmp = NULL;
-  while (subnode) {
-    tmp = subnode->next;
-    node_append_subnode(new_node, node_clone(subnode));
-    subnode = tmp;
+  // subnodes
+  new_node->subnode_count = node->subnode_count;
+  new_node->subnodes = malloc(node->subnode_count * sizeof(node_t *));
+  node_t *subnode = NULL;
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = node->subnodes[i];
+    new_node->subnodes[i] = node_clone(subnode);
+    new_node->subnodes[i]->parent = new_node;
   }
 
   return new_node;
@@ -132,21 +99,10 @@ bool node_equal(node_t *node_a, node_t *node_b) {
   // subnodes
   if (node_a->subnode_count != node_b->subnode_count) return false;
 
-  node_t *subnode_a = node_a->subnodes;
-  node_t *tmp_a = NULL;
-  node_t *subnode_b = node_b->subnodes;
-  node_t *tmp_b = NULL;
-  while (subnode_a && subnode_b) {
-    tmp_a = subnode_a->next;
-    tmp_b = subnode_b->next;
-
-    if (!node_equal(subnode_a, subnode_b)) return false;
-
-    subnode_a = tmp_a;
-    subnode_b = tmp_b;
+  for (int i = 0; i < node_a->subnode_count; ++i) {
+    if (!node_equal(node_a->subnodes[i], node_b->subnodes[i]))
+      return false;
   }
-
-  if (unlikely(subnode_a != subnode_b)) return false;
 
   return true;
 }
@@ -160,31 +116,21 @@ inline size_t node_get_size(node_t *root) {
 bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
   if (!root || !subnode || !new_subnode) return false;
   if (subnode->id != new_subnode->id) return false;
+  if (root != subnode->parent) return false;
 
-  node_t *cur, *next, *prev = NULL;
-  cur = root->subnodes;
-  while (cur) {
-    next = cur->next;
+  node_t *cur = NULL;
+  for (int i = 0; i < root->subnode_count; ++i) {
+    cur = root->subnodes[i];
 
     if (cur == subnode) {
-      new_subnode->next = next;
-      if (cur == root->subnodes) {
-        root->subnodes = new_subnode;
-      } else {
-        prev->next = new_subnode;
-      }
-
-      if (cur == root->subnode_last) { root->subnode_last = new_subnode; }
+      root->subnodes[i] = new_subnode;
+      new_subnode->parent = root;
 
       // Detach `subnode` from the linked list and the parent
-      cur->next = NULL;
       cur->parent = NULL;
 
       return true;
     }
-
-    prev = cur;
-    cur = next;
   }
 
   return false;
@@ -197,19 +143,14 @@ node_t *node_pick_non_term_subnode(node_t *root) {
   if (prob < 1) return root;
   prob -= 1;
 
-  node_t *subnode = root->subnodes;
-  node_t *tmp = NULL;
-  while (subnode) {
-    tmp = subnode->next;
+  node_t *subnode = NULL;
+  for (int i = 0; i < root->subnode_count; ++i) {
+    subnode = root->subnodes[i];
+    if (subnode->id == 0) continue;  // "0" means the terminal node
 
-    if (subnode->id != 0) {  // "0" means the terminal node
-      if (prob < subnode->non_term_size)
-        return node_pick_non_term_subnode(subnode);
-
-      prob -= subnode->non_term_size;
-    }
-
-    subnode = tmp;
+    if (prob < subnode->non_term_size)
+      return node_pick_non_term_subnode(subnode);
+    prob -= subnode->non_term_size;
   }
 
   // should not reach here
@@ -238,12 +179,10 @@ void _node_to_buf(tree_t *tree, node_t *node) {
   }
 
   // subnodes
-  node_t *subnode = node->subnodes;  // subnode linked list
-  node_t *tmp = NULL;
-  while (subnode) {
-    tmp = subnode->next;
+  node_t *subnode = NULL;
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = node->subnodes[i];
     _node_to_buf(tree, subnode);
-    subnode = tmp;
   }
 }
 

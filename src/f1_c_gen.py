@@ -245,53 +245,6 @@ pool_of_%(key)s = %(values)s''' % {
 result = []''')
         return '\n'.join(result)
 
-    def gen_main_src(self):
-        result = []
-        result.append('''
-import random
-import sys
-def main(args):
-    global result
-    max_num, max_depth = get_opts(args)
-    for i in range(max_num):
-        gen_start(0, max_depth)
-        print(''.join(result))
-        result = []
-
-main(sys.argv)''')
-        return '\n'.join(result)
-
-    def gen_alt_src(self, key):
-        rules = self.grammar[key]
-        result = []
-        result.append('''
-def gen_%(name)s(depth, max_depth):
-    next_depth = depth + 1
-    if depth > max_depth:
-        result.append(random.choice(pool_of_%(name)s))
-        return
-    val = random.randrange(%(nrules)s)''' % {
-            'name':self.k_to_s(key),
-            'nrules':len(rules)})
-        for i, rule in enumerate(rules):
-            result.append('''\
-    if val == %d:
-%s
-        return''' % (i, self.add_indent(self.gen_rule_src(rule, key, i),'        ')))
-        return '\n'.join(result)
-
-    def gen_fuzz_src(self):
-        result = []
-        result.append(self.string_pool_defs())
-        for key in self.grammar:
-            result.append(self.gen_alt_src(key))
-        return '\n'.join(result)
-
-    def fuzz_src(self, key='<start>'):
-        result = [self.gen_fuzz_src(),
-                  self.gen_main_src()]
-        return ''.join(result)
-
 
 class PyRecCompiledFuzzer(PyCompiledFuzzer):
     def __init__(self, grammar):
@@ -362,50 +315,62 @@ class CFuzzer(PyRecCompiledFuzzer):
 
     def gen_rule_src(self, rule, key, i):
         res = []
-        for token in rule:
+        ntokens = len(rule)
+        res.append(
+            'node->subnodes = (node_t**)malloc(%d * sizeof(node_t*));' % (
+                ntokens))
+        res.append('node->subnode_count = %d;' % ntokens)
+        for i, token in enumerate(rule):
             if token in self.grammar:
                 res.append('subnode = gen_%s(depth +1);' % self.k_to_s(token))
-                res.append("node_append_subnode(node, subnode);")
+                if key == token:
+                    res.append('node->recursive_subnode_size += 1;')
             else:
                 esc_token_chars = [self.esc_char(c) for c in token]
                 esc_token = ''.join(esc_token_chars)
                 res.append(
-                    "subnode = node_create_with_val(\"%s\", %d);" % (
+                    'subnode = node_create_with_val(TERM_NODE, "%s", %d);' % (
                         esc_token, len(esc_token_chars)))
-                res.append("node_append_subnode(node, subnode);")
-        return '\n        '.join(res)
+            # res.append('node_append_subnode(node, subnode);')
+            res.append('node->subnodes[%d] = subnode;' % i)
+        return '\n    '.join(res)
 
     def gen_alt_src(self, k):
         rules = self.grammar[k]
         cheap_strings = self.pool_of_strings[k]
-        result = ['''
+        result = []
+        result.append('''
 node_t *gen_%(name)s(int depth) {
-    node_t *node = node_create();
+  node_t *node = node_create(%(node_type)s);
 
-    if (depth > max_depth) {
-        int val = map_rand(%(num_cheap_strings)d);
-        const char* str = pool_%(name)s[val];
-        const int str_l = pool_l_%(name)s[val];
-        node_set_val(node, str, str_l);
-        return node;
-    }
+  if (depth > max_depth) {
+    int val = map_rand(%(num_cheap_strings)d);
+    const char* str = pool_%(name)s[val];
+    const int str_l = pool_l_%(name)s[val];
+    node_set_val(node, str, str_l);
+    return node;
+  }
 
-    int val = map_rand(%(nrules)d);
-    node_t *subnode = NULL;
-    switch(val) {''' % {'name':self.k_to_s(k), 'nrules':len(rules),
-                        'num_cheap_strings': len(cheap_strings),
-                       }]
+  int val = map_rand(%(nrules)d);
+  node_t *subnode = NULL;
+  switch(val) {''' % {
+            'node_type': self.k_to_s(k).upper(),
+            'name': self.k_to_s(k),
+            'nrules': len(rules),
+            'num_cheap_strings': len(cheap_strings),
+        })
+
         for i, rule in enumerate(rules):
             result.append('''
-    case %d:
-        %s
-        break;''' % (i, self.gen_rule_src(rule, k, i)))
-        result.append('''
-    }
+  case %d:
+    %s
+    break;''' % (i, self.gen_rule_src(rule, k, i)))
 
-    return node;
-}
-    ''')
+        result.append('''
+  }
+
+  return node;
+}''')
         return '\n'.join(result)
 
     def string_pool_defs(self):
@@ -414,88 +379,17 @@ node_t *gen_%(name)s(int depth) {
             cheap_strings = self.pool_of_strings[k]
             result.append('''
 const char* pool_%(k)s[] =  {%(cheap_strings)s};
-const int pool_l_%(k)s[] =  {%(cheap_strings_len)s};
-        ''' % {'k':self.k_to_s(k),
+const int pool_l_%(k)s[] =  {%(cheap_strings_len)s};''' % {
+                'k': self.k_to_s(k),
                'cheap_strings': ', '.join(['"%s"' % self.esc(s) for s in cheap_strings]),
                'cheap_strings_len': ', '.join([str(len(s)) for s in cheap_strings])})
         return '\n'.join(result)
 
-
-    def fn_fuzz_decs(self):
+    def fuzz_fn_decs(self):
         result = []
         for k in self.grammar:
             result.append('''node_t *gen_%s(int depth);''' % self.k_to_s(k))
         return '\n'.join(result)
-
-    def fn_map_def(self):
-        return '''
-int map_rand(int v) {
-    return random() % v;
-}
- '''
-
-    def fuzz_hdefs(self):
-        return '''
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <string.h>
-
-#include "tree.h"
-'''
-
-
-    def fuzz_rand_var_defs(self):
-        return '''
-int map_rand(int v);'''
-    def fuzz_stack_var_defs(self):
-        return '''
-extern int max_depth;'''
-
-    def fuzz_var_defs(self):
-        return '\n'.join([self.fuzz_rand_var_defs(), self.fuzz_stack_var_defs()])
-
-    def fn_main_input_frag(self):
-        return '''
-    if (argc < 3) {
-        printf("%s <seed> <max_num> <max_depth>\\n", argv[0]);
-        return 0;
-    }
-    seed = atoi(argv[1]);
-    max_num = atoi(argv[2]);
-    max_depth = atoi(argv[3]);'''
-
-    def fn_main_loop_frag(self):
-        return '''
-    for(int i=0; i < max_num; i++) {
-        tree_t *tree = gen_init__();
-        tree_to_buf(tree);
-        printf("%.*s\\n", (int)tree->data_len, tree->data_buf);
-        tree_free(tree);
-    }'''
-
-    def fn_main_def(self):
-        result = '''
-int main(int argc, char** argv) {
-    int seed, max_num;
-%(input_frag)s
-    srandom(seed);
-%(loop_frag)s
-    return 0;
-}''' % {'input_frag':self.fn_main_input_frag(),
-        'loop_frag': self.fn_main_loop_frag()}
-        return result
-
-    def main_stack_var_defs(self):
-        return '''
-int max_depth = 0;'''
-
-    def main_init_var_defs(self):
-        return '''
-tree_t *gen_init__();'''
-
-    def main_var_defs(self):
-        return '\n'.join([self.main_stack_var_defs(), self.main_init_var_defs()])
 
     def fuzz_fn_defs(self):
         result = []
@@ -503,43 +397,104 @@ tree_t *gen_init__();'''
             result.append(self.gen_alt_src(key))
         return '\n'.join(result)
 
-    def fuzz_entry(self):
-        return '''
-tree_t *gen_init__() {
-    tree_t *tree = tree_create();
-    tree->root = gen_start(0);
-    return tree;
-}'''
+    def node_type_decs(self):
+        result = '''
+enum node_type {
+  TERM_NODE = 0,
+  %s
+};'''
+        node_types = []
+        for k in self.grammar:
+            node_types.append('%s,' % self.k_to_s(k).upper())
+        return result % ('\n  '.join(node_types))
 
-    def main_hdefs(self):
-        return '''
-#define _LARGEFILE64_SOURCE
-#define _FILE_OFFSET_BITS 64
+    def fuzz_fn_array_defs(self):
+        result = '''
+gen_func_t gen_funcs[%d] = {
+  NULL,
+  %s
+};
+'''
+        fuzz_fn_names = []
+        for k in self.grammar:
+            fuzz_fn_names.append('gen_%s,' % self.k_to_s(k))
+        return result % (
+            len(self.grammar.keys()) + 1,
+            '\n  '.join(fuzz_fn_names))
 
+    def gen_fuzz_hdr(self, grammar_name):
+        hdr_content = '''
+#ifndef __%(grammar_name)s_C_FUZZ_H__
+#define __%(grammar_name)s_C_FUZZ_H__
+
+#include "tree.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern int max_depth;
+
+%(fuzz_fn_decs)s
+
+tree_t *gen_init__();
+
+%(node_type_decs)s
+
+typedef node_t *(*gen_func_t)(int depth);
+extern gen_func_t gen_funcs[%(num_nodes)d];
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif'''
+
+        params = {
+            "grammar_name": grammar_name.upper(),
+            "fuzz_fn_decs": self.fuzz_fn_decs(),
+            "node_type_decs": self.node_type_decs(),
+            "num_nodes": len(self.grammar.keys()) + 1
+        }
+
+        return hdr_content % params
+
+    def gen_fuzz_src(self, grammar_name):
+        src_content = '''
 #include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
 #include <string.h>
 
 #include "tree.h"
-'''
+#include "%(grammar_name)s_c_fuzz.h"
 
-    def gen_main_src(self):
-        return '\n'.join([self.main_hdefs(),
-                          self.main_var_defs(),
-                          self.fn_map_def(),
-                          self.fn_main_def()])
+int max_depth = -1;
 
-    def gen_fuzz_src(self):
-        return '\n'.join([self.fuzz_hdefs(),
-                          self.fuzz_var_defs(),
-                          self.fn_fuzz_decs(),
-                          self.string_pool_defs(),
-                          self.fuzz_fn_defs(),
-                          self.fuzz_entry()])
+static inline int map_rand(int v) {
+  return random() %% v;
+}
+%(string_pool_defs)s
 
-    def fuzz_src(self, key='<start>'):
-        return self.gen_main_src(), self.gen_fuzz_src()
+%(fuzz_fn_defs)s
+
+%(fuzz_fn_array_defs)s
+
+tree_t *gen_init__() {
+  tree_t *tree = tree_create();
+  tree->root = gen_start(0);
+  return tree;
+}'''
+
+        params = {
+            "grammar_name": grammar_name.lower(),
+            "string_pool_defs": self.string_pool_defs(),
+            "fuzz_fn_defs": self.fuzz_fn_defs(),
+            "fuzz_fn_array_defs": self.fuzz_fn_array_defs()
+        }
+
+        return src_content % params
+
+    def fuzz_src(self, key='<start>', grammar_name=''):
+        return self.gen_fuzz_hdr(grammar_name), self.gen_fuzz_src(grammar_name)
 
 
 def main(grammar, name):
@@ -551,11 +506,11 @@ def main(grammar, name):
 
     c_grammar = grammar
 
-    main_src, fuzz_src = CFuzzer(c_grammar).fuzz_src()
-    with open(name + '_c_fuzz.c', 'w') as f:
+    fuzz_hdr, fuzz_src = CFuzzer(c_grammar).fuzz_src(grammar_name=name)
+    with open(name.lower() + '_c_fuzz.h', 'w') as f:
+        print(fuzz_hdr, file=f)
+    with open(name.lower() + '_c_fuzz.c', 'w') as f:
         print(fuzz_src, file=f)
-    with open(name + '_c_main.c', 'w') as f:
-        print(main_src, file=f)
 
 
 if __name__ == '__main__':
