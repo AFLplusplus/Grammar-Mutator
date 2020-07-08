@@ -11,6 +11,8 @@ endif ()
 # CMake modules
 # set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(CMakeOptions.txt)
+set(MEMORCHECK_COMMAND_OPTIONS "--leak-check=full --show-leak-kinds=all")
+include(CTest)
 
 # Check build type
 if (ENABLE_DEBUG)
@@ -50,4 +52,9 @@ add_subdirectory(src)
 if (ENABLE_TESTING)
   enable_testing()
   add_subdirectory(test)
+
+  # Valgrind
+  add_custom_target(test_memcheck
+    COMMAND ${CMAKE_CTEST_COMMAND} --force-new-ctest-process --test-action memcheck
+    COMMAND cat "${CMAKE_BINARY_DIR}/Testing/Temporary/MemoryChecker.*.log")
 endif ()

@@ -1,2 +1,2 @@
-option(ENABLE_DEBUG     "Turn on debug output" ON)
-option(ENABLE_TESTING   "Turn on testing"      OFF)
+option(ENABLE_DEBUG     "Turn on debug output"  ON)
+option(ENABLE_TESTING   "Turn on testing"       OFF)

@@ -18,7 +18,7 @@ git checkout dev
 mkdir build
 cd build
 cmake -DENABLE_TESTING=ON ../
-make && make test
+make && make test && make test_memcheck
 cd ../examples/JSON
 mkdir out
 export AFL_SKIP_CPUFREQ=1
