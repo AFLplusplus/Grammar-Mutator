@@ -14,29 +14,29 @@ static inline int map_rand(int v) {
 const char *pool_start[] = {"null", "false", "true"};
 const int   pool_l_start[] = {4, 5, 4};
 
-const char *pool_json[] = {"true", "false", "null"};
+const char *pool_json[] = {"null", "false", "true"};
 const int   pool_l_json[] = {4, 5, 4};
 
-const char *pool_element[] = {"true", "false", "null"};
-const int   pool_l_element[] = {4, 5, 4};
+const char *pool_element[] = {"true", "null", "false"};
+const int   pool_l_element[] = {4, 4, 5};
 
-const char *pool_value[] = {"false", "true", "null"};
-const int   pool_l_value[] = {5, 4, 4};
+const char *pool_value[] = {"null", "false", "true"};
+const int   pool_l_value[] = {4, 5, 4};
 
 const char *pool_object[] = {"{}"};
 const int   pool_l_object[] = {2};
 
-const char *pool_members[] = {"\"\":true", "\"\":false", "\"\":null"};
-const int   pool_l_members[] = {7, 8, 7};
+const char *pool_members[] = {"\"\":false", "\"\":true", "\"\":null"};
+const int   pool_l_members[] = {8, 7, 7};
 
-const char *pool_member[] = {"\"\":true", "\"\":null", "\"\":false"};
+const char *pool_member[] = {"\"\":null", "\"\":true", "\"\":false"};
 const int   pool_l_member[] = {7, 7, 8};
 
 const char *pool_array[] = {"[]"};
 const int   pool_l_array[] = {2};
 
-const char *pool_elements[] = {"false", "null", "true"};
-const int   pool_l_elements[] = {5, 4, 4};
+const char *pool_elements[] = {"null", "false", "true"};
+const int   pool_l_elements[] = {4, 5, 4};
 
 const char *pool_string[] = {"\"\""};
 const int   pool_l_string[] = {2};
@@ -45,23 +45,23 @@ const char *pool_characters[] = {""};
 const int   pool_l_characters[] = {0};
 
 const char *pool_character[] = {
-    "9", "L", "o", "7", ".",  "0", "q", "r", "Y", "|", "D", "4", ",", "1",
-    "d", "b", "6", "2", "\"", "~", "u", "5", "@", "&", "G", " ", "K", "P",
-    "`", "$", "+", "-", "3",  "t", "!", "i", "Q", "^", "n", "<", "S", "X",
-    "g", "[", "k", "v", "{",  "j", "c", "?", "V", "f", "}", "T", "E", "e",
-    "J", "h", "x", "/", "U",  "s", "p", "I", "]", "z", "l", "w", ")", "M",
-    "C", "R", "A", "Z", "#",  ">", "O", "=", "H", "a", "B", "F", "%", "*",
-    "m", ";", "8", "y", ":",  "_", "W", "(", "N"};
+    "C", "f", "k", "m", "#", "Q",  "~", "7", "(", "^", "Z", "6", "h", ":",
+    "z", "j", "E", "O", "`", "v",  "+", "A", "x", "G", "K", "&", "0", "a",
+    "e", "I", "P", "[", ";", "|",  "l", "{", "1", "r", "S", "q", "u", "}",
+    "Y", "4", "R", "B", "*", "U",  "?", "2", "p", "n", "s", "5", "]", "H",
+    "d", "F", "T", "y", " ", "%",  "9", "/", "W", "b", "_", "V", "<", ")",
+    "!", ".", "N", "$", "D", "c",  ">", "M", "-", "J", "3", "g", "X", "=",
+    ",", "i", "L", "o", "8", "\"", "w", "t", "@"};
 const int pool_l_character[] = {
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
-const char *pool_esc[] = {"\\\\", "\\f", "\\r", "\\t", "\\b", "\\n", "\\\""};
+const char *pool_esc[] = {"\\n", "\\\\", "\\\"", "\\r", "\\f", "\\b", "\\t"};
 const int   pool_l_esc[] = {2, 2, 2, 2, 2, 2, 2};
 
-const char *pool_escc[] = {"n", "f", "\"", "\\", "b", "r", "t"};
+const char *pool_escc[] = {"n", "t", "\\", "f", "b", "\"", "r"};
 const int   pool_l_escc[] = {1, 1, 1, 1, 1, 1, 1};
 
 const char *pool_number[] = {"0"};
@@ -76,7 +76,7 @@ const int   pool_l_digits[] = {1};
 const char *pool_digit[] = {"0"};
 const int   pool_l_digit[] = {1};
 
-const char *pool_onenine[] = {"5", "4", "9", "8", "3", "7", "1", "2", "6"};
+const char *pool_onenine[] = {"3", "2", "5", "6", "9", "4", "7", "8", "1"};
 const int   pool_l_onenine[] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 const char *pool_frac[] = {""};
@@ -85,20 +85,20 @@ const int   pool_l_frac[] = {0};
 const char *pool_exp[] = {""};
 const int   pool_l_exp[] = {0};
 
-const char *pool_sign[] = {"", "-", "+"};
+const char *pool_sign[] = {"", "+", "-"};
 const int   pool_l_sign[] = {0, 1, 1};
 
 const char *pool_ws[] = {""};
 const int   pool_l_ws[] = {0};
 
-const char *pool_sp1[] = {"\r", "\t", "\n", " "};
+const char *pool_sp1[] = {" ", "\n", "\r", "\t"};
 const int   pool_l_sp1[] = {1, 1, 1, 1};
 
 const char *pool_symbol[] = {",\"\":true", ",\"\":null", ",\"\":false"};
 const int   pool_l_symbol[] = {8, 8, 9};
 
-const char *pool_symbol_1[] = {",null", ",false", ",true"};
-const int   pool_l_symbol_1[] = {5, 6, 5};
+const char *pool_symbol_1[] = {",false", ",null", ",true"};
+const int   pool_l_symbol_1[] = {6, 5, 5};
 
 const char *pool_symbol_2[] = {""};
 const int   pool_l_symbol_2[] = {0};
@@ -130,6 +130,7 @@ node_t *gen_start(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_json(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
   }
@@ -155,6 +156,7 @@ node_t *gen_json(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_element(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
   }
@@ -180,10 +182,13 @@ node_t *gen_element(int depth) {
       node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
       node->subnode_count = 3;
       subnode = gen_ws(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_value(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = gen_ws(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[2] = subnode;
       break;
   }
@@ -230,6 +235,7 @@ node_t *gen_value(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_array(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
 
@@ -237,6 +243,7 @@ node_t *gen_value(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_object(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
 
@@ -244,6 +251,7 @@ node_t *gen_value(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_number(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
 
@@ -251,6 +259,7 @@ node_t *gen_value(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_string(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
   }
@@ -278,6 +287,7 @@ node_t *gen_object(int depth) {
       subnode = node_create_with_val(TERM_NODE, "{", 1);
       node->subnodes[0] = subnode;
       subnode = gen_ws(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "}", 1);
       node->subnodes[2] = subnode;
@@ -289,6 +299,7 @@ node_t *gen_object(int depth) {
       subnode = node_create_with_val(TERM_NODE, "{", 1);
       node->subnodes[0] = subnode;
       subnode = gen_members(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "}", 1);
       node->subnodes[2] = subnode;
@@ -316,8 +327,10 @@ node_t *gen_members(int depth) {
       node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
       node->subnode_count = 2;
       subnode = gen_member(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_symbol_2(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -343,14 +356,18 @@ node_t *gen_member(int depth) {
       node->subnodes = (node_t **)malloc(5 * sizeof(node_t *));
       node->subnode_count = 5;
       subnode = gen_ws(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_string(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = gen_ws(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[2] = subnode;
       subnode = node_create_with_val(TERM_NODE, ":", 1);
       node->subnodes[3] = subnode;
       subnode = gen_element(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[4] = subnode;
       break;
   }
@@ -378,6 +395,7 @@ node_t *gen_array(int depth) {
       subnode = node_create_with_val(TERM_NODE, "[", 1);
       node->subnodes[0] = subnode;
       subnode = gen_ws(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "]", 1);
       node->subnodes[2] = subnode;
@@ -389,6 +407,7 @@ node_t *gen_array(int depth) {
       subnode = node_create_with_val(TERM_NODE, "[", 1);
       node->subnodes[0] = subnode;
       subnode = gen_elements(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "]", 1);
       node->subnodes[2] = subnode;
@@ -416,8 +435,10 @@ node_t *gen_elements(int depth) {
       node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
       node->subnode_count = 2;
       subnode = gen_element(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_symbol_1_1(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -445,6 +466,7 @@ node_t *gen_string(int depth) {
       subnode = node_create_with_val(TERM_NODE, "\"", 1);
       node->subnodes[0] = subnode;
       subnode = gen_characters(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = node_create_with_val(TERM_NODE, "\"", 1);
       node->subnodes[2] = subnode;
@@ -472,6 +494,7 @@ node_t *gen_characters(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_character_1(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
   }
@@ -1148,6 +1171,7 @@ node_t *gen_character(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_esc(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
   }
@@ -1175,6 +1199,7 @@ node_t *gen_esc(int depth) {
       subnode = node_create_with_val(TERM_NODE, "\\", 1);
       node->subnodes[0] = subnode;
       subnode = gen_escc(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1267,10 +1292,13 @@ node_t *gen_number(int depth) {
       node->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
       node->subnode_count = 3;
       subnode = gen_int(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_frac(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = gen_exp(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[2] = subnode;
       break;
   }
@@ -1296,6 +1324,7 @@ node_t *gen_int(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_digit(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
 
@@ -1305,6 +1334,7 @@ node_t *gen_int(int depth) {
       subnode = node_create_with_val(TERM_NODE, "-", 1);
       node->subnodes[0] = subnode;
       subnode = gen_digits(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       break;
 
@@ -1314,8 +1344,10 @@ node_t *gen_int(int depth) {
       subnode = node_create_with_val(TERM_NODE, "-", 1);
       node->subnodes[0] = subnode;
       subnode = gen_onenine(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = gen_digits(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[2] = subnode;
       break;
 
@@ -1323,8 +1355,10 @@ node_t *gen_int(int depth) {
       node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
       node->subnode_count = 2;
       subnode = gen_onenine(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_digits(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1350,6 +1384,7 @@ node_t *gen_digits(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_digit_1(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
   }
@@ -1382,6 +1417,7 @@ node_t *gen_digit(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_onenine(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
   }
@@ -1495,6 +1531,7 @@ node_t *gen_frac(int depth) {
       subnode = node_create_with_val(TERM_NODE, ".", 1);
       node->subnodes[0] = subnode;
       subnode = gen_digits(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1527,8 +1564,10 @@ node_t *gen_exp(int depth) {
       subnode = node_create_with_val(TERM_NODE, "E", 1);
       node->subnodes[0] = subnode;
       subnode = gen_sign(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = gen_digits(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[2] = subnode;
       break;
 
@@ -1538,8 +1577,10 @@ node_t *gen_exp(int depth) {
       subnode = node_create_with_val(TERM_NODE, "e", 1);
       node->subnodes[0] = subnode;
       subnode = gen_sign(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       subnode = gen_digits(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[2] = subnode;
       break;
   }
@@ -1607,8 +1648,10 @@ node_t *gen_ws(int depth) {
       node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
       node->subnode_count = 2;
       subnode = gen_sp1(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_ws(depth + 1);
+      node->non_term_size += 1;
       node->recursive_subnode_size += 1;
       node->subnodes[1] = subnode;
       break;
@@ -1683,6 +1726,7 @@ node_t *gen_symbol(int depth) {
       subnode = node_create_with_val(TERM_NODE, ",", 1);
       node->subnodes[0] = subnode;
       subnode = gen_members(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1710,6 +1754,7 @@ node_t *gen_symbol_1(int depth) {
       subnode = node_create_with_val(TERM_NODE, ",", 1);
       node->subnodes[0] = subnode;
       subnode = gen_elements(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1740,8 +1785,10 @@ node_t *gen_symbol_2(int depth) {
       node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
       node->subnode_count = 2;
       subnode = gen_symbol(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_symbol_2(depth + 1);
+      node->non_term_size += 1;
       node->recursive_subnode_size += 1;
       node->subnodes[1] = subnode;
       break;
@@ -1773,8 +1820,10 @@ node_t *gen_symbol_1_1(int depth) {
       node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
       node->subnode_count = 2;
       subnode = gen_symbol_1(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_symbol_1_1(depth + 1);
+      node->non_term_size += 1;
       node->recursive_subnode_size += 1;
       node->subnodes[1] = subnode;
       break;
@@ -1806,8 +1855,10 @@ node_t *gen_character_1(int depth) {
       node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
       node->subnode_count = 2;
       subnode = gen_character(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_character_1(depth + 1);
+      node->non_term_size += 1;
       node->recursive_subnode_size += 1;
       node->subnodes[1] = subnode;
       break;
@@ -1834,6 +1885,7 @@ node_t *gen_digit_1(int depth) {
       node->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
       node->subnode_count = 1;
       subnode = gen_digit(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       break;
 
@@ -1841,8 +1893,10 @@ node_t *gen_digit_1(int depth) {
       node->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
       node->subnode_count = 2;
       subnode = gen_digit(depth + 1);
+      node->non_term_size += 1;
       node->subnodes[0] = subnode;
       subnode = gen_digit_1(depth + 1);
+      node->non_term_size += 1;
       node->recursive_subnode_size += 1;
       node->subnodes[1] = subnode;
       break;

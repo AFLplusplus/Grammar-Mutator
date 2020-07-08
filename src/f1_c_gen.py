@@ -323,6 +323,7 @@ class CFuzzer(PyRecCompiledFuzzer):
         for i, token in enumerate(rule):
             if token in self.grammar:
                 res.append('subnode = gen_%s(depth +1);' % self.k_to_s(token))
+                res.append('node->non_term_size += 1;')
                 if key == token:
                     res.append('node->recursive_subnode_size += 1;')
             else:
