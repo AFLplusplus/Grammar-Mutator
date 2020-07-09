@@ -11,32 +11,32 @@ static inline int map_rand(int v) {
   return random() % v;
 }
 
-const char *pool_start[] = {"null", "false", "true"};
-const int   pool_l_start[] = {4, 5, 4};
+const char *pool_start[] = {"false", "null", "true"};
+const int   pool_l_start[] = {5, 4, 4};
 
-const char *pool_json[] = {"null", "false", "true"};
-const int   pool_l_json[] = {4, 5, 4};
+const char *pool_json[] = {"false", "null", "true"};
+const int   pool_l_json[] = {5, 4, 4};
 
-const char *pool_element[] = {"true", "null", "false"};
-const int   pool_l_element[] = {4, 4, 5};
+const char *pool_element[] = {"false", "null", "true"};
+const int   pool_l_element[] = {5, 4, 4};
 
-const char *pool_value[] = {"null", "false", "true"};
-const int   pool_l_value[] = {4, 5, 4};
+const char *pool_value[] = {"null", "true", "false"};
+const int   pool_l_value[] = {4, 4, 5};
 
 const char *pool_object[] = {"{}"};
 const int   pool_l_object[] = {2};
 
-const char *pool_members[] = {"\"\":false", "\"\":true", "\"\":null"};
-const int   pool_l_members[] = {8, 7, 7};
+const char *pool_members[] = {"\"\":null", "\"\":true", "\"\":false"};
+const int   pool_l_members[] = {7, 7, 8};
 
-const char *pool_member[] = {"\"\":null", "\"\":true", "\"\":false"};
-const int   pool_l_member[] = {7, 7, 8};
+const char *pool_member[] = {"\"\":false", "\"\":true", "\"\":null"};
+const int   pool_l_member[] = {8, 7, 7};
 
 const char *pool_array[] = {"[]"};
 const int   pool_l_array[] = {2};
 
-const char *pool_elements[] = {"null", "false", "true"};
-const int   pool_l_elements[] = {4, 5, 4};
+const char *pool_elements[] = {"true", "null", "false"};
+const int   pool_l_elements[] = {4, 4, 5};
 
 const char *pool_string[] = {"\"\""};
 const int   pool_l_string[] = {2};
@@ -45,23 +45,23 @@ const char *pool_characters[] = {""};
 const int   pool_l_characters[] = {0};
 
 const char *pool_character[] = {
-    "C", "f", "k", "m", "#", "Q",  "~", "7", "(", "^", "Z", "6", "h", ":",
-    "z", "j", "E", "O", "`", "v",  "+", "A", "x", "G", "K", "&", "0", "a",
-    "e", "I", "P", "[", ";", "|",  "l", "{", "1", "r", "S", "q", "u", "}",
-    "Y", "4", "R", "B", "*", "U",  "?", "2", "p", "n", "s", "5", "]", "H",
-    "d", "F", "T", "y", " ", "%",  "9", "/", "W", "b", "_", "V", "<", ")",
-    "!", ".", "N", "$", "D", "c",  ">", "M", "-", "J", "3", "g", "X", "=",
-    ",", "i", "L", "o", "8", "\"", "w", "t", "@"};
+    "7", "-", "U", "1", "[", "g", "!", "n",  "p", "*", " ", "6", "|", "l",
+    "{", "f", "b", "d", "Y", "M", "v", "z",  ".", "r", "$", "k", "R", "i",
+    "0", "P", ";", "Q", "X", ",", "9", "c",  "~", "o", "2", "_", "x", "E",
+    "q", ":", "m", "A", "V", "h", "D", "@",  "H", "B", ">", "3", "=", "&",
+    "(", "a", "^", "#", "S", "K", "4", "\"", ")", "?", "5", "G", "w", "e",
+    "/", "y", "<", "%", "u", "j", "t", "I",  "J", "T", "]", "`", "F", "N",
+    "L", "W", "Z", "C", "+", "}", "8", "s",  "O"};
 const int pool_l_character[] = {
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
-const char *pool_esc[] = {"\\n", "\\\\", "\\\"", "\\r", "\\f", "\\b", "\\t"};
+const char *pool_esc[] = {"\\t", "\\f", "\\n", "\\\"", "\\b", "\\\\", "\\r"};
 const int   pool_l_esc[] = {2, 2, 2, 2, 2, 2, 2};
 
-const char *pool_escc[] = {"n", "t", "\\", "f", "b", "\"", "r"};
+const char *pool_escc[] = {"r", "f", "t", "n", "\"", "\\", "b"};
 const int   pool_l_escc[] = {1, 1, 1, 1, 1, 1, 1};
 
 const char *pool_number[] = {"0"};
@@ -76,7 +76,7 @@ const int   pool_l_digits[] = {1};
 const char *pool_digit[] = {"0"};
 const int   pool_l_digit[] = {1};
 
-const char *pool_onenine[] = {"3", "2", "5", "6", "9", "4", "7", "8", "1"};
+const char *pool_onenine[] = {"3", "5", "1", "2", "8", "9", "6", "7", "4"};
 const int   pool_l_onenine[] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 const char *pool_frac[] = {""};
@@ -85,19 +85,19 @@ const int   pool_l_frac[] = {0};
 const char *pool_exp[] = {""};
 const int   pool_l_exp[] = {0};
 
-const char *pool_sign[] = {"", "+", "-"};
-const int   pool_l_sign[] = {0, 1, 1};
+const char *pool_sign[] = {"-", "+", ""};
+const int   pool_l_sign[] = {1, 1, 0};
 
 const char *pool_ws[] = {""};
 const int   pool_l_ws[] = {0};
 
-const char *pool_sp1[] = {" ", "\n", "\r", "\t"};
+const char *pool_sp1[] = {"\n", "\r", " ", "\t"};
 const int   pool_l_sp1[] = {1, 1, 1, 1};
 
-const char *pool_symbol[] = {",\"\":true", ",\"\":null", ",\"\":false"};
+const char *pool_symbol[] = {",\"\":null", ",\"\":true", ",\"\":false"};
 const int   pool_l_symbol[] = {8, 8, 9};
 
-const char *pool_symbol_1[] = {",false", ",null", ",true"};
+const char *pool_symbol_1[] = {",false", ",true", ",null"};
 const int   pool_l_symbol_1[] = {6, 5, 5};
 
 const char *pool_symbol_2[] = {""};
@@ -1652,7 +1652,7 @@ node_t *gen_ws(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_ws(depth + 1);
       node->non_term_size += 1;
-      node->recursive_subnode_size += 1;
+      node->recursive_link_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1789,7 +1789,7 @@ node_t *gen_symbol_2(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_symbol_2(depth + 1);
       node->non_term_size += 1;
-      node->recursive_subnode_size += 1;
+      node->recursive_link_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1824,7 +1824,7 @@ node_t *gen_symbol_1_1(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_symbol_1_1(depth + 1);
       node->non_term_size += 1;
-      node->recursive_subnode_size += 1;
+      node->recursive_link_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1859,7 +1859,7 @@ node_t *gen_character_1(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_character_1(depth + 1);
       node->non_term_size += 1;
-      node->recursive_subnode_size += 1;
+      node->recursive_link_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1897,7 +1897,7 @@ node_t *gen_digit_1(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_digit_1(depth + 1);
       node->non_term_size += 1;
-      node->recursive_subnode_size += 1;
+      node->recursive_link_size += 1;
       node->subnodes[1] = subnode;
       break;
   }

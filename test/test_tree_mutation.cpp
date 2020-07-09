@@ -12,49 +12,49 @@ TEST(TreeMutationTest, RandomMutation) {
   tree->root = start;
 
   // start -> json
-  start->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
-  node_t *json = node_create(1);
-  start->subnodes[0] = json;
+  node_init_subnodes(start, 1);
+  node_t *json = node_create(JSON);
+  node_set_subnode(start, 0, json);
 
   // json -> element
-  json->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
-  node_t *element = node_create(2);
-  json->subnodes[0] = element;
+  node_init_subnodes(json, 1);
+  node_t *element = node_create(ELEMENT);
+  node_set_subnode(json, 0, element);
 
   // element -> ws_1, value, ws_2 (NULL)
-  element->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
-  node_t *ws_1 = node_create(3);
+  node_init_subnodes(element, 3);
+  node_t *ws_1 = node_create(WS);
   node_t *value = node_create(VALUE);
-  node_t *ws_2 = node_create(3);
-  element->subnodes[0] = ws_1;
-  element->subnodes[1] = value;
-  element->subnodes[2] = ws_2;
+  node_t *ws_2 = node_create(WS);
+  node_set_subnode(element, 0, ws_1);
+  node_set_subnode(element, 1, value);
+  node_set_subnode(element, 2, ws_2);
 
   // ws_1 -> sp1_1 (" "), ws_3 (NULL)
-  ws_1->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
-  node_t *sp1_1 = node_create_with_val(5, " ", 1);
-  node_t *ws_3 = node_create(3);
-  ws_1->subnodes[0] = sp1_1;
-  ws_1->subnodes[1] = ws_3;
+  node_init_subnodes(ws_1, 2);
+  node_t *sp1_1 = node_create_with_val(SP1, " ", 1);
+  node_t *ws_3 = node_create(WS);
+  node_set_subnode(ws_1, 0, sp1_1);
+  node_set_subnode(ws_1, 1, ws_3);
 
   // value -> object
-  value->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+  node_init_subnodes(value, 1);
   node_t *object = node_create(OBJECT);
-  value->subnodes[0] = object;
+  node_set_subnode(value, 0, object);
 
   // object -> "{", ws_4, "}"
-  object->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+  node_init_subnodes(object, 3);
   node_t *ws_4 = node_create(WS);
-  object->subnodes[0] = node_create_with_val(TERM_NODE, "{", 1);
-  object->subnodes[1] = ws_4;
-  object->subnodes[2] = node_create_with_val(TERM_NODE, "}", 1);
+  node_set_subnode(object, 0, node_create_with_val(TERM_NODE, "{", 1));
+  node_set_subnode(object, 1, ws_4);
+  node_set_subnode(object, 2, node_create_with_val(TERM_NODE, "}", 1));
 
   // ws_4 -> sp1_2 (" "), ws_5 (NULL)
-  ws_4->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+  node_init_subnodes(ws_4, 2);
   node_t *sp1_2 = node_create_with_val(SP1, " ", 1);
   node_t *ws_5 = node_create(WS);
-  ws_4->subnodes[0] = sp1_2;
-  ws_4->subnodes[1] = ws_5;
+  node_set_subnode(ws_4, 0, sp1_2);
+  node_set_subnode(ws_4, 1, ws_5);
 
   tree_to_buf(tree);
   fprintf(stderr, "Before: %.*s\n", (int)tree->data_len, tree->data_buf);
@@ -79,61 +79,62 @@ TEST(TreeMutationTest, RandomRecursiveMutation) {
   tree->root = start;
 
   // start -> json
-  start->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
-  node_t *json = node_create(1);
-  start->subnodes[0] = json;
+  node_init_subnodes(start, 1);
+  node_t *json = node_create(JSON);
+  node_set_subnode(start, 0, json);
 
   // json -> element
-  json->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
-  node_t *element = node_create(2);
-  json->subnodes[0] = element;
+  node_init_subnodes(json, 1);
+  node_t *element = node_create(ELEMENT);
+  node_set_subnode(json, 0, element);
 
   // element -> ws_1, value, ws_2 (NULL)
-  element->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
-  node_t *ws_1 = node_create(3);
+  node_init_subnodes(element, 3);
+  node_t *ws_1 = node_create(WS);
   node_t *value = node_create(VALUE);
-  node_t *ws_2 = node_create(3);
-  element->subnodes[0] = ws_1;
-  element->subnodes[1] = value;
-  element->subnodes[2] = ws_2;
+  node_t *ws_2 = node_create(WS);
+  node_set_subnode(element, 0, ws_1);
+  node_set_subnode(element, 1, value);
+  node_set_subnode(element, 2, ws_2);
 
   // ws_1 -> sp1_1 (" "), ws_3 (NULL)
-  ws_1->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
-  node_t *sp1_1 = node_create_with_val(5, " ", 1);
-  node_t *ws_3 = node_create(3);
-  ws_1->subnodes[0] = sp1_1;
-  ws_1->subnodes[1] = ws_3;
+  node_init_subnodes(ws_1, 2);
+  node_t *sp1_1 = node_create_with_val(SP1, " ", 1);
+  node_t *ws_3 = node_create(WS);
+  node_set_subnode(ws_1, 0, sp1_1);
+  node_set_subnode(ws_1, 1, ws_3);
 
   // value -> object
-  value->subnodes = (node_t **)malloc(1 * sizeof(node_t *));
+  node_init_subnodes(value, 1);
   node_t *object = node_create(OBJECT);
-  value->subnodes[0] = object;
+  node_set_subnode(value, 0, object);
 
   // object -> "{", ws_4, "}"
-  object->subnodes = (node_t **)malloc(3 * sizeof(node_t *));
+  node_init_subnodes(object, 3);
   node_t *ws_4 = node_create(WS);
-  object->subnodes[0] = node_create_with_val(TERM_NODE, "{", 1);
-  object->subnodes[1] = ws_4;
-  object->subnodes[2] = node_create_with_val(TERM_NODE, "}", 1);
+  node_set_subnode(object, 0, node_create_with_val(TERM_NODE, "{", 1));
+  node_set_subnode(object, 1, ws_4);
+  node_set_subnode(object, 2, node_create_with_val(TERM_NODE, "}", 1));
 
   // ws_4 -> sp1_2 (" "), ws_5 (NULL)
-  ws_4->subnodes = (node_t **)malloc(2 * sizeof(node_t *));
+  node_init_subnodes(ws_4, 2);
   node_t *sp1_2 = node_create_with_val(SP1, " ", 1);
   node_t *ws_5 = node_create(WS);
-  ws_4->subnodes[0] = sp1_2;
-  ws_4->subnodes[1] = ws_5;
+  node_set_subnode(ws_4, 0, sp1_2);
+  node_set_subnode(ws_4, 1, ws_5);
+
+  tree_get_size(tree);
 
   tree_to_buf(tree);
   fprintf(stderr, "Before: %.*s\n", (int)tree->data_len, tree->data_buf);
 
   tree_t *mutated_tree = random_recursive_mutation(tree, 1);
-  bool    ret = tree_equal(mutated_tree, tree);
-  // TODO: the following line may fail, as we may return the unchanged tree
-  EXPECT_FALSE(ret);
-
   tree_to_buf(mutated_tree);
   fprintf(stderr, "After: %.*s\n", (int)mutated_tree->data_len,
           mutated_tree->data_buf);
+  bool ret = tree_equal(mutated_tree, tree);
+  // TODO: the following line may fail, as we may return the unchanged tree
+  EXPECT_FALSE(ret);
 
   tree_free(tree);
   tree_free(mutated_tree);

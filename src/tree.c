@@ -4,11 +4,17 @@
 
 inline node_t *node_create(uint32_t id) {
   node_t *node = calloc(1, sizeof(node_t));
+  if (!node) {
+    perror("node_create (calloc)");
+    return NULL;
+  }
+
   node->id = id;
-  node->recursive_subnode_size = 0;
+  node->recursive_link_size = 0;
   if (id != 0) {  // "0" means the terminal node
     node->non_term_size = 1;
   }
+
   return node;
 }
 
@@ -18,6 +24,28 @@ node_t *node_create_with_val(uint32_t id, const void *val_buf, size_t val_len) {
   node_set_val(node, val_buf, val_len);
 
   return node;
+}
+
+void node_init_subnodes(node_t *node, size_t n) {
+  if (node == NULL) return;
+
+  if (n == 0) {
+    // clear subnode array
+    if (node->subnodes) free(node->subnodes);
+    node->subnode_count = 0;
+    return;
+  }
+
+  if (node->subnodes) {
+    node->subnodes = realloc(node->subnodes, n * sizeof(node_t *));
+  } else {
+    node->subnodes = calloc(n, sizeof(node_t *));
+  }
+  if (!node->subnodes) {
+    perror("node_init_subnodes (realloc or calloc)");
+    return;
+  }
+  node->subnode_count = n;
 }
 
 void node_free(node_t *node) {
@@ -43,13 +71,16 @@ void node_free(node_t *node) {
     node->subnode_count = 0;
   }
 
-  if (node->subnodes)
-    free(node->subnodes);
+  if (node->subnodes) free(node->subnodes);
 
   free(node);
 }
 
 void node_set_val(node_t *node, const void *val_buf, size_t val_len) {
+  if (node == NULL) return;
+  // TODO: the following line is necessary, but we need to update the polled
+  //  string
+  // if (node->id != 0) return;  // non-terminal node should not have a value
   if (val_len == 0) return;
 
   uint8_t *buf = maybe_grow(BUF_PARAMS(node, val), val_len);
@@ -62,21 +93,36 @@ void node_set_val(node_t *node, const void *val_buf, size_t val_len) {
   memcpy(buf, val_buf, val_len);
 }
 
+void node_set_subnode(node_t *node, size_t i, node_t *subnode) {
+  if (node == NULL) return;
+  if (node->id == 0) return;  // terminal node should not have subnodes
+  if (i >= node->subnode_count) return;
+
+  node->subnodes[i] = subnode;
+  subnode->parent = node;  // set the parent
+
+  // Note that, this function does not update the `recursive_link_size` and
+  // `non_term_size`
+}
+
 node_t *node_clone(node_t *node) {
   node_t *new_node = node_create(node->id);
+
+  new_node->recursive_link_size = node->recursive_link_size;
+  new_node->non_term_size = node->non_term_size;
 
   // val
   node_set_val(new_node, node->val_buf, node->val_len);
   new_node->val_len = node->val_len;
 
   // subnodes
-  new_node->subnode_count = node->subnode_count;
-  new_node->subnodes = malloc(node->subnode_count * sizeof(node_t *));
-  node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
-    subnode = node->subnodes[i];
-    new_node->subnodes[i] = node_clone(subnode);
-    new_node->subnodes[i]->parent = new_node;
+  if (node->subnode_count != 0) {
+    node_init_subnodes(new_node, node->subnode_count);
+    node_t *subnode = NULL;
+    for (int i = 0; i < node->subnode_count; ++i) {
+      subnode = node->subnodes[i];
+      node_set_subnode(new_node, i, node_clone(subnode));
+    }
   }
 
   return new_node;
@@ -84,13 +130,9 @@ node_t *node_clone(node_t *node) {
 
 bool node_equal(node_t *node_a, node_t *node_b) {
   if (node_a == node_b) return true;
-
   if (!node_a || !node_b) return false;
-
   if (node_a->id != node_b->id) return false;
-
   if (node_a->val_len != node_b->val_len) return false;
-
   if (memcmp(node_a->val_buf, node_b->val_buf, node_a->val_len) != 0)
     return false;
 
@@ -100,17 +142,30 @@ bool node_equal(node_t *node_a, node_t *node_b) {
   if (node_a->subnode_count != node_b->subnode_count) return false;
 
   for (int i = 0; i < node_a->subnode_count; ++i) {
-    if (!node_equal(node_a->subnodes[i], node_b->subnodes[i]))
-      return false;
+    if (!node_equal(node_a->subnodes[i], node_b->subnodes[i])) return false;
   }
 
   return true;
 }
 
-inline size_t node_get_size(node_t *root) {
-  if (root == NULL) return 0;
+inline size_t node_get_size(node_t *node) {
+  if (node == NULL) return 0;
+  if (node->id == 0) return 0;  // terminal node
 
-  return root->non_term_size;
+  node->non_term_size = 1;
+  node->recursive_link_size = 0;
+
+  node_t *subnode = NULL;
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = node->subnodes[i];
+    if (node->id == subnode->id) {
+      // recursive link
+      ++node->recursive_link_size;
+    }
+    node->non_term_size += node_get_size(subnode);
+  }
+
+  return node->non_term_size;
 }
 
 bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
@@ -126,7 +181,7 @@ bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
       root->subnodes[i] = new_subnode;
       new_subnode->parent = root;
 
-      // Detach `subnode` from the linked list and the parent
+      // Detach `subnode` from the parent
       cur->parent = NULL;
 
       return true;
@@ -238,4 +293,8 @@ inline bool tree_equal(tree_t *tree_a, tree_t *tree_b) {
   if (tree_a == tree_b) return true;
   if (!tree_a || !tree_b) return false;
   return node_equal(tree_a->root, tree_b->root);
+}
+
+inline size_t tree_get_size(tree_t *tree) {
+  return node_get_size(tree->root);
 }

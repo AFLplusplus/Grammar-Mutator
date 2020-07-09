@@ -18,8 +18,10 @@ typedef struct tree_node node_t;
 struct tree_node {
   uint32_t id;  // node type
 
-  size_t recursive_subnode_size;  // the number of immediate subnodes with the
-                                  // same node type
+  // The following two sizes are calculated by `node_get_size`
+  size_t recursive_link_size;  // the total number of recursive links, (i.e.,
+                               // the number of immediate subnodes with the same
+                               // node type)
   size_t non_term_size;  // the number of non-terminal nodes in the subtree
 
   // uint8_t *val_buf;
@@ -50,6 +52,13 @@ node_t *node_create(uint32_t id);
 node_t *node_create_with_val(uint32_t id, const void *val_buf, size_t val_len);
 
 /**
+ * Initialize the subnode array.
+ * @param node The node
+ * @param n    The size of the subnode array
+ */
+void node_init_subnodes(node_t *node, size_t n);
+
+/**
  * Destroy the node and recursively free all memory
  * @param node The node
  */
@@ -62,6 +71,15 @@ void node_free(node_t *node);
  * @param val_len The size of the attached value
  */
 void node_set_val(node_t *node, const void *val_buf, size_t val_len);
+
+/**
+ * Set i-th subnode. `i` should be less than the number of subnodes. (i.e., i <
+ * node->subnode_count)
+ * @param node    The node
+ * @param i       The index of the subnode
+ * @param subnode The added subnode
+ */
+void node_set_subnode(node_t *node, size_t i, node_t *subnode);
 
 /**
  * Clone a node, including all subnodes
@@ -80,11 +98,11 @@ bool node_equal(node_t *node_a, node_t *node_b);
 
 /**
  * Calculate the size of a given tree (i.e., the total number of non-terminal
- * subnodes).
- * @param  root The root node of a tree
+ * subnodes) and the total number of recursive links
+ * @param  node The root node of a tree
  * @return      The total number of non-terminal nodes in this tree
  */
-size_t node_get_size(node_t *root);
+size_t node_get_size(node_t *node);
 
 /**
  * Replace `subnode` in a stree (`root`) with `new_subnode`. Note that, this
@@ -161,6 +179,14 @@ tree_t *tree_clone(tree_t *tree);
  * @return        True (1) if two trees are the same; otherwise, false (0)
  */
 bool tree_equal(tree_t *tree_a, tree_t *tree_b);
+
+/**
+ * Calculate the size of a given tree (i.e., the total number of non-terminal
+ * nodes in a tree).
+ * @param  tree A given tree
+ * @return      The total number of non-terminal nodes in this tree
+ */
+size_t tree_get_size(tree_t *tree);
 
 #ifdef __cplusplus
 }

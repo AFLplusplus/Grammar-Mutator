@@ -325,7 +325,7 @@ class CFuzzer(PyRecCompiledFuzzer):
                 res.append('subnode = gen_%s(depth +1);' % self.k_to_s(token))
                 res.append('node->non_term_size += 1;')
                 if key == token:
-                    res.append('node->recursive_subnode_size += 1;')
+                    res.append('node->recursive_link_size += 1;')
             else:
                 esc_token_chars = [self.esc_char(c) for c in token]
                 esc_token = ''.join(esc_token_chars)
