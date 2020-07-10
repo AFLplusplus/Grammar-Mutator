@@ -21,21 +21,26 @@ inline node_t *node_create(uint32_t id) {
 node_t *node_create_with_val(uint32_t id, const void *val_buf, size_t val_len) {
   node_t *node = node_create(id);
 
-  node_set_val(node, val_buf, val_len);
+  if (!val_buf) node_set_val(node, val_buf, val_len);
 
   return node;
 }
 
 void node_init_subnodes(node_t *node, size_t n) {
   if (node == NULL) return;
+  if (node->id == 0) return;  // terminal node should not have subnodes
 
   if (n == 0) {
     // clear subnode array
-    if (node->subnodes) free(node->subnodes);
+    if (node->subnodes) {
+      free(node->subnodes);
+      node->subnodes = NULL;
+    }
     node->subnode_count = 0;
     return;
   }
 
+  // TODO: do we need to free subnodes before reallocation?
   if (node->subnodes) {
     node->subnodes = realloc(node->subnodes, n * sizeof(node_t *));
   } else {
@@ -49,6 +54,14 @@ void node_init_subnodes(node_t *node, size_t n) {
 }
 
 void node_free(node_t *node) {
+  if (!node) return;
+
+  // id
+  node->id = 0;
+
+  node->recursive_link_size = 0;
+  node->non_term_size = 0;
+
   // val buf
   if (node->val_buf) {
     free(node->val_buf);
@@ -82,6 +95,7 @@ void node_set_val(node_t *node, const void *val_buf, size_t val_len) {
   //  string
   // if (node->id != 0) return;  // non-terminal node should not have a value
   if (val_len == 0) return;
+  if (!val_buf) return;
 
   uint8_t *buf = maybe_grow(BUF_PARAMS(node, val), val_len);
   if (!buf) {
@@ -97,6 +111,7 @@ void node_set_subnode(node_t *node, size_t i, node_t *subnode) {
   if (node == NULL) return;
   if (node->id == 0) return;  // terminal node should not have subnodes
   if (i >= node->subnode_count) return;
+  if (!node->subnodes) return;
 
   node->subnodes[i] = subnode;
   subnode->parent = node;  // set the parent
