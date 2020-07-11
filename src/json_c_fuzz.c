@@ -1652,7 +1652,7 @@ node_t *gen_ws(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_ws(depth + 1);
       node->non_term_size += 1;
-      node->recursive_link_size += 1;
+      node->recursion_edge_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1789,7 +1789,7 @@ node_t *gen_symbol_2(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_symbol_2(depth + 1);
       node->non_term_size += 1;
-      node->recursive_link_size += 1;
+      node->recursion_edge_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1824,7 +1824,7 @@ node_t *gen_symbol_1_1(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_symbol_1_1(depth + 1);
       node->non_term_size += 1;
-      node->recursive_link_size += 1;
+      node->recursion_edge_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1859,7 +1859,7 @@ node_t *gen_character_1(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_character_1(depth + 1);
       node->non_term_size += 1;
-      node->recursive_link_size += 1;
+      node->recursion_edge_size += 1;
       node->subnodes[1] = subnode;
       break;
   }
@@ -1897,7 +1897,7 @@ node_t *gen_digit_1(int depth) {
       node->subnodes[0] = subnode;
       subnode = gen_digit_1(depth + 1);
       node->non_term_size += 1;
-      node->recursive_link_size += 1;
+      node->recursion_edge_size += 1;
       node->subnodes[1] = subnode;
       break;
   }

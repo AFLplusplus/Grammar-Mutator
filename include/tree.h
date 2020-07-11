@@ -19,7 +19,7 @@ struct tree_node {
   uint32_t id;  // node type
 
   // The following two sizes are calculated by `node_get_size`
-  size_t recursive_link_size;  // the total number of recursive links, (i.e.,
+  size_t recursion_edge_size;  // the total number of recursion edges, (i.e.,
                                // the number of immediate subnodes with the same
                                // node type)
   size_t non_term_size;  // the number of non-terminal nodes in the subtree
@@ -33,6 +33,12 @@ struct tree_node {
 
   node_t **subnodes;
   size_t   subnode_count;
+};
+
+typedef struct recursion_edge recursion_edge_t;
+struct recursion_edge {
+  node_t *node;
+  size_t  subnode_offset;
 };
 
 /**
@@ -127,6 +133,14 @@ bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode);
  * @return     The randomly picked subnode
  */
 node_t *node_pick_non_term_subnode(node_t *root);
+
+/**
+ * Similar to `node_pick_non_term_subnode`, this function uniformly picks a
+ * recursion edge, in which two end points have the same node type (i.e., `id`).
+ * @param root The root node of a tree
+ * @return     The randomly picked recursion edge
+ */
+recursion_edge_t *node_pick_recursion(node_t *root);
 
 typedef struct tree {
   node_t *root;

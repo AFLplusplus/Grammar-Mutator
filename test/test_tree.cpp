@@ -90,7 +90,7 @@ TEST_F(TreeTest, NodeCreate) {
 
   EXPECT_EQ(node->id, 0);
 
-  EXPECT_EQ(node->recursive_link_size, 0);
+  EXPECT_EQ(node->recursion_edge_size, 0);
   EXPECT_EQ(node->non_term_size, 0);
 
   EXPECT_EQ(node->val_buf, nullptr);
@@ -250,31 +250,31 @@ TEST_F(TreeTest, TreeGetSize) {
   EXPECT_EQ(tree_size, 8);
 
   EXPECT_EQ(start->non_term_size, 1 + json->non_term_size);
-  EXPECT_EQ(start->recursive_link_size, 0);
+  EXPECT_EQ(start->recursion_edge_size, 0);
 
   EXPECT_EQ(json->non_term_size, 1 + element->non_term_size);
-  EXPECT_EQ(json->recursive_link_size, 0);
+  EXPECT_EQ(json->recursion_edge_size, 0);
 
   EXPECT_EQ(
       element->non_term_size,
       1 + ws_1->non_term_size + value->non_term_size + ws_2->non_term_size);
-  EXPECT_EQ(element->recursive_link_size, 0);
+  EXPECT_EQ(element->recursion_edge_size, 0);
 
   EXPECT_EQ(ws_1->non_term_size,
             1 + sp1_1->non_term_size + ws_3->non_term_size);
-  EXPECT_EQ(ws_1->recursive_link_size, 1);
+  EXPECT_EQ(ws_1->recursion_edge_size, 1);
 
   EXPECT_EQ(value->non_term_size, 1);
-  EXPECT_EQ(value->recursive_link_size, 0);
+  EXPECT_EQ(value->recursion_edge_size, 0);
 
   EXPECT_EQ(ws_2->non_term_size, 1);
-  EXPECT_EQ(ws_2->recursive_link_size, 0);
+  EXPECT_EQ(ws_2->recursion_edge_size, 0);
 
   EXPECT_EQ(sp1_1->non_term_size, 1);
-  EXPECT_EQ(sp1_1->recursive_link_size, 0);
+  EXPECT_EQ(sp1_1->recursion_edge_size, 0);
 
   EXPECT_EQ(ws_3->non_term_size, 1);
-  EXPECT_EQ(ws_3->recursive_link_size, 0);
+  EXPECT_EQ(ws_3->recursion_edge_size, 0);
 }
 
 TEST_F(TreeTest, NullNodeEqual) {

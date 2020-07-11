@@ -10,7 +10,7 @@ inline node_t *node_create(uint32_t id) {
   }
 
   node->id = id;
-  node->recursive_link_size = 0;
+  node->recursion_edge_size = 0;
   if (id != 0) {  // "0" means the terminal node
     node->non_term_size = 1;
   }
@@ -59,7 +59,7 @@ void node_free(node_t *node) {
   // id
   node->id = 0;
 
-  node->recursive_link_size = 0;
+  node->recursion_edge_size = 0;
   node->non_term_size = 0;
 
   // val buf
@@ -116,14 +116,14 @@ void node_set_subnode(node_t *node, size_t i, node_t *subnode) {
   node->subnodes[i] = subnode;
   subnode->parent = node;  // set the parent
 
-  // Note that, this function does not update the `recursive_link_size` and
+  // Note that, this function does not update the `recursion_edge_size` and
   // `non_term_size`
 }
 
 node_t *node_clone(node_t *node) {
   node_t *new_node = node_create(node->id);
 
-  new_node->recursive_link_size = node->recursive_link_size;
+  new_node->recursion_edge_size = node->recursion_edge_size;
   new_node->non_term_size = node->non_term_size;
 
   // val
@@ -168,14 +168,14 @@ inline size_t node_get_size(node_t *node) {
   if (node->id == 0) return 0;  // terminal node
 
   node->non_term_size = 1;
-  node->recursive_link_size = 0;
+  node->recursion_edge_size = 0;
 
   node_t *subnode = NULL;
   for (int i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
     if (node->id == subnode->id) {
       // recursive link
-      ++node->recursive_link_size;
+      ++node->recursion_edge_size;
     }
     node->non_term_size += node_get_size(subnode);
   }
@@ -207,6 +207,9 @@ bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
 }
 
 node_t *node_pick_non_term_subnode(node_t *root) {
+  if (!root) return NULL;
+  if (root->non_term_size == 0) return NULL;
+
   size_t non_term_size = root->non_term_size;
   int    prob = random() % non_term_size;
 
@@ -223,6 +226,17 @@ node_t *node_pick_non_term_subnode(node_t *root) {
     prob -= subnode->non_term_size;
   }
 
+  // should not reach here
+  return NULL;
+}
+
+recursion_edge_t *node_pick_recursion(node_t *root) {
+  if (!root) return NULL;
+  if (root->recursion_edge_size == 0) return NULL;
+
+  size_t recursion_edge_size = root->recursion_edge_size;
+  int    prob = random() % recursion_edge_size;
+  
   // should not reach here
   return NULL;
 }
