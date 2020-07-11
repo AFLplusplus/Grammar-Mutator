@@ -10,13 +10,13 @@ jobs:
     - uses: actions/checkout@v2
     - name: Create build directory
       run: |
-        mkdir build && cd ./build
+        mkdir build
     - name: CMake
       run: |
-        cmake -DENABLE_TESTING=OFF ../
+        cd ./build && cmake -DENABLE_TESTING=OFF ../
     - name: Compile
-      run: make
+      run: cmake --build build
     - name: Unit testing
-      run: make test
+      run: cd ./build && make test
     - name: Valgrind memcheck on unit testing
-      run: make test_memcheck
+      run: cd ./build && make test_memcheck
