@@ -2,4 +2,4 @@
 set -e
 set -x
 
-sudo apt install valgrind
+sudo apt install -y valgrind
