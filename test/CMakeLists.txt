@@ -27,7 +27,7 @@ add_subdirectory(
   EXCLUDE_FROM_ALL)
 
 
-# Test case 1:
+# Test suite 1:
 # run a custom mutator library, which generates test cases for a specific
 # grammar
 add_executable(test_custom_mutator
@@ -40,7 +40,7 @@ add_test(
   NAME test_json_custom_mutator
   COMMAND test_custom_mutator ${CMAKE_BINARY_DIR}/src/libjsonmutator.so 100)
 
-# Test case 2:
+# Test suite 2:
 # test the tree APIs
 add_executable(test_tree
   test_tree.cpp
@@ -50,7 +50,7 @@ add_test(
   NAME test_tree
   COMMAND test_tree)
 
-# Test case 3:
+# Test suite 3:
 # test the tree mutation APIs
 add_executable(test_tree_mutation
   test_tree_mutation.cpp
@@ -61,3 +61,13 @@ target_link_libraries(test_tree_mutation PRIVATE gtest_main)
 add_test(
   NAME test_tree_mutation
   COMMAND test_tree_mutation)
+
+# Test suite 4:
+# test the doubly linked list
+add_executable(test_list
+  test_list.cpp
+  ${CMAKE_SOURCE_DIR}/src/list.c)
+target_link_libraries(test_list PRIVATE gtest_main)
+add_test(
+  NAME test_list
+  COMMAND test_list)
