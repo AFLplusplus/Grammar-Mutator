@@ -1,0 +1,22 @@
+name: Grammar Mutator CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Create build directory
+      run: |
+        mkdir build && cd ./build
+    - name: CMake
+      run: |
+        cmake -DENABLE_TESTING=OFF ../
+    - name: Compile
+      run: make
+    - name: Unit testing
+      run: make test
+    - name: Valgrind memcheck on unit testing
+      run: make test_memcheck
