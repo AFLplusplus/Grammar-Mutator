@@ -8,15 +8,23 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Install Valgrind
+      run: |
+        bash .github/workflows/setup-deps.sh
     - name: Create build directory
       run: |
         mkdir build
     - name: CMake
       run: |
-        cd ./build && cmake -DENABLE_TESTING=OFF ../
+        cd ./build
+        cmake -DENABLE_TESTING=OFF ../
     - name: Compile
       run: cmake --build build
     - name: Unit testing
-      run: cd ./build && make test
+      run: |
+        cd ./build
+        make test
     - name: Valgrind memcheck on unit testing
-      run: cd ./build && make test_memcheck
+      run: |
+        cd ./build
+        make test_memcheck
