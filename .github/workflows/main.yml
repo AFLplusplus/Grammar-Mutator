@@ -17,7 +17,7 @@ jobs:
     - name: CMake
       run: |
         cd ./build
-        cmake -DENABLE_TESTING=OFF ../
+        cmake -DENABLE_TESTING=ON ../
     - name: Compile
       run: cmake --build build
     - name: Unit testing
