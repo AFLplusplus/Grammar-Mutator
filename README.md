@@ -1,5 +1,7 @@
 # Grammar-Mutator
 
+![Grammar Mutator CI](https://github.com/AFLplusplus/Grammar-Mutator/workflows/Grammar%20Mutator%20CI/badge.svg)
+
 Usage:
 
 ```bash
