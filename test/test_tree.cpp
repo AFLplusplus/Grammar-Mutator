@@ -101,6 +101,8 @@ TEST_F(TreeTest, NodeCreate) {
 
   EXPECT_EQ(node->subnodes, nullptr);
   EXPECT_EQ(node->subnode_count, 0);
+
+  node_free(node);
 }
 
 TEST_F(TreeTest, NodeCreateWithVal) {
@@ -109,6 +111,8 @@ TEST_F(TreeTest, NodeCreateWithVal) {
   EXPECT_EQ(node->val_buf, nullptr);
   EXPECT_EQ(node->val_size, 0);
   EXPECT_EQ(node->val_len, 0);
+
+  node_free(node);
 }
 
 TEST_F(TreeTest, InitSubnodes) {
