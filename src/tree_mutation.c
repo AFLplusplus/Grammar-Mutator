@@ -39,54 +39,34 @@ tree_t *rules_mutation(tree_t *tree) {
   // TODO: finish these functions
 }
 
-node_t *_pick_recursive_node(node_t *root) {
-  // !!!: This function may return NULL
-  // TODO: we should uniformly pick recursive nodes in a tree to avoid returning NULL
-  if (root->recursion_edge_size != 0 && random() % 2) return root;
-
-  node_t *subnode = NULL;
-  node_t *ret = NULL;
-  for (int i = 0; i < root->subnode_count; ++i) {
-    subnode = root->subnodes[i];
-    ret = _pick_recursive_node(subnode);
-    if (ret) return ret;
-  }
-
-  return NULL;
-}
-
 tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
-  // TODO: currently, we assume `n == 1`. We'd better dump the tree as in the
-  //  pre-order traversal way, so we can operate in the array. Then, we need to
-  //  convert the array back to a tree
-
   tree_t *mutated_tree = tree_clone(tree);
 
-  node_t *node = _pick_recursive_node(mutated_tree->root);
-  if (node == NULL) {
-    // do not change anything
-    return mutated_tree;
-  }
-  int prob = random() % node->recursion_edge_size;
+  recursion_edge_t picked_edge = node_pick_recursion_edge(mutated_tree->root);
 
-  node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
-    subnode = node->subnodes[i];
-    if (subnode->id == node->id) {
-      if (prob == 0) {
-        // pick this subnode
-        node_t *replace_node = node_clone(node);
-        if (node_replace_subnode(node, subnode, replace_node)) {
-          node_free(subnode);
-        } else {
-          node_free(replace_node);
-        }
-        break;
-      }
+  node_t *parent = picked_edge.parent;
+  node_t *tail = picked_edge.subnode;
+  size_t offset = picked_edge.subnode_offset;
 
-      prob -= 1;
-    }
+  // detach the tail
+  tail->parent = NULL;
+  parent->subnodes[offset] = NULL;
+
+  int num = 1 << n;
+  node_t *cloned_part = NULL;
+  for (int i = 0; i < num; ++i) {
+    cloned_part = node_clone(parent);
+
+    // attach the tail to the cloned part
+    tail->parent = cloned_part;
+    cloned_part->subnodes[offset] = tail;
+
+    tail = cloned_part;
   }
+
+  // attach the tail to the parent
+  tail->parent = parent;
+  parent->subnodes[offset] = tail;
 
   return mutated_tree;
 }

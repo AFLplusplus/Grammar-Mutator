@@ -98,8 +98,7 @@ TEST_F(CustomMutatorTest, FuzzNTimes) {
   uint8_t ret =
       mutator->afl_custom_queue_get(mutator->data, (const uint8_t *)"seed");
   ASSERT_EQ(ret, 1);
-  buf_size = mutator->afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr,
-                                      0, 4096);
+  mutator->afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
   ASSERT_TRUE(buf != nullptr);
   mutator->afl_custom_queue_new_entry(mutator->data, (const uint8_t *)"init",
                                       (const uint8_t *)"seed");
@@ -122,7 +121,7 @@ TEST_F(CustomMutatorTest, FuzzNTimes) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  if (argc < 3) { exit(EXIT_FAILURE); }
+  if (argc < 3) exit(EXIT_FAILURE);
   fn = argv[1];
   num = atoi(argv[2]);
   return RUN_ALL_TESTS();

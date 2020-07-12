@@ -2,16 +2,7 @@
 #include "json_c_fuzz.h"
 
 #include "gtest/gtest.h"
-
-#define ASSERT_MEMEQ(mem1, mem2, len) \
-  ASSERT_EQ(memcmp((void *)(mem1), (void *)(mem2), (int)(len)), 0)
-#define EXPECT_MEMEQ(mem1, mem2, len) \
-  EXPECT_EQ(memcmp((void *)(mem1), (void *)(mem2), (int)(len)), 0)
-
-#define ASSERT_MEMNE(mem1, mem2, len) \
-  ASSERT_NE(memcmp((void *)(mem1), (void *)(mem2), (int)(len)), 0)
-#define EXPECT_MEMNE(mem1, mem2, len) \
-  EXPECT_NE(memcmp((void *)(mem1), (void *)(mem2), (int)(len)), 0)
+#include "gtest_ext.h"
 
 class TreeTest : public ::testing::Test {
  protected:
@@ -63,7 +54,7 @@ class TreeTest : public ::testing::Test {
     node_set_subnode(element, 1, value);
     node_set_subnode(element, 2, ws_2);
 
-    // ws_1 -> sp1_1 (" "), ws_3 (NULL)
+    // ws_1 -> sp1_1 (" "), ws_3 (NULL)  (recursive)
     node_init_subnodes(ws_1, 2);
     sp1_1 = node_create_with_val(SP1, " ", 1);
     ws_3 = node_create(WS);
@@ -108,9 +99,7 @@ TEST_F(TreeTest, NodeCreate) {
 TEST_F(TreeTest, NodeCreateWithVal) {
   auto node = node_create_with_val(0, "test", 4);  // terminal node
 
-  EXPECT_EQ(node->val_buf, nullptr);
-  EXPECT_EQ(node->val_size, 0);
-  EXPECT_EQ(node->val_len, 0);
+  EXPECT_MEMEQ(node->val_buf, "test", 4);
 
   node_free(node);
 }
@@ -166,9 +155,9 @@ TEST_F(TreeTest, NodeSetVal) {
 
   auto node = node_create(1);
   // TODO: uncomment the following three lines after updating polled string
-//  node_set_val(node, "test", 4);
-//  EXPECT_EQ(node->val_size, 0);
-//  EXPECT_EQ(node->val_buf, nullptr);
+  //  node_set_val(node, "test", 4);
+  //  EXPECT_EQ(node->val_size, 0);
+  //  EXPECT_EQ(node->val_buf, nullptr);
 
   node_set_val(node, "test", 0);
   EXPECT_EQ(node->val_size, 0);
@@ -254,15 +243,15 @@ TEST_F(TreeTest, TreeGetSize) {
   EXPECT_EQ(tree_size, 8);
 
   EXPECT_EQ(start->non_term_size, 1 + json->non_term_size);
-  EXPECT_EQ(start->recursion_edge_size, 0);
+  EXPECT_EQ(start->recursion_edge_size, 1);
 
   EXPECT_EQ(json->non_term_size, 1 + element->non_term_size);
-  EXPECT_EQ(json->recursion_edge_size, 0);
+  EXPECT_EQ(json->recursion_edge_size, 1);
 
   EXPECT_EQ(
       element->non_term_size,
       1 + ws_1->non_term_size + value->non_term_size + ws_2->non_term_size);
-  EXPECT_EQ(element->recursion_edge_size, 0);
+  EXPECT_EQ(element->recursion_edge_size, 1);
 
   EXPECT_EQ(ws_1->non_term_size,
             1 + sp1_1->non_term_size + ws_3->non_term_size);
@@ -332,6 +321,60 @@ TEST_F(TreeTest, PickNonTermNodeNeverNull) {
   }
 
   node_free(_start);
+}
+
+TEST_F(TreeTest, PickRecursionEdgeNeverNull) {
+  auto node1 = node_create(1);
+  auto node2 = node_create(1);
+  auto node3 = node_create(1);
+  auto node4 = node_create(1);
+  auto node5 = node_create(2);
+  auto node6 = node_create(1);
+  auto node7 = node_create_with_val(0, "test", 4);
+
+  recursion_edge_t picked_edge = {nullptr, nullptr, 0};
+
+  node_init_subnodes(node1, 3);
+  node_set_subnode(node1, 0, node2);
+  node_set_subnode(node1, 1, node3);
+  node_set_subnode(node1, 2, node7);
+  node_init_subnodes(node3, 3);
+  node_set_subnode(node3, 0, node4);
+  node_set_subnode(node3, 1, node5);
+  node_set_subnode(node3, 2, node6);
+
+  node_get_size(node1);
+  EXPECT_EQ(node1->recursion_edge_size, 4);
+  for (int i = 0; i < 100; ++i) {
+    picked_edge = node_pick_recursion_edge(node1);
+    if (picked_edge.parent == node1) {
+      if (picked_edge.subnode == node2) {
+        EXPECT_EQ(picked_edge.subnode_offset, 0);
+      } else if (picked_edge.subnode == node3) {
+        EXPECT_EQ(picked_edge.subnode_offset, 1);
+      } else {
+        // should not reach here
+        EXPECT_FALSE(true);
+        break;
+      }
+    } else if (picked_edge.parent == node3) {
+      if (picked_edge.subnode == node4) {
+        EXPECT_EQ(picked_edge.subnode_offset, 0);
+      } else if (picked_edge.subnode == node6) {
+        EXPECT_EQ(picked_edge.subnode_offset, 2);
+      } else {
+        // should not reach here
+        EXPECT_FALSE(true);
+        break;
+      }
+    } else {
+      // should not reach here
+      EXPECT_FALSE(true);
+      break;
+    }
+  }
+
+  node_free(node1);
 }
 
 int main(int argc, char **argv) {

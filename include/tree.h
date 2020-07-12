@@ -19,9 +19,8 @@ struct tree_node {
   uint32_t id;  // node type
 
   // The following two sizes are calculated by `node_get_size`
-  size_t recursion_edge_size;  // the total number of recursion edges, (i.e.,
-                               // the number of immediate subnodes with the same
-                               // node type)
+  size_t recursion_edge_size;  // the total number of recursion edges in the
+                               // subtree
   size_t non_term_size;  // the number of non-terminal nodes in the subtree
 
   // uint8_t *val_buf;
@@ -37,7 +36,8 @@ struct tree_node {
 
 typedef struct recursion_edge recursion_edge_t;
 struct recursion_edge {
-  node_t *node;
+  node_t *parent;
+  node_t *subnode;
   size_t  subnode_offset;
 };
 
@@ -103,12 +103,11 @@ node_t *node_clone(node_t *node);
 bool node_equal(node_t *node_a, node_t *node_b);
 
 /**
- * Calculate the size of a given tree (i.e., the total number of non-terminal
- * subnodes) and the total number of recursive links
+ * Calculate the total number of non-terminal subnodes and the total number of
+ * recursive edges in the tree
  * @param  node The root node of a tree
- * @return      The total number of non-terminal nodes in this tree
  */
-size_t node_get_size(node_t *node);
+void node_get_size(node_t *node);
 
 /**
  * Replace `subnode` in a stree (`root`) with `new_subnode`. Note that, this
@@ -140,7 +139,7 @@ node_t *node_pick_non_term_subnode(node_t *root);
  * @param root The root node of a tree
  * @return     The randomly picked recursion edge
  */
-recursion_edge_t *node_pick_recursion(node_t *root);
+recursion_edge_t node_pick_recursion_edge(node_t *root);
 
 typedef struct tree {
   node_t *root;
