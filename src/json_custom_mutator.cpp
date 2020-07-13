@@ -13,6 +13,7 @@
 #include "custom_mutator.h"
 #include "json_c_fuzz.h"
 #include "tree_mutation.h"
+#include "chunk_store.h"
 
 using namespace std;
 
@@ -37,7 +38,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
                        size_t add_buf_size,  // add_buf can be NULL
                        size_t max_size) {
   tree_t *tree = nullptr;
-  size_t mutated_size = 0;
+  size_t  mutated_size = 0;
 
   if (data->mutated_tree) {
     /* `data->mutated_tree` is NULL, meaning that this is not an interesting
@@ -105,6 +106,9 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
 
   trees[fn] = data->mutated_tree;
 
+  // Store all subtrees in the newly added tree
+  chunk_store_add_tree(data->mutated_tree);
+
   /* Once the test case is added into the queue, we will clear `mutated_tree`
     pointer. In this case, we will store the tree instead destroying it in
     `afl_custom_fuzz`. */
@@ -124,4 +128,6 @@ void afl_custom_deinit(my_mutator_t *data) {
 
   free(data->fuzz_buf);
   free(data);
+
+  chunk_store_clear();
 }

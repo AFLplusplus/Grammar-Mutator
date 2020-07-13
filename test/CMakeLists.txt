@@ -54,9 +54,10 @@ add_test(
 # test the tree mutation APIs
 add_executable(test_tree_mutation
   test_tree_mutation.cpp
+  ${CMAKE_SOURCE_DIR}/src/chunk_store.cpp
+  ${CMAKE_SOURCE_DIR}/src/json_c_fuzz.c
   ${CMAKE_SOURCE_DIR}/src/tree.c
-  ${CMAKE_SOURCE_DIR}/src/tree_mutation.c
-  ${CMAKE_SOURCE_DIR}/src/json_c_fuzz.c)
+  ${CMAKE_SOURCE_DIR}/src/tree_mutation.c)
 target_link_libraries(test_tree_mutation PRIVATE gtest_main)
 add_test(
   NAME test_tree_mutation
@@ -71,3 +72,15 @@ target_link_libraries(test_list PRIVATE gtest_main)
 add_test(
   NAME test_list
   COMMAND test_list)
+
+# Test suite 5:
+# test the chunk store
+add_executable(test_chunk_store
+  test_chunk_store.cpp
+  ${CMAKE_SOURCE_DIR}/src/chunk_store.cpp
+  ${CMAKE_SOURCE_DIR}/src/tree.c)
+target_link_libraries(test_chunk_store PRIVATE gtest_main)
+add_test(
+  NAME test_chunk_store
+  COMMAND test_chunk_store)
+

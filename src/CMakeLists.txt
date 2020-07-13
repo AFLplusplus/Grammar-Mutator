@@ -1,4 +1,5 @@
 add_library(jsonmutator SHARED
+  chunk_store.cpp
   list.c
   tree.c
   tree_mutation.c
