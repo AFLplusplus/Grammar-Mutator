@@ -57,7 +57,7 @@ TEST_F(ChunkStoreTest, AddTree) {
 }
 
 TEST_F(ChunkStoreTest, GetAlternativeNode) {
-
+  EXPECT_TRUE(true);
 }
 
 int main(int argc, char **argv) {
