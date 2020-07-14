@@ -3,22 +3,11 @@
 #include <vector>
 
 #include "chunk_store.h"
+#include "../src/chunk_store_internal.h"
 
 #include "gtest/gtest.h"
 
 using namespace std;
-
-struct buffer {
-  BUF_VAR(uint8_t, data);
-  size_t data_len;
-
-  buffer();
-  explicit buffer(node_t *node);
-  buffer(const buffer &_other);
-  ~buffer();
-  void from_node(node_t *node);
-  bool operator<(const buffer &rhs) const;
-};
 
 extern map<uint32_t, vector<node_t *>> chunk_store;
 extern set<buffer>                     seen_chunks;
