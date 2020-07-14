@@ -6,18 +6,24 @@
 
 #include "gtest/gtest.h"
 
-#include "chunk_store.h"
-
 using namespace std;
 
-struct chunk_compare {
-  bool operator()(node_t *lhs, node_t *rhs) const {
-    return !node_equal(lhs, rhs);  // TODO: need to check this
-  }
+struct buffer {
+  BUF_VAR(uint8_t, data);
+  size_t data_len;
+
+  buffer();
+  explicit buffer(node_t *node);
+  buffer(const buffer &_other);
+  ~buffer();
+  void from_node(node_t *node);
+  bool operator<(const buffer &rhs) const;
 };
 
 extern map<uint32_t, vector<node_t *>> chunk_store;
-extern set<node_t *, chunk_compare>    seen_chunks;
+extern set<buffer>                     seen_chunks;
+
+extern void chunk_store_add_node(node_t *node);
 
 class ChunkStoreTest : public ::testing::Test {
  protected:
@@ -30,6 +36,35 @@ class ChunkStoreTest : public ::testing::Test {
     chunk_store_clear();
   }
 };
+
+TEST_F(ChunkStoreTest, SeenChunk) {
+  auto node1 = node_create(1);
+  auto node2 = node_clone(node1);
+
+  auto ret1 = seen_chunks.insert(buffer(node1));
+  EXPECT_TRUE(ret1.second);
+  auto ret2 = seen_chunks.insert(buffer(node2));
+  EXPECT_FALSE(ret2.second);
+
+  EXPECT_EQ(seen_chunks.size(), 1);
+
+  node_free(node1);
+  node_free(node2);
+}
+
+TEST_F(ChunkStoreTest, AddNode) {
+  auto node1 = node_create(1);
+  auto node2 = node_create_with_val(0, "\r", 1);
+  node_init_subnodes(node1, 1);
+  node_set_subnode(node1, 0, node2);
+
+  chunk_store_add_node(node1);
+  //  chunk_store_add_node(node1);
+
+  EXPECT_EQ(seen_chunks.size(), chunk_store[1].size());
+
+  node_free(node1);
+}
 
 TEST_F(ChunkStoreTest, AddTree) {
   srandom(0);  // Fix the random seed

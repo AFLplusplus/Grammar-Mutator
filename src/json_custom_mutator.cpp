@@ -52,8 +52,8 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
   if (!tree) {
     // Generation
     // Randomly generate a JSON string
-    max_depth =
-        random() % 15 + 1;  // randomly pick a `max_depth` within [1, 15]
+    max_depth = 0;
+//        random() % 15 + 1;  // randomly pick a `max_depth` within [1, 15]
     tree = gen_init__();
   } else {
     // Mutation
@@ -65,6 +65,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
   }
 
   tree_to_buf(tree);
+  tree_get_size(tree);
   data->mutated_tree = tree;
   mutated_size = tree->data_len <= max_size ? tree->data_len : max_size;
 
@@ -89,7 +90,10 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   if (trees.find(fn) != trees.end()) data->tree_cur = trees[fn];
 
-  if (data->tree_cur) return 1;
+  if (data->tree_cur) {
+    tree_get_size(data->tree_cur);
+    return 1;
+  }
 
   // TODO: Read the test case from the file and parse it
 

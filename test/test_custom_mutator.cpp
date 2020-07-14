@@ -35,15 +35,13 @@ static int   num = 100;
 
 class CustomMutatorTest : public ::testing::Test {
  protected:
-  void *                 dh;
+  void *                 dh = nullptr;
   void *                 afl = nullptr;
   struct custom_mutator *mutator = nullptr;
 
-  CustomMutatorTest() {
-  }
+  CustomMutatorTest() = default;
 
-  ~CustomMutatorTest() override {
-  }
+  ~CustomMutatorTest() override = default;
 
   void SetUp() override {
     // Load the custom mutator library
