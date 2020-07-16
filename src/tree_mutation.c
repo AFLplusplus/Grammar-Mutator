@@ -43,7 +43,7 @@ tree_t *rules_mutation(tree_t *tree) {
 tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
   tree_t *mutated_tree = tree_clone(tree);
 
-  recursion_edge_t picked_edge = node_pick_recursion_edge(mutated_tree->root);
+  edge_t picked_edge = node_pick_recursion_edge(mutated_tree->root);
 
   node_t *parent = picked_edge.parent;
   node_t *tail = picked_edge.subnode;

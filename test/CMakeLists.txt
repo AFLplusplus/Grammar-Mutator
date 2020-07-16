@@ -84,3 +84,13 @@ add_test(
   NAME test_chunk_store
   COMMAND test_chunk_store)
 
+# Test suite 6:
+# test the tree trimming APIs
+add_executable(test_tree_trimming
+  test_tree_trimming.cpp
+  ${CMAKE_SOURCE_DIR}/src/tree.c
+  ${CMAKE_SOURCE_DIR}/src/tree_trimming.c)
+target_link_libraries(test_tree_trimming PRIVATE gtest_main)
+add_test(
+  NAME test_tree_trimming
+  COMMAND test_tree_trimming)

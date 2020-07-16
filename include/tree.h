@@ -34,8 +34,8 @@ struct tree_node {
   size_t   subnode_count;
 };
 
-typedef struct recursion_edge recursion_edge_t;
-struct recursion_edge {
+typedef struct edge edge_t;
+struct edge {
   node_t *parent;
   node_t *subnode;
   size_t  subnode_offset;
@@ -121,25 +121,32 @@ void node_get_size(node_t *node);
 bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode);
 
 /**
- * Uniformly pick a subnode in a tree (`root`). As we track the number of
+ * Uniformly pick a subnode in a tree (`node`). As we track the number of
  * non-terminal nodes while adding the subnode (see `node_append_subnode`), for
- * each root node in a tree, the probability of being selected is `1 / the
+ * each node node in a tree, the probability of being selected is `1 / the
  * number of non-terminal subnodes in the tree`.
  *
  * Alternative solution: We can first apply pre-order traversal on the tree
  * and dump the tree to an array. Then, randomly pick an element in the array.
- * @param root The root node of a tree
+ * @param node The root node of a tree
  * @return     The randomly picked subnode
  */
-node_t *node_pick_non_term_subnode(node_t *root);
+node_t *node_pick_non_term_subnode(node_t *node);
 
 /**
  * Similar to `node_pick_non_term_subnode`, this function uniformly picks a
  * recursion edge, in which two end points have the same node type (i.e., `id`).
- * @param root The root node of a tree
+ * @param node The root node of a tree
  * @return     The randomly picked recursion edge
  */
-recursion_edge_t node_pick_recursion_edge(node_t *root);
+edge_t node_pick_recursion_edge(node_t *node);
+
+/**
+ * Find the edge between the given `node` and its parent `node->parent`, if any
+ * @param node The root node of a tree
+ * @return     The edge between the given node and its parent; otherwise, NULL
+ */
+edge_t node_get_parent_edge(node_t *node);
 
 typedef struct tree {
   node_t *root;

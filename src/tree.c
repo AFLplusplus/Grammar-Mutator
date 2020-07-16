@@ -218,19 +218,19 @@ bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
   return false;
 }
 
-node_t *node_pick_non_term_subnode(node_t *root) {
-  if (!root) return NULL;
-  if (root->non_term_size == 0) return NULL;
+node_t *node_pick_non_term_subnode(node_t *node) {
+  if (!node) return NULL;
+  if (node->non_term_size == 0) return NULL;
 
-  size_t non_term_size = root->non_term_size;
+  size_t non_term_size = node->non_term_size;
   int    prob = random() % non_term_size;
 
-  if (prob < 1) return root;
+  if (prob < 1) return node;
   prob -= 1;
 
   node_t *subnode = NULL;
-  for (int i = 0; i < root->subnode_count; ++i) {
-    subnode = root->subnodes[i];
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = node->subnodes[i];
     if (subnode->id == 0) continue;  // "0" means the terminal node
 
     if (prob < subnode->non_term_size)
@@ -242,23 +242,23 @@ node_t *node_pick_non_term_subnode(node_t *root) {
   return NULL;
 }
 
-recursion_edge_t node_pick_recursion_edge(node_t *root) {
-  recursion_edge_t ret = {NULL, NULL, 0};
-  if (!root) return ret;
-  if (root->recursion_edge_size == 0) return ret;
+edge_t node_pick_recursion_edge(node_t *node) {
+  edge_t ret = {NULL, NULL, 0};
+  if (!node) return ret;
+  if (node->recursion_edge_size == 0) return ret;
 
-  size_t recursion_edge_size = root->recursion_edge_size;
+  size_t recursion_edge_size = node->recursion_edge_size;
   int    prob = random() % recursion_edge_size;
 
   node_t *subnode = NULL;
-  for (int i = 0; i < root->subnode_count; ++i) {
-    subnode = root->subnodes[i];
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = node->subnodes[i];
 
-    // "root -> subnode" is a recursion edge
-    if (root->id == subnode->id) {
+    // "node -> subnode" is a recursion edge
+    if (node->id == subnode->id) {
       if (prob < 1) {
         // select this edge
-        ret.parent = root;
+        ret.parent = node;
         ret.subnode = subnode;
         ret.subnode_offset = i;
         return ret;
@@ -274,6 +274,25 @@ recursion_edge_t node_pick_recursion_edge(node_t *root) {
   }
 
   // should not reach here
+  return ret;
+}
+
+edge_t node_get_parent_edge(node_t *node) {
+  edge_t ret = {NULL, NULL, 0};
+  if (!node) return ret;
+  if (!node->parent) return ret;
+
+  ret.parent = node->parent;
+  ret.subnode = node;
+
+  node_t *parent = node->parent;
+  for (int i = 0; i < parent->subnode_count; ++i) {
+    if (node == parent->subnodes[i]) {
+      ret.subnode_offset = i;
+      break;
+    }
+  }
+
   return ret;
 }
 

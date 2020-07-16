@@ -332,7 +332,7 @@ TEST_F(TreeTest, PickRecursionEdgeNeverNull) {
   auto node6 = node_create(1);
   auto node7 = node_create_with_val(0, "test", 4);
 
-  recursion_edge_t picked_edge = {nullptr, nullptr, 0};
+  edge_t picked_edge = {nullptr, nullptr, 0};
 
   node_init_subnodes(node1, 3);
   node_set_subnode(node1, 0, node2);
