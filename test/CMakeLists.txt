@@ -32,7 +32,7 @@ add_subdirectory(
 # grammar
 add_executable(test_custom_mutator
   test_custom_mutator.cpp)
-add_dependencies(test_custom_mutator jsonmutator)
+add_dependencies(test_custom_mutator grammarmutator)
 target_link_libraries(test_custom_mutator
   PRIVATE dl
   PRIVATE gtest_main)
@@ -42,56 +42,50 @@ add_test(
 
 # Test suite 2:
 # test the tree APIs
-add_executable(test_tree
-  test_tree.cpp
-  ${CMAKE_SOURCE_DIR}/src/list.c
-  ${CMAKE_SOURCE_DIR}/src/tree.c)
-target_link_libraries(test_tree PRIVATE gtest_main)
+add_executable(test_tree test_tree.cpp)
+target_link_libraries(test_tree
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
 add_test(
   NAME test_tree
   COMMAND test_tree)
 
 # Test suite 3:
 # test the tree mutation APIs
-add_executable(test_tree_mutation
-  test_tree_mutation.cpp
-  ${CMAKE_SOURCE_DIR}/src/chunk_store.cpp
-  ${CMAKE_SOURCE_DIR}/src/json_c_fuzz.c
-  ${CMAKE_SOURCE_DIR}/src/tree.c
-  ${CMAKE_SOURCE_DIR}/src/tree_mutation.c)
-target_link_libraries(test_tree_mutation PRIVATE gtest_main)
+add_executable(test_tree_mutation test_tree_mutation.cpp)
+target_link_libraries(test_tree_mutation
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
 add_test(
   NAME test_tree_mutation
   COMMAND test_tree_mutation)
 
 # Test suite 4:
 # test the doubly linked list
-add_executable(test_list
-  test_list.cpp
-  ${CMAKE_SOURCE_DIR}/src/list.c)
-target_link_libraries(test_list PRIVATE gtest_main)
+add_executable(test_list test_list.cpp)
+target_link_libraries(test_list
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
 add_test(
   NAME test_list
   COMMAND test_list)
 
 # Test suite 5:
 # test the chunk store
-add_executable(test_chunk_store
-  test_chunk_store.cpp
-  ${CMAKE_SOURCE_DIR}/src/chunk_store.cpp
-  ${CMAKE_SOURCE_DIR}/src/tree.c)
-target_link_libraries(test_chunk_store PRIVATE gtest_main)
+add_executable(test_chunk_store test_chunk_store.cpp)
+target_link_libraries(test_chunk_store
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
 add_test(
   NAME test_chunk_store
   COMMAND test_chunk_store)
 
 # Test suite 6:
 # test the tree trimming APIs
-add_executable(test_tree_trimming
-  test_tree_trimming.cpp
-  ${CMAKE_SOURCE_DIR}/src/tree.c
-  ${CMAKE_SOURCE_DIR}/src/tree_trimming.c)
-target_link_libraries(test_tree_trimming PRIVATE gtest_main)
+add_executable(test_tree_trimming test_tree_trimming.cpp)
+target_link_libraries(test_tree_trimming
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
 add_test(
   NAME test_tree_trimming
   COMMAND test_tree_trimming)

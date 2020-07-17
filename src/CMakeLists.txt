@@ -1,4 +1,4 @@
-add_library(jsonmutator SHARED
+add_library(grammarmutator SHARED
   chunk_store.cpp
   list.c
   tree.c
