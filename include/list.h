@@ -15,6 +15,8 @@ struct list_node {
   void *       data;
 };
 
+typedef void (*data_free_t)(void *data);
+
 typedef struct list list_t;
 struct list {
   list_node_t *head, *tail;
@@ -32,6 +34,14 @@ list_t *list_create();
  * @param list A doubly linked list
  */
 void list_free(list_t *list);
+
+/**
+ * Destroy the linked list and free all stored data
+ * @param list      A doubly linked list
+ * @param free_func A pointer to the function for destroying the stored data in
+ *                  each list node
+ */
+void list_free_with_data_free_func(list_t *list, data_free_t free_func);
 
 /**
  * Add a new node at the beginning of the list
@@ -56,6 +66,13 @@ list_node_t *list_append(list_t *list, void *data);
  * @return     True if the data exists in the list; otherwise, False
  */
 bool list_remove(list_t *list, void *data);
+
+/**
+ * Remove the first node in the list and return the corresponding data
+ * @param list A doubly linked list
+ * @return     The data in the first node
+ */
+void *list_pop_front(list_t *list);
 
 #ifdef __cplusplus
 }

@@ -8,6 +8,10 @@ list_t *list_create() {
 }
 
 void list_free(list_t *list) {
+  list_free_with_data_free_func(list, NULL);
+}
+
+void list_free_with_data_free_func(list_t *list, data_free_t free_func) {
   if (!list) return;
 
   list_node_t *cur = list->head;
@@ -17,6 +21,7 @@ void list_free(list_t *list) {
     next = cur->next;
     cur->next = NULL;
     cur->prev = NULL;
+    if (free_func) free_func(cur->data);
     cur->data = NULL;
     free(cur);
     cur = next;
@@ -104,4 +109,30 @@ bool list_remove(list_t *list, void *data) {
   }
 
   return false;
+}
+
+void *list_pop_front(list_t *list) {
+  if (!list) return NULL;
+  if (list->size == 0 || list->head == NULL) return NULL;
+
+  list_node_t *head = list->head;
+  void *data = head->data;
+
+  list->head = head->next;
+  if (head == list->tail) {
+    // only one element
+    list->tail = NULL;
+  } else {
+    // more than one element
+    head->next->prev = NULL;
+  }
+
+  head->next = NULL;
+  head->prev = NULL;
+  head->data = NULL;
+  free(head);
+
+  --list->size;
+
+  return data;
 }
