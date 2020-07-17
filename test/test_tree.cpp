@@ -377,6 +377,20 @@ TEST_F(TreeTest, PickRecursionEdgeNeverNull) {
   node_free(node1);
 }
 
+TEST_F(TreeTest, TreeGetRecursionEdges) {
+  EXPECT_EQ(tree->recursion_edge_list, nullptr);
+  tree_get_recursion_edges(tree);
+  EXPECT_NE(tree->recursion_edge_list, nullptr);
+
+  list_t *recursion_edge_list = tree->recursion_edge_list;
+  EXPECT_EQ(recursion_edge_list->size, 1);
+  list_node_t  *head = recursion_edge_list->head;
+  auto edge = (edge_t *)head->data;
+  EXPECT_EQ(edge->parent, ws_1);
+  EXPECT_EQ(edge->subnode, ws_3);
+  EXPECT_EQ(edge->subnode_offset, 1);
+}
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

@@ -9,6 +9,7 @@
 #include <stdbool.h>
 
 #include "helpers.h"
+#include "list.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -156,6 +157,8 @@ typedef struct tree {
   // size_t   data_size;
   BUF_VAR(uint8_t, data);
   size_t data_len;  // data_len <= data_size
+
+  list_t *recursion_edge_list;
 } tree_t;
 
 /**
@@ -172,7 +175,7 @@ void tree_free(tree_t *tree);
 
 /**
  * Convert a parsing tree into a concrete test case stored in the data buffer
- * @param  tree    The parsing tree
+ * @param  tree The parsing tree
  */
 void tree_to_buf(tree_t *tree);
 
@@ -207,6 +210,12 @@ bool tree_equal(tree_t *tree_a, tree_t *tree_b);
  * @return      The total number of non-terminal nodes in this tree
  */
 size_t tree_get_size(tree_t *tree);
+
+/**
+ * Get all recursion edges in the tree, and store them in a linked list
+ * @param tree A given tree
+ */
+void tree_get_recursion_edges(tree_t *tree);
 
 #ifdef __cplusplus
 }

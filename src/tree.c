@@ -325,6 +325,25 @@ void _node_to_buf(tree_t *tree, node_t *node) {
   }
 }
 
+void _node_get_recursion_edges(tree_t *tree, node_t *node) {
+  if (!tree || !node) return;
+  if (node->subnode_count == 0) return;
+
+  // subnodes
+  node_t *subnode = NULL;
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = node->subnodes[i];
+    if (node->id == subnode->id) {
+      edge_t *edge = malloc(sizeof(edge_t));
+      edge->parent = node;
+      edge->subnode = subnode;
+      edge->subnode_offset = i;
+      list_append(tree->recursion_edge_list, edge);
+    }
+    _node_get_recursion_edges(tree, subnode);
+  }
+}
+
 inline tree_t *tree_create() {
   return calloc(1, sizeof(tree_t));
 }
@@ -342,6 +361,12 @@ void tree_free(tree_t *tree) {
     tree->data_buf = NULL;
     tree->data_size = 0;
     tree->data_len = 0;
+  }
+
+  // recursion edge list
+  if (tree->recursion_edge_list) {
+    list_free_with_data_free_func(tree->recursion_edge_list, free);
+    tree->recursion_edge_list = NULL;
   }
 
   free(tree);
@@ -383,4 +408,14 @@ inline size_t tree_get_size(tree_t *tree) {
   if (tree->root->id == 0) return 0;
   node_get_size(tree->root);
   return tree->root->non_term_size;
+}
+
+void tree_get_recursion_edges(tree_t *tree) {
+  if (!tree) return;
+
+  if (tree->recursion_edge_list)
+    list_free_with_data_free_func(tree->recursion_edge_list, free);
+  tree->recursion_edge_list = list_create();
+
+  _node_get_recursion_edges(tree, tree->root);
 }

@@ -44,6 +44,7 @@ add_test(
 # test the tree APIs
 add_executable(test_tree
   test_tree.cpp
+  ${CMAKE_SOURCE_DIR}/src/list.c
   ${CMAKE_SOURCE_DIR}/src/tree.c)
 target_link_libraries(test_tree PRIVATE gtest_main)
 add_test(
