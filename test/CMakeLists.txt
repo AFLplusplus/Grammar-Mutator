@@ -37,8 +37,8 @@ target_link_libraries(test_custom_mutator
   PRIVATE dl
   PRIVATE gtest_main)
 add_test(
-  NAME test_json_custom_mutator
-  COMMAND test_custom_mutator ${CMAKE_BINARY_DIR}/src/libjsonmutator.so 100)
+  NAME test_custom_mutator
+  COMMAND test_custom_mutator ${CMAKE_BINARY_DIR}/src/libgrammarmutator.so 100)
 
 # Test suite 2:
 # test the tree APIs
