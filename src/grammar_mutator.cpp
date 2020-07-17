@@ -33,6 +33,59 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   return data;
 }
 
+void afl_custom_deinit(my_mutator_t *data) {
+  if (data->mutated_tree) tree_free(data->mutated_tree);
+
+  // trees
+  for (auto &kv : trees) {
+    tree_free(kv.second);
+  }
+  trees.clear();
+
+  // if (data->tree_cur) tree_free(data->tree_cur);
+
+  free(data->fuzz_buf);
+  free(data);
+
+  chunk_store_clear();
+}
+
+// For each interesting test case in the queue
+uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
+  string fn((const char *)filename);
+  data->filename_cur = filename;
+  data->tree_cur = nullptr;
+
+  if (trees.find(fn) != trees.end()) data->tree_cur = trees[fn];
+
+  if (data->tree_cur) {
+    tree_get_size(data->tree_cur);
+    return 1;
+  }
+
+  // TODO: Read the test case from the file and parse it
+
+  return 1;
+}
+
+// Trimming
+int32_t afl_custom_init_trim(my_mutator_t *data, uint8_t *buf, size_t buf_size) {
+  data->cur_trimming_step = 0;
+  tree_get_recursion_edges(data->tree_cur);
+  return data->tree_cur->root->recursion_edge_size;
+}
+
+size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
+  ++data->cur_trimming_step;
+  return 0;
+}
+
+int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
+  return data->cur_trimming_step;
+}
+
+// Fuzz the given test case several times, which is defined by the
+// `custom_mutator_stage` in `afl-fuzz-one.c`
 size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
                        uint8_t **out_buf, uint8_t *add_buf,
                        size_t add_buf_size,  // add_buf can be NULL
@@ -83,23 +136,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
   return mutated_size;
 }
 
-uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
-  string fn((const char *)filename);
-  data->filename_cur = filename;
-  data->tree_cur = nullptr;
-
-  if (trees.find(fn) != trees.end()) data->tree_cur = trees[fn];
-
-  if (data->tree_cur) {
-    tree_get_size(data->tree_cur);
-    return 1;
-  }
-
-  // TODO: Read the test case from the file and parse it
-
-  return 1;
-}
-
+// Save interesting mutated test cases
 void afl_custom_queue_new_entry(my_mutator_t * data,
                                 const uint8_t *filename_new_queue,
                                 const uint8_t *filename_orig_queue) {
@@ -117,21 +154,4 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
     pointer. In this case, we will store the tree instead destroying it in
     `afl_custom_fuzz`. */
   data->mutated_tree = nullptr;
-}
-
-void afl_custom_deinit(my_mutator_t *data) {
-  if (data->mutated_tree) tree_free(data->mutated_tree);
-
-  // trees
-  for (auto &kv : trees) {
-    tree_free(kv.second);
-  }
-  trees.clear();
-
-  // if (data->tree_cur) tree_free(data->tree_cur);
-
-  free(data->fuzz_buf);
-  free(data);
-
-  chunk_store_clear();
 }
