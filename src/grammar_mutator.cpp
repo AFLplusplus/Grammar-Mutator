@@ -161,8 +161,24 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
         random() % 15 + 1;  // randomly pick a `max_depth` within [1, 15]
     tree = gen_init__();
   } else {
-    // Mutation
-    tree = random_mutation(tree);
+    int mutation_choice = random() % 3;
+    switch (mutation_choice) {
+      case 0:
+        // random mutation
+        tree = random_mutation(tree);
+        break;
+      case 1:
+        // random recursive mutation
+        tree = random_recursive_mutation(tree, random() % 6);
+        break;
+      case 2:
+        // splicing mutation
+        tree = splicing_mutation(tree);
+        break;
+      default:
+        break;
+    }
+
     if (!tree) {
       perror("random mutation");
       return 0;

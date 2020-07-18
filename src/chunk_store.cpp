@@ -41,7 +41,7 @@ node_t *chunk_store_get_alternative_node(node_t *node) {
 
   size_t n = chunk_store[node->id].size();
   int    prob = random() % n;
-  return chunk_store[node->id][prob];
+  return node_clone(chunk_store[node->id][prob]);  // must clone the node
 }
 
 void chunk_store_clear() {

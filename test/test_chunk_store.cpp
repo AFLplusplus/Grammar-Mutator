@@ -27,10 +27,11 @@ class ChunkStoreTest : public ::testing::Test {
 };
 
 TEST_F(ChunkStoreTest, SeenChunk) {
-  auto node1 = node_create(1);
+  auto node1 = node_create_with_val(1, "test", 4);
   auto node2 = node_clone(node1);
 
-  auto ret1 = seen_chunks.insert(buffer(node1));
+  buffer node1_buffer(node1);
+  auto ret1 = seen_chunks.insert(node1_buffer);
   EXPECT_TRUE(ret1.second);
   auto ret2 = seen_chunks.insert(buffer(node2));
   EXPECT_FALSE(ret2.second);
@@ -73,9 +74,9 @@ TEST_F(ChunkStoreTest, AddTree) {
   tree_get_size(tree);
 
   chunk_store_add_tree(tree);
-  EXPECT_TRUE(seen_chunks.size() == 2);
-  EXPECT_TRUE(chunk_store.find(1) != chunk_store.end());
-  EXPECT_TRUE(chunk_store[1].size() == 2);
+  EXPECT_EQ(seen_chunks.size(), 2);
+  EXPECT_NE(chunk_store.find(1), chunk_store.end());
+  EXPECT_EQ(chunk_store[1].size(), 2);
 
   tree_free(tree);
 }

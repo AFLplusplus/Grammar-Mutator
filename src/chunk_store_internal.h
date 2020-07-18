@@ -22,7 +22,7 @@ struct buffer {
   }
 
   buffer(const buffer &_other) : buffer() {
-    if (data_len == 0) return;
+    if (_other.data_len == 0) return;
 
     data_len = _other.data_len;
     data_size = _other.data_size;
@@ -67,12 +67,18 @@ struct buffer {
   }
 
   bool operator<(const buffer &rhs) const {
-    if (data_len < rhs.data_len)
-      return true;
-    else if (data_len > rhs.data_len)
-      return false;
-    else
-      return memcmp(data_buf, rhs.data_buf, data_len);
+    size_t min_len = std::min(data_len, rhs.data_len);
+    int i = 0;
+    for (; i < min_len; ++i) {
+      if (data_buf[i] < rhs.data_buf[i]) return true;
+      if (rhs.data_buf[i] < data_buf[i]) return false;
+    }
+    return (i == data_len) && (i != rhs.data_len);
+  }
+
+  bool operator==(const buffer &rhs) const {
+    if (data_len != rhs.data_len) return false;
+    return memcmp(data_buf, rhs.data_buf, data_len) == 0;
   }
 };
 

@@ -72,7 +72,7 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
   return mutated_tree;
 }
 
-tree_t *splicing_mutation(tree_t *tree, tree_t *other_tree) {
+tree_t *splicing_mutation(tree_t *tree) {
   tree_t *mutated_tree = tree_clone(tree);
 
   // randomly pick a node in the tree

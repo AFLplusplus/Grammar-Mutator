@@ -80,9 +80,9 @@ TEST_F(CustomMutatorTest, Trimming) {
   uint8_t *buf = nullptr;
   size_t   buf_size = 0;
   uint8_t  ret = 0;
-  int32_t stage_cur = 0;
-  int32_t stage_max = 0;
-  size_t old_buf_len = 0;
+  int32_t  stage_cur = 0;
+  int32_t  stage_max = 0;
+  size_t   old_buf_len = 0;
 
   // prepare a tree that has 4 recursion edges
   auto tree = tree_create();
@@ -127,7 +127,8 @@ TEST_F(CustomMutatorTest, Trimming) {
 
   // always fail in trimming
   stage_cur = 0;
-  stage_max = afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
+  stage_max =
+      afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
   old_buf_len = tree->data_len;
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
@@ -139,7 +140,8 @@ TEST_F(CustomMutatorTest, Trimming) {
 
   // always success in trimming
   stage_cur = 0;
-  stage_max = afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
+  stage_max =
+      afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
   old_buf_len = tree->data_len;
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
