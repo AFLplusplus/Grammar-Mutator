@@ -13,6 +13,7 @@
 #include "custom_mutator.h"
 #include "json_c_fuzz.h"
 #include "tree_mutation.h"
+#include "tree_trimming.h"
 #include "chunk_store.h"
 
 using namespace std;
@@ -25,7 +26,7 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   my_mutator_t *data = (my_mutator_t *)calloc(1, sizeof(my_mutator_t));
   if (!data) {
     perror("afl_custom_init alloc");
-    return NULL;
+    return nullptr;
   }
 
   data->afl = afl;
@@ -35,14 +36,14 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
 
 void afl_custom_deinit(my_mutator_t *data) {
   if (data->mutated_tree) tree_free(data->mutated_tree);
+  if (data->trimmed_tree) tree_free(data->trimmed_tree);
+  data->cur_trimming_step = 0;
 
   // trees
   for (auto &kv : trees) {
     tree_free(kv.second);
   }
   trees.clear();
-
-  // if (data->tree_cur) tree_free(data->tree_cur);
 
   free(data->fuzz_buf);
   free(data);
@@ -60,6 +61,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   if (data->tree_cur) {
     tree_get_size(data->tree_cur);
+//    tree_get_recursion_edges(data->tree_cur);
     return 1;
   }
 
@@ -69,18 +71,68 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 }
 
 // Trimming
-int32_t afl_custom_init_trim(my_mutator_t *data, uint8_t *buf, size_t buf_size) {
+int32_t afl_custom_init_trim(my_mutator_t *data, uint8_t *buf,
+                             size_t buf_size) {
+  if (!data->tree_cur) return 0;
+
   data->cur_trimming_step = 0;
   tree_get_recursion_edges(data->tree_cur);
   return data->tree_cur->root->recursion_edge_size;
 }
 
 size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
+  tree_t *trimmed_tree = nullptr;
+  size_t  trimmed_size = 0;
+  tree_t *tree_cur = data->tree_cur;
+  edge_t *edge = (edge_t *)list_pop_front(tree_cur->recursion_edge_list);
+
+  trimmed_tree = recursive_trimming(tree_cur, *edge);
+  tree_to_buf(trimmed_tree);
+  tree_get_size(trimmed_tree);
+  data->trimmed_tree = trimmed_tree;
+  free(edge);
+
+  trimmed_size = trimmed_tree->data_len;
+
+  // maybe_grow is optimized to be quick for reused buffers.
+  uint8_t *trimmed_out =
+      (uint8_t *)maybe_grow(BUF_PARAMS(data, fuzz), trimmed_size);
+  if (!trimmed_out) {
+    *out_buf = nullptr;
+    perror("custom mutator allocation (maybe_grow)");
+    return 0; /* afl-fuzz will very likely error out after this. */
+  }
+
+  memcpy(trimmed_out, trimmed_tree->data_buf, trimmed_size);
+  *out_buf = trimmed_out;
+
   ++data->cur_trimming_step;
-  return 0;
+
+  return trimmed_size;
 }
 
 int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
+  if (success) {
+    size_t remaining_edge_size = data->tree_cur->recursion_edge_list->size;
+
+    // update the corresponding tree
+    string fn((const char *)data->filename_cur);
+    trees[fn] = data->trimmed_tree;
+    tree_free(data->tree_cur);
+    data->tree_cur = data->trimmed_tree;
+
+
+    // update the recursion edge list
+    tree_get_recursion_edges(data->tree_cur);
+    size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
+
+    data->cur_trimming_step += (remaining_edge_size - new_edge_size);
+  } else {
+    tree_free(data->trimmed_tree);
+  }
+
+  data->trimmed_tree = nullptr;
+
   return data->cur_trimming_step;
 }
 

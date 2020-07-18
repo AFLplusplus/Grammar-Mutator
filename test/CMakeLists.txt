@@ -30,15 +30,13 @@ add_subdirectory(
 # Test suite 1:
 # run a custom mutator library, which generates test cases for a specific
 # grammar
-add_executable(test_custom_mutator
-  test_custom_mutator.cpp)
-add_dependencies(test_custom_mutator grammarmutator)
+add_executable(test_custom_mutator test_custom_mutator.cpp)
 target_link_libraries(test_custom_mutator
-  PRIVATE dl
-  PRIVATE gtest_main)
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
 add_test(
   NAME test_custom_mutator
-  COMMAND test_custom_mutator ${CMAKE_BINARY_DIR}/src/libgrammarmutator.so 100)
+  COMMAND test_custom_mutator 100)
 
 # Test suite 2:
 # test the tree APIs
