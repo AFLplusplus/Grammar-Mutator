@@ -90,12 +90,14 @@ int32_t afl_custom_init_trim(my_mutator_t *data, uint8_t *buf,
   data->total_recursive_trimming_steps =
       data->tree_cur->root->recursion_edge_size;
 
+//  return data->total_subtree_trimming_steps +
+//         data->total_recursive_trimming_steps;
+
   // TODO: disable subtree trimming
   data->cur_trimming_stage = 1;
   data->cur_subtree_trimming_step = data->total_subtree_trimming_steps;
 
-  return data->total_subtree_trimming_steps +
-         data->total_recursive_trimming_steps;
+  return data->total_recursive_trimming_steps;
 }
 
 size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {

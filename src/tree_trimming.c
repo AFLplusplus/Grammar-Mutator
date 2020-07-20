@@ -41,6 +41,11 @@ tree_t *recursive_trimming(tree_t *tree, edge_t edge) {
 
   node_t *parent = edge.parent;
   node_t *tail = edge.subnode;
+  if (!parent || !tail) {
+    // if `edge` is empty, return the original tree
+    trimmed_tree = tree_clone(tree);
+    return trimmed_tree;
+  }
 
   node_t *pre_parent = parent->parent;
   if (!pre_parent) {
