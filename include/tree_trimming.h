@@ -17,9 +17,10 @@ extern "C" {
  * Then, this function sequentially replaces each node’s subtree with the
  * smallest possible subtree at this position
  * @param  tree A tree
+ * @param  node The non-terminal node that needs to be trimmed
  * @return      A tree with smaller size
  */
-tree_t *subtree_trimming(tree_t *tree);
+tree_t *subtree_trimming(tree_t *tree, node_t *node);
 
 /**
  * Reduce the amount of recursions by identifying recursions and replacing them

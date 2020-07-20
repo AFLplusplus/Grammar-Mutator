@@ -1,7 +1,39 @@
+#include "json_c_fuzz.h"
 #include "tree_trimming.h"
 
-tree_t *subtree_trimming(tree_t *tree) {
-  return NULL;  // TODO: implement this
+tree_t *subtree_trimming(tree_t *tree, node_t *node) {
+  tree_t *trimmed_tree = NULL;
+
+  // generate the minimal subtree
+  gen_func_t gen_func = gen_funcs[node->id];
+  max_depth = -1;
+  node_t *min_node = gen_func(0);
+
+  node_t *parent = node->parent;
+  if (!parent) {
+    // no parent, meaning that the input node is the root node in the tree
+    trimmed_tree = tree_create();
+    trimmed_tree->root = min_node;
+    return trimmed_tree;
+  }
+
+  // detach `node` from `parent`
+  edge_t edge = node_get_parent_edge(node);
+  node->parent = NULL;
+
+  // attach `min_node` to the original position of `node` in `parent`
+  parent->subnodes[edge.subnode_offset] = min_node;
+  min_node->parent = parent;
+
+  trimmed_tree = tree_clone(tree);
+
+  // recover `tree`
+  parent->subnodes[edge.subnode_offset] = node;
+  node->parent = parent;
+
+  node_free(min_node);
+
+  return trimmed_tree;
 }
 
 tree_t *recursive_trimming(tree_t *tree, edge_t edge) {
@@ -12,8 +44,7 @@ tree_t *recursive_trimming(tree_t *tree, edge_t edge) {
 
   node_t *pre_parent = parent->parent;
   if (!pre_parent) {
-    // `parent` is the root node of the tree
-    // return the tail part
+    // if `parent` is the root node of the tree, return the tail part
     trimmed_tree = tree_create();
     trimmed_tree->root = node_clone(tail);
     return trimmed_tree;
