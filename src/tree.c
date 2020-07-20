@@ -363,6 +363,13 @@ void tree_free(tree_t *tree) {
     tree->data_len = 0;
   }
 
+  // non-ternimal node list
+  if (tree->non_terminal_node_list) {
+    // no need to free the data for each node
+    list_free(tree->non_terminal_node_list);
+    tree->non_terminal_node_list = NULL;
+  }
+
   // recursion edge list
   if (tree->recursion_edge_list) {
     list_free_with_data_free_func(tree->recursion_edge_list, free);

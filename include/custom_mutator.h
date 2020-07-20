@@ -32,8 +32,15 @@ typedef struct my_mutator {
   tree_t *       mutated_tree;
   tree_t *       trimmed_tree;
 
-  // Trimming - for now, only recursive trimming
-  size_t  cur_trimming_step;
+  // Trimming
+  uint8_t cur_trimming_stage;  // 0: subtree trimming
+                               // 1: recursive trimming
+
+  size_t cur_subtree_trimming_step;
+  size_t total_subtree_trimming_steps;
+
+  size_t cur_recursive_trimming_step;
+  size_t total_recursive_trimming_steps;
 
   // Reused buffers:
   BUF_VAR(uint8_t, fuzz);

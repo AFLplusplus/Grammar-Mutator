@@ -158,6 +158,7 @@ typedef struct tree {
   BUF_VAR(uint8_t, data);
   size_t data_len;  // data_len <= data_size
 
+  list_t *non_terminal_node_list;
   list_t *recursion_edge_list;
 } tree_t;
 
