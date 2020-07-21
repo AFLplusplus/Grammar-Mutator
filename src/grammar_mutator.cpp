@@ -204,6 +204,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
   }
 
   tree = data->tree_cur;
+  int mutation_choice = -1;
   if (!tree) {
     // Generation
     // Randomly generate a JSON string
@@ -211,7 +212,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
         random() % 15 + 1;  // randomly pick a `max_depth` within [1, 15]
     tree = gen_init__();
   } else {
-    int mutation_choice = random() % 3;
+    mutation_choice = random() % 3;
     switch (mutation_choice) {
       case 0:
         // random mutation
@@ -226,11 +227,12 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
         tree = splicing_mutation(tree);
         break;
       default:
+        perror("mutation error (invalid choice)");
         break;
     }
 
     if (!tree) {
-      perror("random mutation");
+      perror("mutation error");
       return 0;
     }
   }

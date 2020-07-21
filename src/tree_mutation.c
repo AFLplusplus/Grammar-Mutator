@@ -91,6 +91,10 @@ tree_t *splicing_mutation(tree_t *tree) {
   // pick a subtree, in which the root type is the same as the picked node, from
   // the chunk store
   node_t *replace_node = chunk_store_get_alternative_node(node);
+  if (!replace_node) {
+    // if there is no alternative node, return the cloned tree
+    return mutated_tree;
+  }
 
   if (!parent) {  // no parent, meaning that the picked node is the root node
     // Destroy the original root node
