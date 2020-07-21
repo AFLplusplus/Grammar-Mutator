@@ -391,6 +391,15 @@ TEST_F(TreeTest, TreeGetRecursionEdges) {
   EXPECT_EQ(edge->subnode_offset, 1);
 }
 
+TEST_F(TreeTest, TreeGetNonTerminalNodes) {
+  EXPECT_EQ(tree->non_terminal_node_list, nullptr);
+  tree_get_non_terminal_nodes(tree);
+  EXPECT_NE(tree->non_terminal_node_list, nullptr);
+
+  list_t *non_terminal_node_list = tree->non_terminal_node_list;
+  EXPECT_EQ(non_terminal_node_list->size, 8);
+}
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

@@ -218,6 +218,12 @@ size_t tree_get_size(tree_t *tree);
  */
 void tree_get_recursion_edges(tree_t *tree);
 
+/**
+ * Get all non-terminal nodes in the tree, and store them in a linked list
+ * @param tree A given tree
+ */
+void tree_get_non_terminal_nodes(tree_t *tree);
+
 #ifdef __cplusplus
 }
 #endif

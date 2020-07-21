@@ -344,6 +344,20 @@ void _node_get_recursion_edges(tree_t *tree, node_t *node) {
   }
 }
 
+void _node_get_non_terminal_nodes(tree_t *tree, node_t *node) {
+  if (!tree || !node) return;
+  if (node->id == 0) return;
+
+  list_append(tree->non_terminal_node_list, node);
+
+  // subnodes
+  node_t *subnode = NULL;
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = node->subnodes[i];
+    _node_get_non_terminal_nodes(tree, subnode);
+  }
+}
+
 inline tree_t *tree_create() {
   return calloc(1, sizeof(tree_t));
 }
@@ -425,4 +439,13 @@ void tree_get_recursion_edges(tree_t *tree) {
   tree->recursion_edge_list = list_create();
 
   _node_get_recursion_edges(tree, tree->root);
+}
+
+void tree_get_non_terminal_nodes(tree_t *tree) {
+  if (!tree) return;
+
+  if (tree->non_terminal_node_list) list_free(tree->non_terminal_node_list);
+  tree->non_terminal_node_list = list_create();
+
+  _node_get_non_terminal_nodes(tree, tree->root);
 }

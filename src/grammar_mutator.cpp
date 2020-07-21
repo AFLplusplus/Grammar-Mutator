@@ -79,6 +79,7 @@ int32_t afl_custom_init_trim(my_mutator_t *data, uint8_t *buf,
                              size_t buf_size) {
   if (!data->tree_cur) return 0;
 
+  tree_get_non_terminal_nodes(data->tree_cur);
   tree_get_recursion_edges(data->tree_cur);
 
   data->cur_trimming_stage = 0;
@@ -90,14 +91,8 @@ int32_t afl_custom_init_trim(my_mutator_t *data, uint8_t *buf,
   data->total_recursive_trimming_steps =
       data->tree_cur->root->recursion_edge_size;
 
-//  return data->total_subtree_trimming_steps +
-//         data->total_recursive_trimming_steps;
-
-  // TODO: disable subtree trimming
-  data->cur_trimming_stage = 1;
-  data->cur_subtree_trimming_step = data->total_subtree_trimming_steps;
-
-  return data->total_recursive_trimming_steps;
+  return data->total_subtree_trimming_steps +
+         data->total_recursive_trimming_steps;
 }
 
 size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
@@ -118,6 +113,11 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
     free(edge);
 
     ++data->cur_recursive_trimming_step;
+  } else {
+    // should not reach here
+    *out_buf = nullptr;
+    perror("wrong trimming stage");
+    return 0;
   }
 
   tree_to_buf(trimmed_tree);
@@ -141,42 +141,47 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
 }
 
 int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
-  // update trimming stage
-  if (data->cur_trimming_stage == 0) {
-    if (data->cur_subtree_trimming_step >= data->total_subtree_trimming_steps)
-      ++data->cur_trimming_stage;
-  } else if (data->cur_trimming_stage == 1) {
-    // do nothing
-  }
-
   if (success) {
-    if (data->cur_trimming_stage == 0) {
-      // subtree trimming
-      // TODO: finish this part
-    } else if (data->cur_trimming_stage == 1) {
-      // recursive trimming
-      size_t remaining_edge_size = data->tree_cur->recursion_edge_list->size;
+    // update the trimming step
+    size_t remaining_node_size = data->tree_cur->non_terminal_node_list->size;
+    size_t remaining_edge_size = data->tree_cur->recursion_edge_list->size;
 
-      // update the corresponding tree
-      string fn((const char *)data->filename_cur);
-      trees[fn] = data->trimmed_tree;
-      tree_free(data->tree_cur);
-      data->tree_cur = data->trimmed_tree;
+    // update the corresponding tree
+    string fn((const char *)data->filename_cur);
+    trees[fn] = data->trimmed_tree;
+    tree_free(data->tree_cur);
+    data->tree_cur = data->trimmed_tree;
 
-      // update the recursion edge list
-      tree_get_recursion_edges(data->tree_cur);
-      size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
+    // update the non-terminal node list
+    tree_get_non_terminal_nodes(data->tree_cur);
+    for (int i = 0; i < data->cur_subtree_trimming_step; ++i)
+      list_pop_front(data->tree_cur->non_terminal_node_list);
+    size_t new_node_size = data->tree_cur->non_terminal_node_list->size;
 
-      data->cur_recursive_trimming_step +=
-          (remaining_edge_size - new_edge_size);
-    }
+    data->cur_subtree_trimming_step += (remaining_node_size - new_node_size);
 
+    // update the recursion edge list
+    tree_get_recursion_edges(data->tree_cur);
+    size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
+
+    data->cur_recursive_trimming_step +=
+        (remaining_edge_size - new_edge_size);
   } else {
     // the trimmed tree will not be saved, so destroy it
     tree_free(data->trimmed_tree);
   }
-
   data->trimmed_tree = nullptr;
+
+  // update trimming stage
+  if (data->cur_trimming_stage == 0) {
+    if (data->cur_subtree_trimming_step >= data->total_subtree_trimming_steps)
+      ++data->cur_trimming_stage;
+  }
+
+  if (data->cur_trimming_stage == 1) {
+    if (data->cur_recursive_trimming_step >= data->total_recursive_trimming_steps)
+      ++data->cur_trimming_stage;
+  }
 
   return data->cur_subtree_trimming_step + data->cur_recursive_trimming_step;
 }

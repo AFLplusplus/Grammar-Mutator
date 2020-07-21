@@ -5,6 +5,7 @@
 #include <string>
 
 #include "custom_mutator.h"
+#include "json_c_fuzz.h"
 #include "tree.h"
 
 #include "gtest/gtest.h"
@@ -84,39 +85,37 @@ TEST_F(CustomMutatorTest, Trimming) {
   int32_t  stage_max = 0;
   size_t   old_buf_len = 0;
 
-  // prepare a tree that has 4 recursion edges
+  // prepare a tree: 8 non-terminal nodes, 1 recursion edge
   auto tree = tree_create();
-  auto node1 = node_create(1);
-  auto node2 = node_create(1);
-  auto node3 = node_create_with_val(0, "{", 1);
-  auto node4 = node_create(1);
-  auto node5 = node_create_with_val(0, "test", 4);
-  auto node6 = node_create_with_val(0, "}", 1);
-  auto node7 = node_create(1);
-  auto node8 = node_create_with_val(0, " ", 1);
-  auto node9 = node_create(1);
-  auto node10 = node_create_with_val(0, " ", 1);
+  auto start = node_create(START);
+  tree->root = start;
 
-  node_init_subnodes(node1, 2);
-  node_set_subnode(node1, 0, node2);  // node1 -> node2
-  node_set_subnode(node1, 1, node7);  // node1 -> node7
+  // start -> json
+  node_init_subnodes(start, 1);
+  auto json = node_create(JSON);
+  node_set_subnode(start, 0, json);
 
-  node_init_subnodes(node2, 3);
-  node_set_subnode(node2, 0, node3);
-  node_set_subnode(node2, 1, node4);  // node2 -> node4
-  node_set_subnode(node2, 2, node6);
+  // json -> element
+  node_init_subnodes(json, 1);
+  auto element = node_create(ELEMENT);
+  node_set_subnode(json, 0, element);
 
-  node_init_subnodes(node4, 1);
-  node_set_subnode(node4, 0, node5);
+  // element -> ws_1, value ("true"), ws_2 (NULL)
+  node_init_subnodes(element, 3);
+  auto ws_1 = node_create(WS);
+  auto value = node_create_with_val(VALUE, "true", 4);
+  auto ws_2 = node_create(WS);
+  node_set_subnode(element, 0, ws_1);
+  node_set_subnode(element, 1, value);
+  node_set_subnode(element, 2, ws_2);
 
-  node_init_subnodes(node7, 2);
-  node_set_subnode(node7, 0, node8);
-  node_set_subnode(node7, 1, node9);  // node7 -> node9
+  // ws_1 -> sp1_1 (" "), ws_3 (NULL)  (recursive)
+  node_init_subnodes(ws_1, 2);
+  auto sp1_1 = node_create_with_val(SP1, " ", 1);
+  auto ws_3 = node_create(WS);
+  node_set_subnode(ws_1, 0, sp1_1);
+  node_set_subnode(ws_1, 1, ws_3);
 
-  node_init_subnodes(node9, 1);
-  node_set_subnode(node9, 0, node10);
-
-  tree->root = node1;
   tree_to_buf(tree);
   tree_get_size(tree);
 
@@ -129,6 +128,7 @@ TEST_F(CustomMutatorTest, Trimming) {
   stage_cur = 0;
   stage_max =
       afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
+  EXPECT_EQ(stage_max, 9);  // 8 non-terminal nodes, 1 recursion edge
   old_buf_len = tree->data_len;
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
@@ -142,6 +142,7 @@ TEST_F(CustomMutatorTest, Trimming) {
   stage_cur = 0;
   stage_max =
       afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
+  EXPECT_EQ(stage_max, 9);  // 8 non-terminal nodes, 1 recursion edge
   old_buf_len = tree->data_len;
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
