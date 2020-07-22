@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.10.0)
+
+project(json-parser-download NONE)
+
+include(ExternalProject)
+ExternalProject_Add(json-parser
+  GIT_REPOSITORY    https://github.com/h1994st/json-parser.git
+  SOURCE_DIR        "${CMAKE_CURRENT_BINARY_DIR}/json-parser-src"
+  CONFIGURE_COMMAND CC=afl-clang CXX=afl-clang++ ./configure
+  BUILD_COMMAND     ${CMAKE_MAKE_PROGRAM} && afl-clang examples/test_json.c -I. libjsonparser.a -lm -o test_json
+  BUILD_IN_SOURCE   TRUE
+  BUILD_BYPRODUCTS  ""
+  INSTALL_COMMAND   ""
+  TEST_COMMAND      ""
+)

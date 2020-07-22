@@ -42,8 +42,8 @@ endforeach ()
 set(CMAKE_CXX_STANDARD 14)
 
 # Toolchain
-message(STATUS "Using C compiler: ${CMAKE_C_COMPILER}")
-message(STATUS "Using C++ compiler: ${CMAKE_CXX_COMPILER}")
+message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
+message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 
 include_directories(include)
 
