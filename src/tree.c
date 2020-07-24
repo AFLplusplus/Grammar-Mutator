@@ -358,6 +358,101 @@ void _node_get_non_terminal_nodes(tree_t *tree, node_t *node) {
   }
 }
 
+void _node_serialize(tree_t *tree, node_t *node) {
+  if (!tree || !node) return;
+
+  // allocate or update the buffer
+  size_t len = sizeof(node->id) + sizeof(node->subnode_count) +
+               sizeof(node->val_len) + node->val_len;
+  size_t   ser_len = tree->ser_len;
+  uint8_t *ser_buf = maybe_grow(BUF_PARAMS(tree, ser), ser_len + len);
+  if (!ser_buf) {
+    perror("tree serialization buffer allocation (maybe_grow)");
+    return;
+  }
+
+  // save `id`
+  memcpy(ser_buf + ser_len, &(node->id), sizeof(node->id));
+  ser_len += sizeof(node->id);
+
+  // save `subnode_count`
+  memcpy(ser_buf + ser_len, &(node->subnode_count),
+         sizeof(node->subnode_count));
+  ser_len += sizeof(node->subnode_count);
+
+  // save `val`
+  // - save `val_len`
+  memcpy(ser_buf + ser_len, &(node->val_len), sizeof(node->val_len));
+  ser_len += sizeof(node->val_len);
+
+  // - save `val_buf`
+  memcpy(ser_buf + ser_len, node->val_buf, node->val_len);
+  ser_len += node->val_len;
+
+  tree->ser_len += ser_len;
+
+  // subnodes
+  node_t *subnode = NULL;
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = node->subnodes[i];
+    _node_serialize(tree, subnode);
+  }
+}
+
+node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
+                          size_t *consumed_size) {
+  if (!data_buf) return NULL;
+
+  node_t *node = node_create(0);
+  size_t  min_len =
+      sizeof(node->id) + sizeof(node->subnode_count) + sizeof(node->val_len);
+  if (data_size < min_len) {
+    // data is not enough for a node
+    node_free(node);
+    return NULL;
+  }
+
+  size_t ser_len = *consumed_size;
+
+  // `id`
+  memcpy(&(node->id), data_buf + ser_len, sizeof(node->id));
+  ser_len += sizeof(node->id);
+
+  // `subnode_count`
+  memcpy(&(node->subnode_count), data_buf + ser_len,
+         sizeof(node->subnode_count));
+  ser_len += sizeof(node->subnode_count);
+
+  // `val`
+  // - `val_len`
+  memcpy(&(node->val_len), data_buf + ser_len, sizeof(node->val_len));
+  ser_len += sizeof(node->val_len);
+
+  // - `val_buf`
+  node_set_val(node, (data_buf + ser_len), node->val_len);
+  ser_len += node->val_len;
+
+  *consumed_size += ser_len;
+
+  if (!node->subnode_count) return node;
+
+  // subnodes
+  node_init_subnodes(node, node->subnode_count);
+
+  node_t *subnode = NULL;
+  for (int i = 0; i < node->subnode_count; ++i) {
+    subnode = _node_deserialize(data_buf, data_size, consumed_size);
+    if (unlikely(!subnode)) {
+      // unlikely reach here
+      node_free(node);
+      return NULL;
+    }
+    node_set_subnode(node, i, subnode);
+  }
+
+  return node;
+}
+
 inline tree_t *tree_create() {
   return calloc(1, sizeof(tree_t));
 }
@@ -367,14 +462,20 @@ void tree_free(tree_t *tree) {
   node_free(tree->root);
   tree->root = NULL;
 
-  tree->depth = 0;
-
   // data buf
   if (tree->data_buf) {
     free(tree->data_buf);
     tree->data_buf = NULL;
     tree->data_size = 0;
     tree->data_len = 0;
+  }
+
+  // ser buf
+  if (tree->ser_buf) {
+    free(tree->ser_buf);
+    tree->ser_buf = NULL;
+    tree->ser_size = 0;
+    tree->ser_len = 0;
   }
 
   // non-ternimal node list
@@ -406,10 +507,32 @@ tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
   return NULL;  // TODO: implement this function
 }
 
+void tree_serialize(tree_t *tree) {
+  if (!tree) return;
+
+  maybe_grow(BUF_PARAMS(tree, ser), TREE_BUF_PREALLOC_SIZE);
+  tree->ser_len = 0;
+
+  _node_serialize(tree, tree->root);
+}
+
+tree_t *tree_deserialize(const uint8_t *data_buf, size_t data_size) {
+  size_t  consumed_size = 0;
+  node_t *root = _node_deserialize(data_buf, data_size, &consumed_size);
+  if (!root) return NULL;
+  if (consumed_size > data_size) {
+    node_free(root);
+    return NULL;
+  }
+
+  tree_t *tree = tree_create();
+  tree->root = root;
+  return tree;
+}
+
 tree_t *tree_clone(tree_t *tree) {
   tree_t *new_tree = tree_create();
   new_tree->root = node_clone(tree->root);
-  new_tree->depth = tree->depth;
 
   // Do not clone the data buffer, as the cloned tree is likely for mutations
   new_tree->data_buf = NULL;

@@ -19,11 +19,6 @@ typedef struct tree_node node_t;
 struct tree_node {
   uint32_t id;  // node type
 
-  // The following two sizes are calculated by `node_get_size`
-  size_t recursion_edge_size;  // the total number of recursion edges in the
-                               // subtree
-  size_t non_term_size;  // the number of non-terminal nodes in the subtree
-
   // uint8_t *val_buf;
   // size_t   val_size;
   BUF_VAR(uint8_t, val);
@@ -33,6 +28,11 @@ struct tree_node {
 
   node_t **subnodes;
   size_t   subnode_count;
+  
+  // The following two sizes are calculated by `node_get_size`
+  size_t recursion_edge_size;  // the total number of recursion edges in the
+  // subtree
+  size_t non_term_size;  // the number of non-terminal nodes in the subtree
 };
 
 typedef struct edge edge_t;
@@ -151,12 +151,16 @@ edge_t node_get_parent_edge(node_t *node);
 
 typedef struct tree {
   node_t *root;
-  size_t  depth;
 
   // uint8_t *data_buf;
   // size_t   data_size;
   BUF_VAR(uint8_t, data);
   size_t data_len;  // data_len <= data_size
+
+  // uint8_t *ser_buf;
+  // size_t   ser_size;
+  BUF_VAR(uint8_t, ser);
+  size_t ser_len;  // ser_len <= ser_size
 
   list_t *non_terminal_node_list;
   list_t *recursion_edge_list;
@@ -182,11 +186,25 @@ void tree_to_buf(tree_t *tree);
 
 /**
  * Parse the given buffer to construct a parsing tree
- * @param  data_buf  The buffer of serialized data
+ * @param  data_buf  The buffer of a test case
  * @param  data_size The size of the buffer
  * @return           A newly created tree
  */
 tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size);
+
+/**
+ * Serialize a given tree into binary data
+ * @param tree    A given tree
+ */
+void tree_serialize(tree_t *tree);
+
+/**
+ * Deserialize the data to recover a tree
+ * @param data_buf  The buffer of a serialized tree
+ * @param data_size The size of the buffer
+ * @return          A newly created tree
+ */
+tree_t *tree_deserialize(const uint8_t *data_buf, size_t data_size);
 
 /**
  * Clone a parsing tree

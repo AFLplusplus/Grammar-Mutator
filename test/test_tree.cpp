@@ -400,6 +400,16 @@ TEST_F(TreeTest, TreeGetNonTerminalNodes) {
   EXPECT_EQ(non_terminal_node_list->size, 8);
 }
 
+TEST_F(TreeTest, TreeSerializeDeserialize) {
+  tree_serialize(tree);
+
+  tree_t *new_tree = tree_deserialize(tree->ser_buf, tree->ser_len);
+
+  EXPECT_TRUE(tree_equal(tree, new_tree));
+
+  tree_free(new_tree);
+}
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
