@@ -22,8 +22,6 @@ static void dump_test_case(uint8_t *buf, size_t buf_size) {
 
 static int num = 100;
 
-extern map<string, tree_t *> trees;
-
 class CustomMutatorTest : public ::testing::Test {
  protected:
   afl_t *                afl = nullptr;
@@ -48,6 +46,8 @@ class CustomMutatorTest : public ::testing::Test {
     mutator->data = nullptr;
     free(mutator);
     mutator = nullptr;
+
+    // Delete the tree
   }
 };
 
@@ -55,22 +55,22 @@ TEST_F(CustomMutatorTest, FuzzNTimes) {
   uint8_t *buf = nullptr;
   size_t   buf_size = 0;
 
-  uint8_t ret = afl_custom_queue_get(mutator->data, (const uint8_t *)"seed");
+  uint8_t ret = afl_custom_queue_get(mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/0");
   EXPECT_EQ(ret, 1);
   afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
   EXPECT_NE(buf, nullptr);
-  afl_custom_queue_new_entry(mutator->data, (const uint8_t *)"init",
-                             (const uint8_t *)"seed");
+  afl_custom_queue_new_entry(mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/1",
+                             (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/0");
 
-  ret = afl_custom_queue_get(mutator->data, (const uint8_t *)"init");
+  ret = afl_custom_queue_get(mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/1");
   EXPECT_EQ(ret, 1);
   for (int i = 0; i < num; ++i) {
     buf_size =
         afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
-    string fn_new = to_string(i);
+    string fn_new = "/tmp/afl_test_fuzz_out/queue/1_" + to_string(i);
     afl_custom_queue_new_entry(mutator->data, (const uint8_t *)fn_new.c_str(),
-                               (const uint8_t *)"init");
+                               (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/1");
 
     fprintf(stderr, "=====%d=====\n", i + 1);
     dump_test_case(buf, buf_size);
@@ -83,7 +83,6 @@ TEST_F(CustomMutatorTest, Trimming) {
   uint8_t  ret = 0;
   int32_t  stage_cur = 0;
   int32_t  stage_max = 0;
-  size_t   old_buf_len = 0;
 
   // prepare a tree: 8 non-terminal nodes, 1 recursion edge
   auto tree = tree_create();
@@ -116,12 +115,12 @@ TEST_F(CustomMutatorTest, Trimming) {
   node_set_subnode(ws_1, 0, sp1_1);
   node_set_subnode(ws_1, 1, ws_3);
 
-  tree_to_buf(tree);
-  tree_get_size(tree);
+  tree_serialize(tree);
+  write_tree_to_file("/tmp/afl_test_fuzz_out/trees/00", tree->ser_buf,
+                     tree->ser_len, 0);
 
-  trees["init"] = tree;
-
-  ret = afl_custom_queue_get(mutator->data, (const uint8_t *)"init");
+  ret = afl_custom_queue_get(
+      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/00");
   ASSERT_EQ(ret, 1);
 
   // always fail in trimming
@@ -129,10 +128,8 @@ TEST_F(CustomMutatorTest, Trimming) {
   stage_max =
       afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
   EXPECT_EQ(stage_max, 9);  // 8 non-terminal nodes, 1 recursion edge
-  old_buf_len = tree->data_len;
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
-    EXPECT_LE(buf_size, old_buf_len);
     dump_test_case(buf, buf_size);
 
     stage_cur = afl_custom_post_trim(mutator->data, 0);
@@ -143,15 +140,14 @@ TEST_F(CustomMutatorTest, Trimming) {
   stage_max =
       afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
   EXPECT_EQ(stage_max, 9);  // 8 non-terminal nodes, 1 recursion edge
-  old_buf_len = tree->data_len;
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
-    EXPECT_LE(buf_size, old_buf_len);
     dump_test_case(buf, buf_size);
 
-    old_buf_len = buf_size;
     stage_cur = afl_custom_post_trim(mutator->data, 1);
   }
+
+  tree_free(tree);
 }
 
 int main(int argc, char **argv) {

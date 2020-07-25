@@ -402,6 +402,7 @@ TEST_F(TreeTest, TreeGetNonTerminalNodes) {
 
 TEST_F(TreeTest, TreeSerializeDeserialize) {
   tree_serialize(tree);
+  EXPECT_EQ(tree->ser_len, 20 * 8 + 5);
 
   tree_t *new_tree = tree_deserialize(tree->ser_buf, tree->ser_len);
 

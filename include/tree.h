@@ -242,6 +242,17 @@ void tree_get_recursion_edges(tree_t *tree);
  */
 void tree_get_non_terminal_nodes(tree_t *tree);
 
+/**
+ * Write a tree to a file. If `updated` is 1, the corresponding file will be
+ * updated
+ * @param filename The path to the tree file
+ * @param buf      The buffer of the serialized tree
+ * @param buf_size The buffer size
+ * @param updated  Update an existing file or create a new file?
+ */
+void write_tree_to_file(const char *filename, uint8_t *buf, size_t buf_size,
+                        uint8_t updated);
+
 #ifdef __cplusplus
 }
 #endif

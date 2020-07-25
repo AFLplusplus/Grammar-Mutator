@@ -27,6 +27,8 @@ typedef struct afl {
 typedef struct my_mutator {
   afl_t *afl;
 
+  uint8_t tree_out_dir_exist;
+
   const uint8_t *filename_cur;
   tree_t *       tree_cur;
   tree_t *       mutated_tree;

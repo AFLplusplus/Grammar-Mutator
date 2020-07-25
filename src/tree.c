@@ -1,3 +1,5 @@
+#include <fcntl.h>
+
 #include "tree.h"
 
 #define TREE_BUF_PREALLOC_SIZE (64)
@@ -389,7 +391,7 @@ void _node_serialize(tree_t *tree, node_t *node) {
   memcpy(ser_buf + ser_len, node->val_buf, node->val_len);
   ser_len += node->val_len;
 
-  tree->ser_len += ser_len;
+  tree->ser_len = ser_len;
 
   // subnodes
   node_t *subnode = NULL;
@@ -432,7 +434,7 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
   node_set_val(node, (data_buf + ser_len), node->val_len);
   ser_len += node->val_len;
 
-  *consumed_size += ser_len;
+  *consumed_size = ser_len;
 
   if (!node->subnode_count) return node;
 
@@ -571,4 +573,30 @@ void tree_get_non_terminal_nodes(tree_t *tree) {
   tree->non_terminal_node_list = list_create();
 
   _node_get_non_terminal_nodes(tree, tree->root);
+}
+
+
+void write_tree_to_file(const char *filename, uint8_t *buf, size_t buf_size,
+                        uint8_t updated) {
+  int fd, ret;
+
+  // Open the file
+//  if (updated) {
+    fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+//  } else {
+//    fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0600);
+//  }
+  if (unlikely(fd < 0)) {
+    perror("Unable to create the file (write_tree_to_file)");
+    exit(EXIT_FAILURE);
+  }
+
+  // Write the data
+  ret = write(fd, buf, buf_size);
+  if (unlikely(ret != buf_size)) {
+    perror("Short write to tree file (write_tree_to_file)");
+    exit(EXIT_FAILURE);
+  }
+
+  close(fd);
 }

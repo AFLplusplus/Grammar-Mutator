@@ -5,8 +5,10 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
-#include <map>
 #include <string>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 
 #include "helpers.h"
 #include "tree.h"
@@ -17,8 +19,6 @@
 #include "chunk_store.h"
 
 using namespace std;
-
-map<string, tree_t *> trees;
 
 my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   srandom(seed);
@@ -35,6 +35,7 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
 }
 
 void afl_custom_deinit(my_mutator_t *data) {
+  if (data->tree_cur) tree_free(data->tree_cur);
   if (data->mutated_tree) tree_free(data->mutated_tree);
   if (data->trimmed_tree) tree_free(data->trimmed_tree);
 
@@ -43,12 +44,6 @@ void afl_custom_deinit(my_mutator_t *data) {
   data->total_subtree_trimming_steps = 0;
   data->cur_recursive_trimming_step = 0;
   data->total_recursive_trimming_steps = 0;
-
-  // trees
-  for (auto &kv : trees) {
-    tree_free(kv.second);
-  }
-  trees.clear();
 
   free(data->fuzz_buf);
   free(data);
@@ -60,16 +55,81 @@ void afl_custom_deinit(my_mutator_t *data) {
 uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   string fn((const char *)filename);
   data->filename_cur = filename;
+  if (data->tree_cur) {
+    // Clear the previous tree
+    tree_free(data->tree_cur);
+  }
   data->tree_cur = nullptr;
 
-  if (trees.find(fn) != trees.end()) data->tree_cur = trees[fn];
+  string tree_fn(fn);
+  auto   found = tree_fn.find("/queue/");
+  if (unlikely(found == string::npos)) {
+    // Should not reach here
+    perror("Invalid filename (afl_custom_queue_get)");
+    return 0;
+  }
+  tree_fn.replace(found + 1, 5, "trees");
 
-  if (data->tree_cur) {
-    tree_get_size(data->tree_cur);
-    return 1;
+  // Check the output directory
+  if (unlikely(data->tree_out_dir_exist == 0)) {
+    // Retrieve the output directory path
+    found = tree_fn.rfind('/');
+    if (unlikely(found == string::npos)) {
+      // Should not reach here
+      perror("Invalid filename (afl_custom_queue_get)");
+      return 0;
+    }
+    string tree_out_dir = tree_fn.substr(0, found);
+
+    // Check whether the directory exists
+    struct stat info;
+    if (stat(tree_out_dir.c_str(), &info) != 0) {
+      if (mkdir(tree_out_dir.c_str(), 0700) != 0) {
+        // error
+        perror("Cannot create the directory");
+        return 0;
+      }
+      data->tree_out_dir_exist = 1;
+    } else if (info.st_mode & S_IFDIR) {
+      data->tree_out_dir_exist = 1;
+    } else {
+      // Not a directory
+      perror("Wrong tree output path (stat)");
+      return 0;
+    }
   }
 
-  // TODO: Read the test case from the file and parse it
+  // Read the corresponding serialized tree from file
+  int fd = open(tree_fn.c_str(), O_RDONLY);
+  if (unlikely(fd < 0)) {
+    // TODO: no tree file
+    // Parse the tree from a test case
+    return 1;
+  }
+  struct stat info;
+  if (unlikely(fstat(fd, &info) != 0)) {
+    // error
+    perror("Cannot get file information");
+    return 0;
+  }
+  size_t   tree_file_size = info.st_size;
+  uint8_t *tree_buf = (uint8_t *)mmap(0, tree_file_size, PROT_READ | PROT_WRITE,
+                                      MAP_PRIVATE, fd, 0);
+  if (unlikely(tree_buf == MAP_FAILED)) {
+    perror("Cannot map the tree file to the memory");
+    return 0;
+  }
+  close(fd);
+
+  // Deserialize the data to recover the tree
+  data->tree_cur = tree_deserialize(tree_buf, tree_file_size);
+  munmap(tree_buf, tree_file_size);
+  if (unlikely(!data->tree_cur)) {
+    perror("Cannot deserialize the data");
+    return 0;
+  }
+
+  tree_get_size(data->tree_cur);
 
   return 1;
 }
@@ -142,17 +202,29 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
 
 int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
   if (success) {
-    // update the trimming step
+    // Update the trimming step
     size_t remaining_node_size = data->tree_cur->non_terminal_node_list->size;
     size_t remaining_edge_size = data->tree_cur->recursion_edge_list->size;
 
-    // update the corresponding tree
+    // Update the corresponding tree file
     string fn((const char *)data->filename_cur);
-    trees[fn] = data->trimmed_tree;
+    string tree_fn(fn);
+    auto   found = tree_fn.find("/queue/");
+    if (unlikely(found == string::npos)) {
+      // Should not reach here
+      perror("Invalid filename_new_queue (afl_custom_queue_new_entry)");
+      return -1;
+    }
+    tree_fn.replace(found + 1, 5, "trees");
+    tree_serialize(data->trimmed_tree);
+    size_t ser_len = data->trimmed_tree->ser_len;
+    uint8_t *ser_buf = data->trimmed_tree->ser_buf;
+    write_tree_to_file(tree_fn.c_str(), ser_buf, ser_len, 1);
+
     tree_free(data->tree_cur);
     data->tree_cur = data->trimmed_tree;
 
-    // update the non-terminal node list
+    // Update the non-terminal node list
     tree_get_non_terminal_nodes(data->tree_cur);
     for (int i = 0; i < data->cur_subtree_trimming_step; ++i)
       list_pop_front(data->tree_cur->non_terminal_node_list);
@@ -164,8 +236,7 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     tree_get_recursion_edges(data->tree_cur);
     size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
 
-    data->cur_recursive_trimming_step +=
-        (remaining_edge_size - new_edge_size);
+    data->cur_recursive_trimming_step += (remaining_edge_size - new_edge_size);
   } else {
     // the trimmed tree will not be saved, so destroy it
     tree_free(data->trimmed_tree);
@@ -179,7 +250,8 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
   }
 
   if (data->cur_trimming_stage == 1) {
-    if (data->cur_recursive_trimming_step >= data->total_recursive_trimming_steps)
+    if (data->cur_recursive_trimming_step >=
+        data->total_recursive_trimming_steps)
       ++data->cur_trimming_stage;
   }
 
@@ -196,7 +268,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
   size_t  mutated_size = 0;
 
   if (data->mutated_tree) {
-    /* `data->mutated_tree` is NULL, meaning that this is not an interesting
+    /* `data->mutated_tree` is not NULL, meaning that this is not an interesting
       mutation (`afl_custom_queue_new_entry` is not invoked). Therefore, we
       need to free the memory. */
     tree_free(data->mutated_tree);
@@ -264,14 +336,27 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
   if (!filename_orig_queue) return;
 
   string fn((const char *)filename_new_queue);
+  string tree_fn(fn);
+  auto   found = tree_fn.find("/queue/");
+  if (unlikely(found == string::npos)) {
+    // Should not reach here
+    perror("Invalid filename_new_queue (afl_custom_queue_new_entry)");
+    return;
+  }
+  tree_fn.replace(found + 1, 5, "trees");
 
-  trees[fn] = data->mutated_tree;
+  // Serialize the mutated tree
+  tree_serialize(data->mutated_tree);
+
+  // Write the serialized tree to the file
+  size_t   ser_len = data->mutated_tree->ser_len;
+  uint8_t *ser_buf = data->mutated_tree->ser_buf;
+  write_tree_to_file(tree_fn.c_str(), ser_buf, ser_len, 0);
 
   // Store all subtrees in the newly added tree
   chunk_store_add_tree(data->mutated_tree);
 
-  /* Once the test case is added into the queue, we will clear `mutated_tree`
-    pointer. In this case, we will store the tree instead destroying it in
-    `afl_custom_fuzz`. */
+  /* Once the test case is added into the queue, we will clear `mutated_tree` */
+  tree_free(data->mutated_tree);
   data->mutated_tree = nullptr;
 }
