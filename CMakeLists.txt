@@ -51,7 +51,7 @@ add_subdirectory(src)
 
 if (ENABLE_TESTING)
   enable_testing()
-  add_subdirectory(test)
+  add_subdirectory(tests)
 
   # Valgrind
   add_custom_target(test_memcheck
