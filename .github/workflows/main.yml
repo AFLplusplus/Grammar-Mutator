@@ -3,7 +3,7 @@ name: Grammar Mutator CI
 on: [push, pull_request]
 
 jobs:
-  build:
+  cmake-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,3 +28,15 @@ jobs:
       run: |
         cd ./build
         make test_memcheck
+
+  make-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Compile
+      run: |
+        make ENABLE_DEBUG=1
+    - name: Unit testing
+      run: |
+        make ENABLE_DEBUG=1 test

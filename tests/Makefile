@@ -11,7 +11,7 @@ CXX_FLAGS = -std=gnu++14
 CXX_DEFINES =
 CXX_INCLUDES = -I../include -isystem $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest/include -isystem $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest
 
-LIBS = $(GTEST_DIR)/libgtest_main.a ../src/libgrammarmutator.so $(GTEST_DIR)/libgtest.a
+LIBS = $(GTEST_DIR)/libgtest_main.a $(realpath ../src/libgrammarmutator.so) $(GTEST_DIR)/libgtest.a
 LDFLAGS = $(LIBS) -lpthread
 
 ifdef ENABLE_DEBUG
@@ -31,15 +31,11 @@ $(GTEST_DIR)/libgtest_main.a:
 	$(MAKE) -C $(GTEST_DIR) all
 
 test_%: test_%.o $(LIBS)
-	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,/home/h1994st/Developer/Fuzzing/Grammar-Mutator/cmake-build-debug/src $(LDFLAGS)
+	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS)
 
+.PRECIOUS: test_%.o
 test_%.o: test_%.cpp
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
-
-.PHONY: clean
-clean:
-	$(MAKE) -C $(GTEST_DIR) clean
-	rm -rf $(TARGETS)
 
 .PHONY: run_test
 run_test: $(TARGETS)
@@ -54,3 +50,9 @@ run_test: $(TARGETS)
 .PHONY: memcheck
 memcheck:
 	@echo $@  # TODO
+
+.PHONY: clean
+clean:
+	$(MAKE) -C $(GTEST_DIR) clean
+	rm -f $(TARGETS)
+	rm -f $(OBJS)
