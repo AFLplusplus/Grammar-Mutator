@@ -91,8 +91,10 @@ TEST_F(CustomMutatorTest, FuzzNTimes) {
         mutator->data, (const uint8_t *)fn_new.c_str(),
         (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_1");
 
+#ifdef DEBUG_BUILD
     fprintf(stderr, "=====%d=====\n", i + 1);
     dump_test_case(buf, buf_size);
+#endif
   }
 }
 
@@ -150,7 +152,9 @@ TEST_F(CustomMutatorTest, Trimming) {
   EXPECT_EQ(stage_max, 9);  // 8 non-terminal nodes, 1 recursion edge
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
+#ifdef DEBUG_BUILD
     dump_test_case(buf, buf_size);
+#endif
 
     stage_cur = afl_custom_post_trim(mutator->data, 0);
   }
@@ -162,7 +166,9 @@ TEST_F(CustomMutatorTest, Trimming) {
   EXPECT_EQ(stage_max, 9);  // 8 non-terminal nodes, 1 recursion edge
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
+#ifdef DEBUG_BUILD
     dump_test_case(buf, buf_size);
+#endif
 
     stage_cur = afl_custom_post_trim(mutator->data, 1);
   }

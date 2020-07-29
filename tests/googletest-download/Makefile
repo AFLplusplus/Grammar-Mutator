@@ -29,10 +29,10 @@ endif
 all: $(GTEST_ROOT_DIR) $(TARGETS)
 
 $(GTEST_TAR):
-	wget $(GTEST_DOWNLOAD_URL)
+	@wget -q $(GTEST_DOWNLOAD_URL) > /dev/null
 
-$(GTEST_ROOT_DIR): $(GTEST_TAR)
-	tar -xzvf $(GTEST_TAR)
+$(GTEST_ROOT_DIR): | $(GTEST_TAR)
+	@tar -xzvf $(GTEST_TAR) > /dev/null
 
 gtest-all.o: $(GTEST_SRC_FILES)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $(GTEST_DIR)/src/gtest-all.cc
@@ -50,7 +50,7 @@ libgtest_main.a: gtest_main.o
 
 .PHONY: clean
 clean:
-	rm -f $(GTEST_TAR)
-	rm -rf $(GTEST_ROOT_DIR)
-	rm -f $(GTEST_OBJS)
-	rm -f $(TARGETS)
+	@rm -f $(GTEST_TAR)
+	@rm -rf $(GTEST_ROOT_DIR)
+	@rm -f $(GTEST_OBJS)
+	@rm -f $(TARGETS)

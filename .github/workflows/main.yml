@@ -34,9 +34,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Install Valgrind
+      run: |
+        bash .github/workflows/setup-deps.sh
     - name: Compile
       run: |
-        make ENABLE_DEBUG=1
+        make ENABLE_TESTING=1
     - name: Unit testing
       run: |
-        make ENABLE_DEBUG=1 test
+        make test
+    - name: Valgrind memcheck on unit testing
+      run: |
+        make test_memcheck
