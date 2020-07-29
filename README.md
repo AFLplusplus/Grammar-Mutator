@@ -22,7 +22,7 @@ make test_memcheck
 # The last test case will run afl-fuzz with the grammar mutator on json-parser
 ```
 
-# Makefile
+### Makefile
 
 ```bash
 git clone https://github.com/AFLplusplus/Grammar-Mutator.git
