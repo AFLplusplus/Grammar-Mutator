@@ -1,7 +1,6 @@
 TARGET = libgrammarmutator.so
 
-# C_SRC_FILES = $(wildcard *.c)
-C_SRC_FILES = json_c_fuzz.c list.c tree.c tree_mutation.c tree_trimming.c
+C_SRC_FILES = $(wildcard *.c)
 CXX_SRC_FILES = $(wildcard *.cpp)
 OBJS = $(C_SRC_FILES:.c=.o) $(CXX_SRC_FILES:.cpp=.o)
 

@@ -5,7 +5,7 @@
 #include <string>
 
 #include "custom_mutator.h"
-#include "json_c_fuzz.h"
+#include "f1_c_fuzz.h"
 #include "tree.h"
 
 #include "gtest/gtest.h"

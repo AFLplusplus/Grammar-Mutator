@@ -1,6 +1,6 @@
 
-#ifndef __JSON_C_FUZZ_H__
-#define __JSON_C_FUZZ_H__
+#ifndef __F1_C_FUZZ_H__
+#define __F1_C_FUZZ_H__
 
 #include "tree.h"
 
@@ -42,6 +42,7 @@ node_t *gen_character_1(int depth);
 node_t *gen_digit_1(int depth);
 
 tree_t *gen_init__();
+
 
 enum node_type {
   TERM_NODE = 0,

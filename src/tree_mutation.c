@@ -1,5 +1,5 @@
 #include "tree_mutation.h"
-#include "json_c_fuzz.h"
+#include "f1_c_fuzz.h"
 #include "chunk_store.h"
 
 tree_t *random_mutation(tree_t *tree) {

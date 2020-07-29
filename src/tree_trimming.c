@@ -1,4 +1,4 @@
-#include "json_c_fuzz.h"
+#include "f1_c_fuzz.h"
 #include "tree_trimming.h"
 
 tree_t *subtree_trimming(tree_t *tree, node_t *node) {

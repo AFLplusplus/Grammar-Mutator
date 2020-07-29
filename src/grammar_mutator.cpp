@@ -13,7 +13,7 @@
 #include "helpers.h"
 #include "tree.h"
 #include "custom_mutator.h"
-#include "json_c_fuzz.h"
+#include "f1_c_fuzz.h"
 #include "tree_mutation.h"
 #include "tree_trimming.h"
 #include "chunk_store.h"

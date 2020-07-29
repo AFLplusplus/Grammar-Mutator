@@ -423,10 +423,10 @@ gen_func_t gen_funcs[%d] = {
             len(self.grammar.keys()) + 1,
             '\n  '.join(fuzz_fn_names))
 
-    def gen_fuzz_hdr(self, grammar_name):
+    def gen_fuzz_hdr(self):
         hdr_content = '''
-#ifndef __%(grammar_name)s_C_FUZZ_H__
-#define __%(grammar_name)s_C_FUZZ_H__
+#ifndef __F1_C_FUZZ_H__
+#define __F1_C_FUZZ_H__
 
 #include "tree.h"
 
@@ -452,7 +452,6 @@ extern gen_func_t gen_funcs[%(num_nodes)d];
 #endif'''
 
         params = {
-            "grammar_name": grammar_name.upper(),
             "fuzz_fn_decs": self.fuzz_fn_decs(),
             "node_type_decs": self.node_type_decs(),
             "num_nodes": len(self.grammar.keys()) + 1
@@ -460,13 +459,13 @@ extern gen_func_t gen_funcs[%(num_nodes)d];
 
         return hdr_content % params
 
-    def gen_fuzz_src(self, grammar_name):
+    def gen_fuzz_src(self):
         src_content = '''
 #include <stdlib.h>
 #include <string.h>
 
 #include "tree.h"
-#include "%(grammar_name)s_c_fuzz.h"
+#include "f1_c_fuzz.h"
 
 int max_depth = -1;
 
@@ -486,7 +485,6 @@ tree_t *gen_init__() {
 }'''
 
         params = {
-            "grammar_name": grammar_name.lower(),
             "string_pool_defs": self.string_pool_defs(),
             "fuzz_fn_defs": self.fuzz_fn_defs(),
             "fuzz_fn_array_defs": self.fuzz_fn_array_defs()
@@ -494,32 +492,26 @@ tree_t *gen_init__() {
 
         return src_content % params
 
-    def fuzz_src(self, key='<start>', grammar_name=''):
-        return self.gen_fuzz_hdr(grammar_name), self.gen_fuzz_src(grammar_name)
+    def fuzz_src(self, key='<start>'):
+        return self.gen_fuzz_hdr(), self.gen_fuzz_src()
 
 
-def main(grammar, name):
-    # print(grammar)
-    # print('==========')
-    # c_grammar = CTrans(grammar).translate()
-    # print(c_grammar)
-    # print('==========')
-
+def main(grammar):
     c_grammar = grammar
 
-    fuzz_hdr, fuzz_src = CFuzzer(c_grammar).fuzz_src(grammar_name=name)
-    with open(name.lower() + '_c_fuzz.h', 'w') as f:
+    fuzz_hdr, fuzz_src = CFuzzer(c_grammar).fuzz_src()
+    with open('f1_c_fuzz.h', 'w') as f:
         print(fuzz_hdr, file=f)
-    with open(name.lower() + '_c_fuzz.c', 'w') as f:
+    with open('f1_c_fuzz.c', 'w') as f:
         print(fuzz_src, file=f)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print(sys.argv[0] + ' </path/to/grammar/file> <name>')
+    if len(sys.argv) < 2:
+        print(sys.argv[0] + ' </path/to/grammar/file>')
         sys.exit(1)
 
     grammar_file_path = sys.argv[1]
     with open(grammar_file_path, 'r') as fp:
         grammar = json.load(fp)
-        main(grammar, sys.argv[2])
+        main(grammar)

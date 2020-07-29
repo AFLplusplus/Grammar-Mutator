@@ -1,4 +1,4 @@
-#include "json_c_fuzz.h"
+#include "f1_c_fuzz.h"
 #include "tree.h"
 #include "tree_trimming.h"
 

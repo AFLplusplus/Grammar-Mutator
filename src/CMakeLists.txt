@@ -4,5 +4,5 @@ add_library(grammarmutator SHARED
   tree.c
   tree_mutation.c
   tree_trimming.c
-  json_c_fuzz.c
+  f1_c_fuzz.c
   grammar_mutator.cpp)

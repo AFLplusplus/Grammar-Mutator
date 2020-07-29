@@ -1,6 +1,6 @@
 #include "tree.h"
 #include "tree_mutation.h"
-#include "json_c_fuzz.h"
+#include "f1_c_fuzz.h"
 
 #include "gtest/gtest.h"
 #include "gtest_ext.h"
