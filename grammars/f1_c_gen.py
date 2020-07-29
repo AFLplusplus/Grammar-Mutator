@@ -494,7 +494,7 @@ tree_t *gen_init__() {
 
 
 def main(grammar, root_dir):
-    random.seed(0)
+    random.seed(0)  # Fixed seed
 
     c_grammar = grammar
 
