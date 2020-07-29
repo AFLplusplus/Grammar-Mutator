@@ -16,9 +16,6 @@ from datetime import datetime
 from resource import getrusage as resource_usage, RUSAGE_CHILDREN
 from time import time as timestamp
 
-from sh import chmod, rm, mkdir
-from fuzzingbook.Timer import Timer
-from fuzzingbook.ExpectError import ExpectTimeout
 
 START_TIME = datetime.now()
 IS_HTML = False
@@ -496,22 +493,26 @@ tree_t *gen_init__() {
         return self.gen_fuzz_hdr(), self.gen_fuzz_src()
 
 
-def main(grammar):
+def main(grammar, root_dir):
+    random.seed(0)
+
     c_grammar = grammar
 
+    hdr_path = os.path.join(root_dir, 'include/f1_c_fuzz.h')
+    src_path = os.path.join(root_dir, 'src/f1_c_fuzz.c')
     fuzz_hdr, fuzz_src = CFuzzer(c_grammar).fuzz_src()
-    with open('f1_c_fuzz.h', 'w') as f:
+    with open(hdr_path, 'w') as f:
         print(fuzz_hdr, file=f)
-    with open('f1_c_fuzz.c', 'w') as f:
+    with open(src_path, 'w') as f:
         print(fuzz_src, file=f)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(sys.argv[0] + ' </path/to/grammar/file>')
+    if len(sys.argv) < 3:
+        print(sys.argv[0] + ' </path/to/grammar/file> </path/to/project/dir')
         sys.exit(1)
 
     grammar_file_path = sys.argv[1]
     with open(grammar_file_path, 'r') as fp:
         grammar = json.load(fp)
-        main(grammar)
+        main(grammar, sys.argv[2])

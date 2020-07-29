@@ -45,8 +45,38 @@ set(CMAKE_CXX_STANDARD 14)
 message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 
-include_directories(include)
+# Python
+find_program(PYTHON
+  NAMES "python3"
+  DOC "Python interpreter")
+if (NOT PYTHON)
+  message(FATAL_ERROR "Python not found!")
+else ()
+  message(STATUS "Python: ${PYTHON}")
+endif ()
 
+# Generate "f1_c_fuzz.c" and "f1_c_fuzz.h"
+# Check the input grammar file
+if (NOT GRAMMAR_FILE)
+  message(STATUS "Use default JSON grammar")
+  set(GRAMMAR_FILE "${CMAKE_SOURCE_DIR}/grammars/json_grammar.json")
+endif ()
+if (EXISTS ${GRAMMAR_FILE})
+  message(STATUS "Grammar: ${GRAMMAR_FILE}")
+else ()
+  message(FATAL_ERROR "Please provide the full path to the grammar file")
+endif ()
+
+# Generate files at configure time
+execute_process(
+  COMMAND ${PYTHON} grammars/f1_c_gen.py ${GRAMMAR_FILE} ${CMAKE_SOURCE_DIR}
+  RESULT_VARIABLE result
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+if (result)
+  message(FATAL_ERROR "CMake step for f1_c_fuzz failed: ${result}")
+endif ()
+
+include_directories(include)
 add_subdirectory(src)
 
 if (ENABLE_TESTING)
