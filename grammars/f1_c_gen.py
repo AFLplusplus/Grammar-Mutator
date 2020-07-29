@@ -477,7 +477,7 @@ static inline int map_rand(int v) {
 
 tree_t *gen_init__() {
   tree_t *tree = tree_create();
-  tree->root = gen_start(0);
+  tree->root = gen_funcs[1](0);
   return tree;
 }'''
 

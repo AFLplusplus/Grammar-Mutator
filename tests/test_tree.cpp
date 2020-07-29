@@ -1,5 +1,4 @@
 #include "tree.h"
-#include "f1_c_fuzz.h"
 
 #include "gtest/gtest.h"
 #include "gtest_ext.h"
@@ -7,72 +6,52 @@
 class TreeTest : public ::testing::Test {
  protected:
   tree_t *tree;
-  node_t *start;
-  node_t *json;
-  node_t *element;
-  node_t *ws_1;
-  node_t *value;
-  node_t *ws_2;
-  node_t *sp1_1;
-  node_t *ws_3;
+  node_t *node1;
+  node_t *node2;
+  node_t *node3;
+  node_t *node4;
+  node_t *node5;
 
   TreeTest() {
     tree = nullptr;
-    start = nullptr;
-    json = nullptr;
-    element = nullptr;
-    ws_1 = nullptr;
-    value = nullptr;
-    ws_2 = nullptr;
-    sp1_1 = nullptr;
-    ws_3 = nullptr;
+    node1 = nullptr;
+    node2 = nullptr;
+    node3 = nullptr;
+    node4 = nullptr;
+    node5 = nullptr;
   }
 
   ~TreeTest() override = default;
 
   void SetUp() override {
     tree = tree_create();
-    start = node_create(START);
-    tree->root = start;
+    node1 = node_create(1);
+    node2 = node_create_with_val(0, "{", 1);
+    node3 = node_create(1);
+    node4 = node_create_with_val(0, "}", 1);
+    node5 = node_create_with_val(0, "123", 3);
 
-    // start -> json
-    node_init_subnodes(start, 1);
-    json = node_create(JSON);
-    node_set_subnode(start, 0, json);
+    node_init_subnodes(node1, 3);
+    node_set_subnode(node1, 0, node2);
+    node_set_subnode(node1, 2, node4);
 
-    // json -> element
-    node_init_subnodes(json, 1);
-    element = node_create(ELEMENT);
-    node_set_subnode(json, 0, element);
+    node_init_subnodes(node3, 1);
+    node_set_subnode(node3, 0, node5);
 
-    // element -> ws_1, value ("true"), ws_2 (NULL)
-    node_init_subnodes(element, 3);
-    ws_1 = node_create(WS);
-    value = node_create_with_val(VALUE, "true", 4);
-    ws_2 = node_create(WS);
-    node_set_subnode(element, 0, ws_1);
-    node_set_subnode(element, 1, value);
-    node_set_subnode(element, 2, ws_2);
-
-    // ws_1 -> sp1_1 (" "), ws_3 (NULL)  (recursive)
-    node_init_subnodes(ws_1, 2);
-    sp1_1 = node_create_with_val(SP1, " ", 1);
-    ws_3 = node_create(WS);
-    node_set_subnode(ws_1, 0, sp1_1);
-    node_set_subnode(ws_1, 1, ws_3);
+    auto _node = node_clone(node1);
+    node_set_subnode(node1, 1, _node);
+    node_set_subnode(_node, 1, node3);
+    tree->root = node1;
   }
 
   void TearDown() override {
     tree_free(tree);
     tree = nullptr;
-    start = nullptr;
-    json = nullptr;
-    element = nullptr;
-    ws_1 = nullptr;
-    value = nullptr;
-    ws_2 = nullptr;
-    sp1_1 = nullptr;
-    ws_3 = nullptr;
+    node1 = nullptr;
+    node2 = nullptr;
+    node3 = nullptr;
+    node4 = nullptr;
+    node5 = nullptr;
   }
 };
 
@@ -206,7 +185,7 @@ TEST_F(TreeTest, NodeSetSubnode) {
 TEST_F(TreeTest, DumpTreeToBuffer) {
   tree_to_buf(tree);
 
-  EXPECT_MEMEQ(" true", tree->data_buf, tree->data_len);
+  EXPECT_MEMEQ("{{123}}", tree->data_buf, tree->data_len);
 }
 
 TEST_F(TreeTest, ClonedTreeShouldEqual) {
@@ -240,34 +219,7 @@ TEST_F(TreeTest, TreeEqualIsNodeEqual) {
 
 TEST_F(TreeTest, TreeGetSize) {
   size_t tree_size = tree_get_size(tree);
-  EXPECT_EQ(tree_size, 8);
-
-  EXPECT_EQ(start->non_term_size, 1 + json->non_term_size);
-  EXPECT_EQ(start->recursion_edge_size, 1);
-
-  EXPECT_EQ(json->non_term_size, 1 + element->non_term_size);
-  EXPECT_EQ(json->recursion_edge_size, 1);
-
-  EXPECT_EQ(
-      element->non_term_size,
-      1 + ws_1->non_term_size + value->non_term_size + ws_2->non_term_size);
-  EXPECT_EQ(element->recursion_edge_size, 1);
-
-  EXPECT_EQ(ws_1->non_term_size,
-            1 + sp1_1->non_term_size + ws_3->non_term_size);
-  EXPECT_EQ(ws_1->recursion_edge_size, 1);
-
-  EXPECT_EQ(value->non_term_size, 1);
-  EXPECT_EQ(value->recursion_edge_size, 0);
-
-  EXPECT_EQ(ws_2->non_term_size, 1);
-  EXPECT_EQ(ws_2->recursion_edge_size, 0);
-
-  EXPECT_EQ(sp1_1->non_term_size, 1);
-  EXPECT_EQ(sp1_1->recursion_edge_size, 0);
-
-  EXPECT_EQ(ws_3->non_term_size, 1);
-  EXPECT_EQ(ws_3->recursion_edge_size, 0);
+  EXPECT_EQ(tree_size, 3);
 }
 
 TEST_F(TreeTest, NullNodeEqual) {
@@ -282,27 +234,28 @@ TEST_F(TreeTest, NullNodeEqual) {
 TEST_F(TreeTest, ReplaceNode) {
   tree_get_size(tree);
 
-  node_t *new_value = node_create_with_val(VALUE, "null", 4);
+  node_t *_node = node_create_with_val(0, "null", 4);
 
-  EXPECT_TRUE(node_replace_subnode(value->parent, value, new_value));
-
+  EXPECT_TRUE(node_replace_subnode(node5->parent, node5, _node));
   tree_to_buf(tree);
-  EXPECT_EQ(memcmp(" null", tree->data_buf, tree->data_len), 0);
+  EXPECT_EQ(memcmp("{{null}}", tree->data_buf, tree->data_len), 0);
 
-  // `value` will not be freed with the tree, because `value` has been detached
-  // from the tree
-  node_free(value);
+  EXPECT_TRUE(node_replace_subnode(_node->parent, _node, node5));
+  tree_to_buf(tree);
+  EXPECT_EQ(memcmp("{{123}}", tree->data_buf, tree->data_len), 0);
+
+  node_free(_node);
 }
 
 TEST_F(TreeTest, PickNonTermNodeNeverNull) {
   node_t *picked_node = nullptr;
 
-  node_t *_start = node_create(START);
+  node_t *_start = node_create(1);
   node_get_size(_start);
   for (int i = 0; i < 100; ++i) {
     picked_node = node_pick_non_term_subnode(_start);
     EXPECT_EQ(picked_node->non_term_size, 1);
-    EXPECT_NE(picked_node->id, TERM_NODE);
+    EXPECT_NE(picked_node->id, 0);
     EXPECT_EQ(picked_node, _start);
   }
 
@@ -316,7 +269,7 @@ TEST_F(TreeTest, PickNonTermNodeNeverNull) {
 
   for (int i = 0; i < 100; ++i) {
     picked_node = node_pick_non_term_subnode(_start);
-    EXPECT_NE(picked_node->id, TERM_NODE);
+    EXPECT_NE(picked_node->id, 0);
     EXPECT_TRUE(picked_node == _start || picked_node == _json);
   }
 
@@ -383,11 +336,10 @@ TEST_F(TreeTest, TreeGetRecursionEdges) {
   EXPECT_NE(tree->recursion_edge_list, nullptr);
 
   list_t *recursion_edge_list = tree->recursion_edge_list;
-  EXPECT_EQ(recursion_edge_list->size, 1);
+  EXPECT_EQ(recursion_edge_list->size, 2);
   list_node_t  *head = recursion_edge_list->head;
   auto edge = (edge_t *)head->data;
-  EXPECT_EQ(edge->parent, ws_1);
-  EXPECT_EQ(edge->subnode, ws_3);
+  EXPECT_EQ(edge->parent, node1);
   EXPECT_EQ(edge->subnode_offset, 1);
 }
 
@@ -397,12 +349,12 @@ TEST_F(TreeTest, TreeGetNonTerminalNodes) {
   EXPECT_NE(tree->non_terminal_node_list, nullptr);
 
   list_t *non_terminal_node_list = tree->non_terminal_node_list;
-  EXPECT_EQ(non_terminal_node_list->size, 8);
+  EXPECT_EQ(non_terminal_node_list->size, 3);
 }
 
 TEST_F(TreeTest, TreeSerializeDeserialize) {
   tree_serialize(tree);
-  EXPECT_EQ(tree->ser_len, 20 * 8 + 5);
+  EXPECT_EQ(tree->ser_len, 20 * 8 + 7);
 
   tree_t *new_tree = tree_deserialize(tree->ser_buf, tree->ser_len);
 

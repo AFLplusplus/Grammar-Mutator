@@ -281,7 +281,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
     // Generation
     // Randomly generate a JSON string
     max_depth =
-        random() % 15 + 1;  // randomly pick a `max_depth` within [1, 15]
+        random() % 100 + 1;  // randomly pick a `max_depth` within [1, 100]
     tree = gen_init__();
   } else {
     mutation_choice = random() % 3;

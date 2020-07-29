@@ -99,42 +99,17 @@ TEST_F(CustomMutatorTest, FuzzNTimes) {
 }
 
 TEST_F(CustomMutatorTest, Trimming) {
+  srandom(1234);
+
   uint8_t *buf = nullptr;
   size_t   buf_size = 0;
   uint8_t  ret = 0;
   int32_t  stage_cur = 0;
   int32_t  stage_max = 0;
 
-  // prepare a tree: 8 non-terminal nodes, 1 recursion edge
-  auto tree = tree_create();
-  auto start = node_create(START);
-  tree->root = start;
-
-  // start -> json
-  node_init_subnodes(start, 1);
-  auto json = node_create(JSON);
-  node_set_subnode(start, 0, json);
-
-  // json -> element
-  node_init_subnodes(json, 1);
-  auto element = node_create(ELEMENT);
-  node_set_subnode(json, 0, element);
-
-  // element -> ws_1, value ("true"), ws_2 (NULL)
-  node_init_subnodes(element, 3);
-  auto ws_1 = node_create(WS);
-  auto value = node_create_with_val(VALUE, "true", 4);
-  auto ws_2 = node_create(WS);
-  node_set_subnode(element, 0, ws_1);
-  node_set_subnode(element, 1, value);
-  node_set_subnode(element, 2, ws_2);
-
-  // ws_1 -> sp1_1 (" "), ws_3 (NULL)  (recursive)
-  node_init_subnodes(ws_1, 2);
-  auto sp1_1 = node_create_with_val(SP1, " ", 1);
-  auto ws_3 = node_create(WS);
-  node_set_subnode(ws_1, 0, sp1_1);
-  node_set_subnode(ws_1, 1, ws_3);
+  // prepare a tree
+  max_depth = 100;
+  auto tree = gen_init__();
 
   tree_serialize(tree);
   write_tree_to_file("/tmp/afl_test_fuzz_out/trees/trimming_0", tree->ser_buf,
@@ -149,7 +124,7 @@ TEST_F(CustomMutatorTest, Trimming) {
   stage_cur = 0;
   stage_max =
       afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
-  EXPECT_EQ(stage_max, 9);  // 8 non-terminal nodes, 1 recursion edge
+//  EXPECT_EQ(stage_max, tree->root->non_term_size + tree->root->recursion_edge_size);
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
 #ifdef DEBUG_BUILD
@@ -163,7 +138,7 @@ TEST_F(CustomMutatorTest, Trimming) {
   stage_cur = 0;
   stage_max =
       afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
-  EXPECT_EQ(stage_max, 9);  // 8 non-terminal nodes, 1 recursion edge
+//  EXPECT_EQ(stage_max, tree->root->non_term_size + tree->root->recursion_edge_size);
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
 #ifdef DEBUG_BUILD
