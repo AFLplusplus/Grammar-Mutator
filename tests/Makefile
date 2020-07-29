@@ -41,7 +41,10 @@ endif
 all: check_grammarmutator run_test
 
 .PHONY: build
-build: $(TARGETS) $(JSON_PARSER_DIR)/test_json
+build: $(TARGETS)
+ifneq "$(shell command -v $(AFL_FUZZ) 2>/dev/null)" ""
+build: $(JSON_PARSER_DIR)/test_json
+endif
 
 .PHONY: check_grammarmutator
 check_grammarmutator:
@@ -52,11 +55,16 @@ check_grammarmutator:
 .PHONY: check_test_programs
 check_test_programs:
 	@echo "Check test programs"
-	@for target in $(TARGETS) $(JSON_PARSER_DIR)/test_json; do \
+	@for target in $(TARGETS); do \
 		if [ ! -f $$target ] ; then \
 			echo "Error: Please compile test programs at first (make ENABLE_TESTING=1)."; exit 2; \
 		fi; \
 	done
+ifneq "$(shell command -v $(AFL_FUZZ) 2>/dev/null)" ""
+	@if [ ! -f $(JSON_PARSER_DIR)/test_json ] ; then \
+		echo "Error: Please compile test programs at first (make ENABLE_TESTING=1)."; exit 2; \
+	fi;
+endif
 
 export GTEST_VERSION
 
@@ -82,11 +90,11 @@ test_%_memcheck: test_%
 
 .PRECIOUS: test_%
 test_%: test_%.o $(LIBS)
-	@$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS)
+	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS)
 
 .PRECIOUS: test_%.o
 test_%.o: test_%.cpp
-	@$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
 
 
 $(JSON_PARSER_DIR)/test_json:
@@ -94,6 +102,8 @@ $(JSON_PARSER_DIR)/test_json:
 
 $(AFL_FUZZ_OUT_DIR):
 	@mkdir -p $@
+
+ifneq "$(shell command -v $(AFL_FUZZ) 2>/dev/null)" ""
 
 .PHONY: fuzz_json_parser
 fuzz_json_parser: $(JSON_PARSER_DIR)/test_json | $(AFL_FUZZ_OUT_DIR)
@@ -108,6 +118,18 @@ fuzz_json_parser_memcheck: $(JSON_PARSER_DIR)/test_json | $(AFL_FUZZ_OUT_DIR)
 	@echo "[==========] Running afl-fuzz."
 	@$(AFL_FUZZ_ENVS) $(VALGRIND_CMD) --log-file=$(VALGRIND_LOG_DIR)/fuzz_json_parser.log $(AFL_FUZZ) -V 10 -s 0 -i ../examples/JSON/in -o $(AFL_FUZZ_OUT_DIR) -- $< @@ > /dev/null
 	@echo "[  PASSED  ] 1 test."
+
+else
+
+.PHONY: fuzz_json_parser
+fuzz_json_parser:
+	@echo "No $(AFL_FUZZ) command"
+
+.PHONY: fuzz_json_parser_memcheck
+fuzz_json_parser_memcheck:
+	@echo "No $(AFL_FUZZ) command"
+
+endif
 
 .PHONY: run_test
 run_test: check_test_programs $(addprefix run_,$(TARGETS)) fuzz_json_parser
