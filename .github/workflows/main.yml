@@ -29,20 +29,20 @@ jobs:
         cd ./build
         make test_memcheck
 
-  make-build:
-    runs-on: ubuntu-latest
+  # make-build:
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install Valgrind
-      run: |
-        bash .github/workflows/setup-deps.sh
-    - name: Compile
-      run: |
-        make ENABLE_TESTING=1
-    - name: Unit testing
-      run: |
-        make test
-    - name: Valgrind memcheck on unit testing
-      run: |
-        make test_memcheck
+  #   steps:
+  #   - uses: actions/checkout@v2
+  #   - name: Install Valgrind
+  #     run: |
+  #       bash .github/workflows/setup-deps.sh
+  #   - name: Compile
+  #     run: |
+  #       make ENABLE_TESTING=1
+  #   - name: Unit testing
+  #     run: |
+  #       make test
+  #   - name: Valgrind memcheck on unit testing
+  #     run: |
+  #       make test_memcheck
