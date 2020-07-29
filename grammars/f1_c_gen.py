@@ -509,7 +509,7 @@ def main(grammar, root_dir):
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print(sys.argv[0] + ' </path/to/grammar/file> </path/to/project/dir')
+        print(sys.argv[0] + ' </path/to/grammar/file> </path/to/project/dir>')
         sys.exit(1)
 
     grammar_file_path = sys.argv[1]

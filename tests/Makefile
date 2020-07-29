@@ -103,6 +103,18 @@ $(JSON_PARSER_DIR)/test_json:
 $(AFL_FUZZ_OUT_DIR):
 	@mkdir -p $@
 
+# FIXME: "make test" will not pass "GRAMMAR_FILE" variable
+ifneq "$(realpath $(GRAMMAR_FILE))" "$(realpath '../grammars/json_grammar.json')"
+
+.PHONY: fuzz_json_parser
+fuzz_json_parser:
+	@echo "Skip JSON grammar mutator test"
+
+.PHONY: fuzz_json_parser_memcheck
+fuzz_json_parser_memcheck:
+	@echo "Skip JSON grammar mutator test"
+
+else
 ifneq "$(shell command -v $(AFL_FUZZ) 2>/dev/null)" ""
 
 .PHONY: fuzz_json_parser
@@ -129,6 +141,7 @@ fuzz_json_parser:
 fuzz_json_parser_memcheck:
 	@echo "No $(AFL_FUZZ) command"
 
+endif
 endif
 
 .PHONY: run_test
