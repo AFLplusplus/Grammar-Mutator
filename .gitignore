@@ -40,3 +40,4 @@ cmake-build-*/
 # F1
 f1_c_fuzz.c
 f1_c_fuzz.h
+.grammar
