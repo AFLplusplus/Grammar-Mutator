@@ -41,3 +41,6 @@ cmake-build-*/
 f1_c_fuzz.c
 f1_c_fuzz.h
 .grammar
+
+# Python
+__pycache__/
