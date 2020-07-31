@@ -103,7 +103,6 @@ $(JSON_PARSER_DIR)/test_json:
 $(AFL_FUZZ_OUT_DIR):
 	@mkdir -p $@
 
-# FIXME: "make test" will not pass "GRAMMAR_FILE" variable
 ifneq "$(realpath $(GRAMMAR_FILE))" "$(realpath '../grammars/json_grammar.json')"
 
 .PHONY: fuzz_json_parser
