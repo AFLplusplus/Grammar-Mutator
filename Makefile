@@ -57,7 +57,7 @@ test_memcheck:
 
 .PHONY: clean
 clean:
-	@rm -f $(GEN_FILES)
-	@rm -rf grammars/__pycache__
 	@$(MAKE) -C src clean
 	@$(MAKE) -C tests clean
+	@rm -f $(GEN_FILES)
+	@rm -rf grammars/__pycache__
