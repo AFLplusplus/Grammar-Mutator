@@ -4,17 +4,12 @@
 # @Author  : Shengtuo Hu (h1994st@gmail.com)
 # @Version : 1.0
 import sys
-import functools
 import itertools
 import random
 import os
-import subprocess
 import string
-import statistics
 import json
 from datetime import datetime
-from resource import getrusage as resource_usage, RUSAGE_CHILDREN
-from time import time as timestamp
 
 
 START_TIME = datetime.now()
@@ -22,79 +17,20 @@ IS_HTML = False
 TX = {}
 
 
-class Sanitize:
-    def __init__(self, g):
-        self.g = g
-
-    def to_key(self, k):
-        s = k.replace('-', '_')
-        s = s.replace('[', 'Osq').replace(']','Csq')
-        s = s.replace('{','Obr').replace('}','Cbr')
-        s = s.replace('import','XimportX')
-        s = s.replace('class', 'XclassX')
-        s = s.replace('def', 'XdefX')
-        return s
-
-    def to_token(self, t):
-        return t
-
-    def split_tokens(self, t, grammar):
-        if t in grammar: return [t]
-        my_tokens = []
-        # these should not matter for performance comparisons,
-        # and makes my life simpler
-        esc = {'\r': '\r', '\n': '\n',
-             '\\': '\\',
-             '"':'"',
-             "'":"'"}
-        for i in t:
-            if i in esc:
-                my_tokens.append(esc[i])
-            else:
-                my_tokens.append(i)
-        return my_tokens
-
-        return list(t)
-
-    def to_rule(self, rule, grammar):
-        tokens = [k for t in rule for k in self.split_tokens(t, grammar)]
-        return [self.to_token(t) if t not in grammar else self.to_key(t)
-                for t in tokens]
-
-    def translate(self):
-        new_grammar = {}
-        for k in self.g:
-            rules = self.g[k]
-            new_grammar[self.to_key(k)] = [self.to_rule(rule, self.g) for rule in rules]
-        return new_grammar
-
-
-class CTrans(Sanitize):
-    def split_tokens(self, t, grammar):
-        if t in grammar:
-            return [t]
-        my_tokens = []
-        for i in t:
-            my_tokens.append(i)
-        return my_tokens
-
-
 class Fuzzer:
     def __init__(self, grammar):
         self.grammar = grammar
 
-    def fuzz(self, key='<start>', max_num=None, max_depth=None):
-        raise NotImplemented()
-
 
 class LimitFuzzer(Fuzzer):
     def symbol_cost(self, grammar, symbol, seen):
-        if symbol in self.key_cost: return self.key_cost[symbol]
+        if symbol in self.key_cost:
+            return self.key_cost[symbol]
         if symbol in seen:
             self.key_cost[symbol] = float('inf')
             return float('inf')
         v = min((self.expansion_cost(grammar, rule, seen | {symbol})
-                    for rule in grammar.get(symbol, [])), default=0)
+                for rule in grammar.get(symbol, [])), default=0)
         self.key_cost[symbol] = v
         return v
 
@@ -105,19 +41,19 @@ class LimitFuzzer(Fuzzer):
 
 class LimitFuzzer(LimitFuzzer):
     def gen_key(self, key, depth, max_depth):
-        if key not in self.grammar: return key
+        if key not in self.grammar:
+            return key
         if depth > max_depth:
-            clst = sorted([(self.cost[key][str(rule)], rule) for rule in self.grammar[key]])
-            rules = [r for c,r in clst if c == clst[0][0]]
+            clst = sorted(
+                [(self.cost[key][str(rule)], rule)
+                 for rule in self.grammar[key]])
+            rules = [r for c, r in clst if c == clst[0][0]]
         else:
             rules = self.grammar[key]
-        return self.gen_rule(random.choice(rules), depth+1, max_depth)
+        return self.gen_rule(random.choice(rules), depth + 1, max_depth)
 
     def gen_rule(self, rule, depth, max_depth):
         return ''.join(self.gen_key(token, depth, max_depth) for token in rule)
-
-    def fuzz(self, key='<start>', max_depth=10):
-        return self.gen_key(key=key, depth=0, max_depth=max_depth)
 
 
 class LimitFuzzer(LimitFuzzer):
@@ -137,8 +73,8 @@ class LimitFuzzer(LimitFuzzer):
 
 class PooledFuzzer(LimitFuzzer):
     def compute_cost(self, grammar, cost={}):
-        return {k:sorted([(self.expansion_cost(grammar, rule, set()), rule)
-                          for rule in grammar[k]])
+        return {k: sorted([(self.expansion_cost(grammar, rule, set()), rule)
+                           for rule in grammar[k]])
                 for k in self.grammar}
 
 
@@ -148,26 +84,28 @@ class PooledFuzzer(PooledFuzzer):
         for k in self.cost:
             crules = self.cost[k]
             min_cost = crules[0][0]
-            new_grammar[k] = [r for c,r in crules if c == min_cost]
+            new_grammar[k] = [r for c, r in crules if c == min_cost]
             assert len(new_grammar[k]) > 0
         return new_grammar
 
 
 class PooledFuzzer(PooledFuzzer):
     def get_strings_for_key(self, grammar, key='<start>'):
-        if key not in grammar: return [key]
+        if key not in grammar:
+            return [key]
         v = sum([self.get_strings_for_rule(grammar, rule)
                  for rule in grammar[key]], [])
         return random.sample(v, min(self.MAX_SAMPLE, len(v)))
 
     def get_strings_for_rule(self, grammar, rule):
-        my_strings_list = [self.get_strings_for_key(grammar, key) for key in rule]
+        my_strings_list = [
+            self.get_strings_for_key(grammar, key) for key in rule]
         v = [''.join(l) for l in itertools.product(*my_strings_list)]
         return random.sample(v, min(self.MAX_SAMPLE, len(v)))
 
     def completion_strings(self):
         # we are being choosy
-        return {k:self.get_strings_for_key(self.c_grammar, k)
+        return {k: self.get_strings_for_key(self.c_grammar, k)
                 for k in self.c_grammar}
 
 
@@ -179,14 +117,16 @@ class PooledFuzzer(PooledFuzzer):
         self.pool_of_strings = self.completion_strings()
         # reorder our grammar rules by cost.
         for k in self.grammar:
-            self.grammar[k] = [r for (i,r) in self.cost[k]]
+            self.grammar[k] = [r for (i, r) in self.cost[k]]
         self.ordered_grammar = True
 
     def gen_key(self, key, depth, max_depth):
-        if key not in self.grammar: return key
+        if key not in self.grammar:
+            return key
         if depth > max_depth:
             return random.choice(self.pool_of_strings[key])
-        return self.gen_rule(random.choice(self.grammar[key]), depth+1, max_depth)
+        return self.gen_rule(
+            random.choice(self.grammar[key]), depth + 1, max_depth)
 
 
 # not clear what is the fastest: + or ''.join
@@ -218,29 +158,8 @@ class PyCompiledFuzzer(PooledFuzzer):
         t = t.replace('"', '\\"')
         return t
 
-    def k_to_s(self, k): return k[1:-1].replace('-', '_')
-
-    def gen_rule_src(self, rule, key, i):
-        res = []
-        for token in rule:
-            if token in self.grammar:
-                res.append('''\
-gen_%s(next_depth, max_depth)''' % self.k_to_s(token))
-            else:
-                res.append('''\
-result.append("%s")''' % self.esc(token))
-        return '\n'.join(res)
-
-    def string_pool_defs(self):
-        result =[]
-        for k in self.pool_of_strings:
-            result.append('''\
-pool_of_%(key)s = %(values)s''' % {
-                'key':self.k_to_s(k),
-                'values': self.pool_of_strings[k]})
-        result.append('''
-result = []''')
-        return '\n'.join(result)
+    def k_to_s(self, k):
+        return k[1:-1].replace('-', '_')
 
 
 class PyRecCompiledFuzzer(PyCompiledFuzzer):
@@ -250,33 +169,45 @@ class PyRecCompiledFuzzer(PyCompiledFuzzer):
         self.rec_cost = {}
         self.compute_rule_recursion()
 
-    def kr_to_s(self, key, i): return 'gen_%s_%d' % (self.k_to_s(key), i)
+    def kr_to_s(self, key, i):
+        return 'gen_%s_%d' % (self.k_to_s(key), i)
     # the grammar needs to be ordered by the cost.
     # else the ordering will change at the end.
 
     def is_rule_recursive(self, rname, rule, seen):
-        if not rule: return False
+        if not rule:
+            return False
         if rname in seen:
-            return False # reached another recursive rule without seeing this one
+            # reached another recursive rule without seeing this one
+            return False
         for token in rule:
-            if token not in self.grammar: continue
-            for i,trule in enumerate(self.grammar[token]):
+            if token not in self.grammar:
+                continue
+            for i, trule in enumerate(self.grammar[token]):
                 rn = self.kr_to_s(token, i)
-                if rn  == rname: return True
-                if rn in seen: return False
+                if rn == rname:
+                    return True
+                if rn in seen:
+                    return False
                 v = self.is_rule_recursive(rname, trule, seen | {rn})
-                if v: return True
+                if v:
+                    return True
         return False
 
     def is_key_recursive(self, check, key, seen):
-        if not key in self.grammar: return False
-        if key in seen: return False
+        if key not in self.grammar:
+            return False
+        if key in seen:
+            return False
         for rule in self.grammar[key]:
             for token in rule:
-                if token not in self.grammar: continue
-                if token == check: return True
+                if token not in self.grammar:
+                    continue
+                if token == check:
+                    return True
                 v = self.is_key_recursive(check, token, seen | {token})
-                if v: return True
+                if v:
+                    return True
         return False
 
     def compute_rule_recursion(self):
@@ -286,7 +217,7 @@ class PyRecCompiledFuzzer(PyCompiledFuzzer):
             return
         self.rule_recursion = {}
         for k in self.grammar:
-            for i_rule,rule in enumerate(self.grammar[k]):
+            for i_rule, rule in enumerate(self.grammar[k]):
                 n = self.kr_to_s(k, i_rule)
                 self.rule_recursion[n] = self.is_rule_recursive(n, rule, set())
         self.key_recursion = {}
