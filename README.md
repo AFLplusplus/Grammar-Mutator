@@ -15,6 +15,8 @@ cd Grammar-Mutator
 git checkout dev
 mkdir build
 cd build
+
+# Default grammar: JSON (./grammars/json_grammar.json)
 cmake -DENABLE_TESTING=ON ../
 make
 make test
@@ -22,6 +24,12 @@ make test_memcheck
 
 # Make sure afl-fuzz/afl-clang/afl-clang++ are installed
 # The last test case will run afl-fuzz with the grammar mutator on json-parser
+
+# Grammar: ./grammars/ruby_grammar.json
+cmake -DENABLE_TESTING=ON -DGRAMMAR_FILE=$(realpath ../grammars/ruby_grammar.json) ../
+make
+make test
+make test_memcheck
 ```
 
 #### Makefile

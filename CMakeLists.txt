@@ -61,22 +61,28 @@ if (NOT GRAMMAR_FILE)
   message(STATUS "Use default JSON grammar")
   set(GRAMMAR_FILE "${CMAKE_SOURCE_DIR}/grammars/json_grammar.json")
 endif ()
+if (NOT IS_ABSOLUTE ${GRAMMAR_FILE})
+  message(FATAL_ERROR "Please provide the full path to the grammar file")
+endif()
 if (EXISTS ${GRAMMAR_FILE})
   message(STATUS "Grammar: ${GRAMMAR_FILE}")
 else ()
-  message(FATAL_ERROR "Please provide the full path to the grammar file")
+  message(FATAL_ERROR "The grammar file does not exist: ${GRAMMAR_FILE}")
 endif ()
 
 # Generate files at configure time
 execute_process(
-  COMMAND ${PYTHON} grammars/f1_c_gen.py ${GRAMMAR_FILE} ${CMAKE_SOURCE_DIR}
+  COMMAND mkdir -p f1/src
+  COMMAND mkdir -p f1/include
+  COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_c_gen.py ${GRAMMAR_FILE} ${CMAKE_BINARY_DIR}/f1
   RESULT_VARIABLE result
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 if (result)
   message(FATAL_ERROR "CMake step for f1_c_fuzz failed: ${result}")
 endif ()
 
 include_directories(include)
+include_directories(${CMAKE_BINARY_DIR}/f1/include)  # Generated headers
 add_subdirectory(src)
 
 if (ENABLE_TESTING)
