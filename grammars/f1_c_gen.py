@@ -11,7 +11,6 @@ import string
 import json
 from datetime import datetime
 
-
 START_TIME = datetime.now()
 IS_HTML = False
 TX = {}
@@ -23,6 +22,11 @@ class Fuzzer:
 
 
 class LimitFuzzer(Fuzzer):
+    def __init__(self, grammar):
+        super().__init__(grammar)
+        self.key_cost = {}
+        self.cost = self.compute_cost(grammar)
+
     def symbol_cost(self, grammar, symbol, seen):
         if symbol in self.key_cost:
             return self.key_cost[symbol]
@@ -30,7 +34,7 @@ class LimitFuzzer(Fuzzer):
             self.key_cost[symbol] = float('inf')
             return float('inf')
         v = min((self.expansion_cost(grammar, rule, seen | {symbol})
-                for rule in grammar.get(symbol, [])), default=0)
+                 for rule in grammar.get(symbol, [])), default=0)
         self.key_cost[symbol] = v
         return v
 
@@ -38,8 +42,6 @@ class LimitFuzzer(Fuzzer):
         return max((self.symbol_cost(grammar, token, seen)
                     for token in tokens if token in grammar), default=0) + 1
 
-
-class LimitFuzzer(LimitFuzzer):
     def gen_key(self, key, depth, max_depth):
         if key not in self.grammar:
             return key
@@ -55,13 +57,6 @@ class LimitFuzzer(LimitFuzzer):
     def gen_rule(self, rule, depth, max_depth):
         return ''.join(self.gen_key(token, depth, max_depth) for token in rule)
 
-
-class LimitFuzzer(LimitFuzzer):
-    def __init__(self, grammar):
-        super().__init__(grammar)
-        self.key_cost = {}
-        self.cost = self.compute_cost(grammar)
-
     def compute_cost(self, grammar):
         cost = {}
         for k in grammar:
@@ -72,13 +67,21 @@ class LimitFuzzer(LimitFuzzer):
 
 
 class PooledFuzzer(LimitFuzzer):
-    def compute_cost(self, grammar, cost={}):
+    def __init__(self, grammar):
+        super().__init__(grammar)
+        self.c_grammar = self.cheap_grammar()
+        self.MAX_SAMPLE = 255
+        self.pool_of_strings = self.completion_strings()
+        # reorder our grammar rules by cost.
+        for k in self.grammar:
+            self.grammar[k] = [r for (i, r) in self.cost[k]]
+        self.ordered_grammar = True
+
+    def compute_cost(self, grammar):
         return {k: sorted([(self.expansion_cost(grammar, rule, set()), rule)
                            for rule in grammar[k]])
                 for k in self.grammar}
 
-
-class PooledFuzzer(PooledFuzzer):
     def cheap_grammar(self):
         new_grammar = {}
         for k in self.cost:
@@ -88,8 +91,6 @@ class PooledFuzzer(PooledFuzzer):
             assert len(new_grammar[k]) > 0
         return new_grammar
 
-
-class PooledFuzzer(PooledFuzzer):
     def get_strings_for_key(self, grammar, key='<start>'):
         if key not in grammar:
             return [key]
@@ -108,17 +109,17 @@ class PooledFuzzer(PooledFuzzer):
         return {k: self.get_strings_for_key(self.c_grammar, k)
                 for k in self.c_grammar}
 
+    def get_trees_for_key(self, grammar, key='<start>'):
+        # TODO: implement this function
+        pass
 
-class PooledFuzzer(PooledFuzzer):
-    def __init__(self, grammar):
-        super().__init__(grammar)
-        self.c_grammar = self.cheap_grammar()
-        self.MAX_SAMPLE = 255
-        self.pool_of_strings = self.completion_strings()
-        # reorder our grammar rules by cost.
-        for k in self.grammar:
-            self.grammar[k] = [r for (i, r) in self.cost[k]]
-        self.ordered_grammar = True
+    def get_trees_for_rule(self, grammar, rule):
+        # TODO: implement this function
+        pass
+
+    def completion_trees(self):
+        return {k: self.get_trees_for_key(self.c_grammar, k)
+                for k in self.c_grammar}
 
     def gen_key(self, key, depth, max_depth):
         if key not in self.grammar:
@@ -165,12 +166,15 @@ class PyCompiledFuzzer(PooledFuzzer):
 class PyRecCompiledFuzzer(PyCompiledFuzzer):
     def __init__(self, grammar):
         super().__init__(grammar)
+        self.key_recursion = {}
+        self.rule_recursion = {}
         assert self.ordered_grammar
         self.rec_cost = {}
         self.compute_rule_recursion()
 
     def kr_to_s(self, key, i):
         return 'gen_%s_%d' % (self.k_to_s(key), i)
+
     # the grammar needs to be ordered by the cost.
     # else the ordering will change at the end.
 
@@ -211,16 +215,10 @@ class PyRecCompiledFuzzer(PyCompiledFuzzer):
         return False
 
     def compute_rule_recursion(self):
-        if IS_HTML:   # TODO -- to much time -- only for HTML
-            self.rule_recursion = HTML_RULE_RECURSION
-            self.key_recursion = HTML_KEY_RECURSION
-            return
-        self.rule_recursion = {}
         for k in self.grammar:
             for i_rule, rule in enumerate(self.grammar[k]):
                 n = self.kr_to_s(k, i_rule)
                 self.rule_recursion[n] = self.is_rule_recursive(n, rule, set())
-        self.key_recursion = {}
         for k in self.grammar:
             self.key_recursion[k] = self.is_key_recursive(k, k, set())
 
@@ -228,7 +226,7 @@ class PyRecCompiledFuzzer(PyCompiledFuzzer):
 class CFuzzer(PyRecCompiledFuzzer):
     def cheap_chars(self, string):
         # to be embedded within single quotes
-        escaped = {'t':'\t', 'n': '\n', "'": "\\'", "\\":"\\\\", 'r': '\r'}
+        escaped = {'t': '\t', 'n': '\n', "'": "\\'", "\\": "\\\\", 'r': '\r'}
         slst = []
         while string:
             c, *string = string
@@ -267,7 +265,7 @@ class CFuzzer(PyRecCompiledFuzzer):
     def gen_alt_src(self, k):
         rules = self.grammar[k]
         cheap_strings = self.pool_of_strings[k]
-        result = []
+        result = list()
         result.append('''
 node_t *gen_%(name)s(int depth) {
   node_t *node = node_create(%(node_type)s);
@@ -310,8 +308,8 @@ node_t *gen_%(name)s(int depth) {
 const char* pool_%(k)s[] =  {%(cheap_strings)s};
 const int pool_l_%(k)s[] =  {%(cheap_strings_len)s};''' % {
                 'k': self.k_to_s(k),
-               'cheap_strings': ', '.join(['"%s"' % self.esc(s) for s in cheap_strings]),
-               'cheap_strings_len': ', '.join([str(len(s)) for s in cheap_strings])})
+                'cheap_strings': ', '.join(['"%s"' % self.esc(s) for s in cheap_strings]),
+                'cheap_strings_len': ', '.join([str(len(s)) for s in cheap_strings])})
         return '\n'.join(result)
 
     def fuzz_fn_decs(self):
@@ -420,7 +418,7 @@ tree_t *gen_init__() {
 
         return src_content % params
 
-    def fuzz_src(self, key='<start>'):
+    def fuzz_src(self):
         return self.gen_fuzz_hdr(), self.gen_fuzz_src()
 
 
@@ -445,5 +443,4 @@ if __name__ == '__main__':
 
     grammar_file_path = sys.argv[1]
     with open(grammar_file_path, 'r') as fp:
-        grammar = json.load(fp)
-        main(grammar, sys.argv[2])
+        main(json.load(fp), sys.argv[2])
