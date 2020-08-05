@@ -172,7 +172,7 @@ class PooledFuzzer(LimitFuzzer):
             self.grammar[k] = [r for (i, r) in self.cost[k]]
         self.ordered_grammar = True
 
-        self.grammar_keys = self.grammar.keys()
+        self.grammar_keys = list(self.grammar.keys())
         self.pool_of_trees = self.completion_trees()
 
     def compute_cost(self, grammar):
