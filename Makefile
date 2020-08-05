@@ -10,6 +10,9 @@ endif
 ifeq "$(filter $(MAKECMDGOALS),clean)" "clean"
 override GRAMMAR_FILE = ""
 endif
+ifeq "$(filter $(MAKECMDGOALS),help)" "help"
+override GRAMMAR_FILE = ""
+endif
 
 ifndef GRAMMAR_FILE
 $(info Use default JSON grammar file)
@@ -61,3 +64,24 @@ clean:
 	@$(MAKE) -C tests clean
 	@rm -f $(GEN_FILES)
 	@rm -rf grammars/__pycache__
+
+.PHONY: help
+help:
+	@echo "HELP --- the following make targets exist:"
+	@echo "=========================================="
+	@echo "all: compiles everything"
+	@echo "build: compiles the grammar mutator library"
+	@echo "build_test: compiles all test cases (if ENABLE_TESTING=1)"
+	@echo "test: runs the testing framework"
+	@echo "test_memcheck: runs Valgrind with all test cases to pinpoint memory leaks"
+	@echo "clean: cleans everything compiled"
+	@echo "help: shows help information"
+	@echo "=========================================="
+	@echo
+	@echo "Known build environment options:"
+	@echo "=========================================="
+	@echo "ENABLE_TESTING - compiles test cases"
+	@echo "ENABLE_DEBUG - compiles with '-g' option for debug purposes"
+	@echo "GRAMMAR_FILE - the path to the input grammar file (Default: grammars/json_grammar.json)"
+	@echo "=========================================="
+	@echo "e.g.: make ENABLE_TESTING=1 GRAMMAR_FILE=./grammars/json_grammar.json"
