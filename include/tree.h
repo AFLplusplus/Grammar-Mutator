@@ -22,13 +22,13 @@ struct tree_node {
   // uint8_t *val_buf;
   // size_t   val_size;
   BUF_VAR(uint8_t, val);
-  size_t val_len;
+  uint32_t val_len;
 
   node_t *parent;  // parent node
 
   node_t **subnodes;
-  size_t   subnode_count;
-  
+  uint32_t  subnode_count;
+
   // The following two sizes are calculated by `node_get_size`
   size_t recursion_edge_size;  // the total number of recursion edges in the
   // subtree

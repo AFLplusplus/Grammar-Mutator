@@ -16,6 +16,100 @@ IS_HTML = False
 TX = {}
 
 
+class TreeNode:
+    node_type: int = 0
+    val: str = None
+    parent: 'TreeNode' = None
+    subnodes: list = None
+
+    def __init__(self, node_type=0, val=None, subnodes=None):
+        super().__init__()
+
+        self.node_type = node_type
+        self.val = val
+
+        if subnodes is None:
+            subnodes = []
+        self.subnodes = subnodes
+        for subnode in self.subnodes:
+            subnode.parent = self
+
+    def __len__(self):
+        return len(self.subnodes)
+
+    def __setitem__(self, key, value):
+        self.subnodes[key] = value
+
+    def __getitem__(self, key):
+        return self.subnodes[key]
+
+    def append_subnode(self, subnode: 'TreeNode'):
+        subnode.parent = self
+        self.subnodes.append(subnode)
+
+    def to_bytes(self):
+        ret = bytes()
+
+        # type
+        ret += self.node_type.to_bytes(4, byteorder='little', signed=False)
+        # subnode_count
+        subnode_count = len(self)
+        ret += subnode_count.to_bytes(4, byteorder='little', signed=False)
+        # val_len
+        val_len = len(self.val)
+        ret += val_len.to_bytes(4, byteorder='little', signed=False)
+        # val
+        ret += bytes(self.val)
+
+        # subnodes
+        for subnode in self.subnodes:
+            ret += subnode.to_bytes()
+
+        return ret
+
+    @staticmethod
+    def from_bytes(data: bytes):
+        node = TreeNode()
+        consumed = 0
+
+        # type
+        node.node_type = int.from_bytes(data[consumed:consumed + 4], byteorder='little', signed=False)
+        consumed += 4
+        # subnode_count
+        subnode_count = int.from_bytes(data[consumed:consumed + 4], byteorder='little', signed=False)
+        consumed += 4
+        # val_len
+        val_len = int.from_bytes(data[consumed:consumed + 4], byteorder='little', signed=False)
+        consumed += 4
+        # val
+        if val_len != 0:
+            node.val = data[consumed:consumed + val_len].decode('utf-8')
+        consumed += val_len
+
+        # subnodes
+        for _ in range(subnode_count):
+            subnode, sub_consumed = TreeNode.from_bytes(data[consumed:])
+
+            node.append_subnode(subnode)
+            consumed += sub_consumed
+
+        return node, consumed
+
+    def __str__(self):
+        ret = ''
+        if len(self) == 0:
+            if self.val is None or len(self.val) == 0:
+                return ret
+            ret += self.val
+            return ret
+
+        # subnodes
+        for subnode in self.subnodes:
+            ret += str(subnode)
+
+        return ret
+
+
 class Fuzzer:
     def __init__(self, grammar):
         self.grammar = grammar
@@ -72,10 +166,14 @@ class PooledFuzzer(LimitFuzzer):
         self.c_grammar = self.cheap_grammar()
         self.MAX_SAMPLE = 255
         self.pool_of_strings = self.completion_strings()
+
         # reorder our grammar rules by cost.
         for k in self.grammar:
             self.grammar[k] = [r for (i, r) in self.cost[k]]
         self.ordered_grammar = True
+
+        self.grammar_keys = self.grammar.keys()
+        self.pool_of_trees = self.completion_trees()
 
     def compute_cost(self, grammar):
         return {k: sorted([(self.expansion_cost(grammar, rule, set()), rule)
@@ -109,13 +207,22 @@ class PooledFuzzer(LimitFuzzer):
         return {k: self.get_strings_for_key(self.c_grammar, k)
                 for k in self.c_grammar}
 
-    def get_trees_for_key(self, grammar, key='<start>'):
-        # TODO: implement this function
-        pass
+    def k_to_id(self, k):
+        return self.grammar_keys.index(k)
 
-    def get_trees_for_rule(self, grammar, rule):
-        # TODO: implement this function
-        pass
+    def get_trees_for_key(self, grammar, key='<start>'):
+        if key not in grammar:
+            return [TreeNode(node_type=0, val=key)]
+        v = sum([self.get_trees_for_rule(grammar, key, rule)
+                 for rule in grammar[key]], [])
+        return random.sample(v, min(self.MAX_SAMPLE, len(v)))
+
+    def get_trees_for_rule(self, grammar, key, rule):
+        my_trees_list = [
+            self.get_trees_for_key(grammar, key) for key in rule]
+        v = [TreeNode(node_type=self.k_to_id(key), subnodes=subnodes)
+             for subnodes in itertools.product(*my_trees_list)]
+        return random.sample(v, min(self.MAX_SAMPLE, len(v)))
 
     def completion_trees(self):
         return {k: self.get_trees_for_key(self.c_grammar, k)
