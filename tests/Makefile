@@ -104,6 +104,8 @@ $(AFL_FUZZ_OUT_DIR):
 	@mkdir -p $@
 
 ifneq "$(realpath $(GRAMMAR_FILE))" "$(realpath ../grammars/json_grammar.json)"
+
+# Not using the default JSON grammar
 .PHONY: fuzz_json_parser
 fuzz_json_parser:
 	@echo "Skip JSON grammar mutator test"
@@ -131,6 +133,7 @@ fuzz_json_parser_memcheck: $(JSON_PARSER_DIR)/test_json | $(AFL_FUZZ_OUT_DIR)
 
 else
 
+# No afl-fuzz
 .PHONY: fuzz_json_parser
 fuzz_json_parser:
 	@echo "No $(AFL_FUZZ) command"

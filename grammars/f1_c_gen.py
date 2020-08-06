@@ -18,11 +18,11 @@ TX = {}
 
 class TreeNode:
     node_type: int = 0
-    val: str = None
+    val: str = ''
     parent: 'TreeNode' = None
     subnodes: list = None
 
-    def __init__(self, node_type=0, val=None, subnodes=None):
+    def __init__(self, node_type=0, val='', subnodes=None):
         super().__init__()
 
         self.node_type = node_type
@@ -59,7 +59,7 @@ class TreeNode:
         val_len = len(self.val)
         ret += val_len.to_bytes(4, byteorder='little', signed=False)
         # val
-        ret += bytes(self.val)
+        ret += bytes(self.val, 'utf-8')
 
         # subnodes
         for subnode in self.subnodes:
@@ -109,6 +109,9 @@ class TreeNode:
 
         return ret
 
+
+def bytes_to_c_str(data: bytes):
+    return ''.join(["\\x%02X" % x for x in data])
 
 class Fuzzer:
     def __init__(self, grammar):
@@ -208,7 +211,7 @@ class PooledFuzzer(LimitFuzzer):
                 for k in self.c_grammar}
 
     def k_to_id(self, k):
-        return self.grammar_keys.index(k)
+        return self.grammar_keys.index(k) + 1
 
     def get_trees_for_key(self, grammar, key='<start>'):
         if key not in grammar:
@@ -419,6 +422,61 @@ const int pool_l_%(k)s[] =  {%(cheap_strings_len)s};''' % {
                 'cheap_strings_len': ', '.join([str(len(s)) for s in cheap_strings])})
         return '\n'.join(result)
 
+    def gen_alt_src_ser_tree(self, k):
+        rules = self.grammar[k]
+        cheap_trees = self.pool_of_trees[k]
+        result = list()
+        result.append('''
+node_t *gen_%(name)s(int depth) {
+  node_t *node = NULL;
+
+  if (depth > max_depth) {
+    int val = map_rand(%(num_cheap_trees)d);
+    size_t consumed = 0;
+    const char* ser_data = pool_ser_%(name)s[val];
+    const int ser_data_l = pool_l_ser_%(name)s[val];
+    node = _node_deserialize(ser_data, ser_data_l, &consumed);
+    return node;
+  }
+
+  node = node_create(%(node_type)s);
+
+  int val = map_rand(%(nrules)d);
+  node_t *subnode = NULL;
+  switch(val) {''' % {
+            'node_type': self.k_to_s(k).upper(),
+            'name': self.k_to_s(k),
+            'nrules': len(rules),
+            'num_cheap_trees': len(cheap_trees),
+        })
+
+        for i, rule in enumerate(rules):
+            result.append('''
+  case %d:
+    %s
+    break;''' % (i, self.gen_rule_src(rule, k, i)))
+
+        result.append('''
+  }
+
+  return node;
+}''')
+        return '\n'.join(result)
+
+    def ser_tree_pool_defs(self):
+        result = []
+        for k in self.grammar:
+            cheap_trees = self.pool_of_trees[k]
+            ser_cheap_trees = [tree.to_bytes() for tree in cheap_trees]
+            ser_cheap_trees_c_str = [bytes_to_c_str(ser_tree) for ser_tree in ser_cheap_trees]
+            result.append('''
+const char* pool_ser_%(k)s[] = {%(ser_trees)s};
+const int pool_l_ser_%(k)s[] = {%(ser_trees_len)s};''' % {
+                'k': self.k_to_s(k),
+                'ser_trees': ', '.join(['"%s"' % ser_tree_c_str for ser_tree_c_str in ser_cheap_trees_c_str]),
+                'ser_trees_len': ', '.join([str(len(ser_tree))for ser_tree in ser_cheap_trees])})
+        return '\n'.join(result)
+
     def fuzz_fn_decs(self):
         result = []
         for k in self.grammar:
@@ -428,7 +486,9 @@ const int pool_l_%(k)s[] =  {%(cheap_strings_len)s};''' % {
     def fuzz_fn_defs(self):
         result = []
         for key in self.grammar:
-            result.append(self.gen_alt_src(key))
+            # result.append(self.gen_alt_src(key))
+            # NOTE: use trees instead
+            result.append(self.gen_alt_src_ser_tree(key))
         return '\n'.join(result)
 
     def node_type_decs(self):
@@ -500,6 +560,8 @@ extern gen_func_t gen_funcs[%(num_nodes)d];
 #include "tree.h"
 #include "f1_c_fuzz.h"
 
+extern node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size, size_t *consumed_size);
+
 int max_depth = -1;
 
 static inline int map_rand(int v) {
@@ -519,6 +581,44 @@ tree_t *gen_init__() {
 
         params = {
             "string_pool_defs": self.string_pool_defs(),
+            "ser_tree_pool_defs": self.ser_tree_pool_defs(),
+            "fuzz_fn_defs": self.fuzz_fn_defs(),
+            "fuzz_fn_array_defs": self.fuzz_fn_array_defs()
+        }
+
+        return src_content % params
+
+    def gen_fuzz_src_ser_tree(self):
+        src_content = '''
+#include <stdlib.h>
+#include <string.h>
+
+#include "tree.h"
+#include "f1_c_fuzz.h"
+
+extern node_t *_node_deserialize(const uint8_t *data_buf,
+                                 size_t data_size, size_t *consumed_size);
+
+int max_depth = -1;
+
+static inline int map_rand(int v) {
+  return random() %% v;
+}
+%(ser_tree_pool_defs)s
+
+%(fuzz_fn_defs)s
+
+%(fuzz_fn_array_defs)s
+
+tree_t *gen_init__() {
+  tree_t *tree = tree_create();
+  tree->root = gen_funcs[1](0);
+  return tree;
+}'''
+
+        params = {
+            "string_pool_defs": self.string_pool_defs(),
+            "ser_tree_pool_defs": self.ser_tree_pool_defs(),
             "fuzz_fn_defs": self.fuzz_fn_defs(),
             "fuzz_fn_array_defs": self.fuzz_fn_array_defs()
         }
@@ -526,7 +626,9 @@ tree_t *gen_init__() {
         return src_content % params
 
     def fuzz_src(self):
-        return self.gen_fuzz_hdr(), self.gen_fuzz_src()
+        # return self.gen_fuzz_hdr(), self.gen_fuzz_src()
+        # NOTE: use trees instead
+        return self.gen_fuzz_hdr(), self.gen_fuzz_src_ser_tree()
 
 
 def main(grammar, root_dir):

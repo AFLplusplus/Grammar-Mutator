@@ -408,7 +408,7 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
   node_t *node = node_create(0);
   size_t  min_len =
       sizeof(node->id) + sizeof(node->subnode_count) + sizeof(node->val_len);
-  if (data_size < min_len) {
+  if (data_size - (*consumed_size) < min_len) {
     // data is not enough for a node
     node_free(node);
     return NULL;
