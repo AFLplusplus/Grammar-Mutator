@@ -29,6 +29,8 @@ typedef struct afl {
 typedef struct my_mutator {
   afl_t *afl;
 
+  bool tree_out_dir_exist;
+
   const uint8_t *filename_cur;
   tree_t *       tree_cur;
   tree_t *       mutated_tree;
@@ -48,8 +50,8 @@ typedef struct my_mutator {
   BUF_VAR(uint8_t, fuzz);
 
   // Tree output directory
-  char tree_out_dir[PATH_MAX];
-  bool tree_out_dir_exist;
+  char tree_fn_cur[PATH_MAX];
+  char new_tree_fn[PATH_MAX];
 
 } my_mutator_t;
 

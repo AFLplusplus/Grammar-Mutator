@@ -51,7 +51,7 @@ void afl_custom_deinit(my_mutator_t *data) {
 // For each interesting test case in the queue
 uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   const char *fn = (const char *)filename;
-  size_t fn_len = strlen(fn);
+  size_t      fn_len = strlen(fn);
   data->filename_cur = filename;
   if (data->tree_cur) {
     // Clear the previous tree
@@ -69,8 +69,8 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     }
 
     // Set the tree output directory
-    snprintf(data->tree_out_dir, last_slash - fn, "%s", fn);
-    char *found = strstr(data->tree_out_dir, "/queue/");
+    char *tree_out_dir = strndup(fn, last_slash - fn);
+    char *found = strstr(tree_out_dir, "/queue");
     if (unlikely(!found)) {
       // Should not reach here
       perror("Invalid filename (afl_custom_queue_get)");
@@ -81,8 +81,8 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
     // Check whether the directory exists
     struct stat info;
-    if (stat(data->tree_out_dir, &info) != 0) {
-      if (mkdir(data->tree_out_dir, 0700) != 0) {
+    if (stat(tree_out_dir, &info) != 0) {
+      if (mkdir(tree_out_dir, 0700) != 0) {
         // error
         perror("Cannot create the directory");
         return 0;
@@ -95,10 +95,22 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
       perror("Wrong tree output path (stat)");
       return 0;
     }
+
+    free(tree_out_dir);
   }
 
+  strncpy(data->tree_fn_cur, fn, fn_len);
+  char *found = strstr(data->tree_fn_cur, "/queue/");
+  if (unlikely(!found)) {
+    // Should not reach here
+    perror("Invalid filename (afl_custom_queue_get)");
+    return 0;
+  }
+  // Replace "queue" with "trees"
+  strncpy(found + 1, "trees", 5);
+
   // Read the corresponding serialized tree from file
-  int fd = open(tree_fn.c_str(), O_RDONLY);
+  int fd = open(data->tree_fn_cur, O_RDONLY);
   if (unlikely(fd < 0)) {
     // TODO: no tree file
     // Parse the tree from a test case
@@ -205,19 +217,10 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     size_t remaining_edge_size = data->tree_cur->recursion_edge_list->size;
 
     // Update the corresponding tree file
-    string fn((const char *)data->filename_cur);
-    string tree_fn(fn);
-    auto   found = tree_fn.find("/queue/");
-    if (unlikely(found == string::npos)) {
-      // Should not reach here
-      perror("Invalid filename_new_queue (afl_custom_queue_new_entry)");
-      return -1;
-    }
-    tree_fn.replace(found + 1, 5, "trees");
     tree_serialize(data->trimmed_tree);
-    size_t ser_len = data->trimmed_tree->ser_len;
+    size_t   ser_len = data->trimmed_tree->ser_len;
     uint8_t *ser_buf = data->trimmed_tree->ser_buf;
-    write_tree_to_file(tree_fn.c_str(), ser_buf, ser_len, 1);
+    write_tree_to_file(data->tree_fn_cur, ser_buf, ser_len, 1);
 
     tree_free(data->tree_cur);
     data->tree_cur = data->trimmed_tree;
@@ -333,15 +336,17 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
   // Skip if we read from initial test cases (i.e., from input directory)
   if (!filename_orig_queue) return;
 
-  string fn((const char *)filename_new_queue);
-  string tree_fn(fn);
-  auto   found = tree_fn.find("/queue/");
-  if (unlikely(found == string::npos)) {
+  const char *fn = (const char *)filename_new_queue;
+  size_t      fn_len = strlen(fn);
+  strncpy(data->new_tree_fn, fn, fn_len);
+  char *found = strstr(data->new_tree_fn, "/queue/");
+  if (unlikely(!found)) {
     // Should not reach here
     perror("Invalid filename_new_queue (afl_custom_queue_new_entry)");
     return;
   }
-  tree_fn.replace(found + 1, 5, "trees");
+  // Replace "queue" with "trees"
+  strncpy(found + 1, "trees", 5);
 
   // Serialize the mutated tree
   tree_serialize(data->mutated_tree);
@@ -349,7 +354,7 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
   // Write the serialized tree to the file
   size_t   ser_len = data->mutated_tree->ser_len;
   uint8_t *ser_buf = data->mutated_tree->ser_buf;
-  write_tree_to_file(tree_fn.c_str(), ser_buf, ser_len, 0);
+  write_tree_to_file(data->new_tree_fn, ser_buf, ser_len, 0);
 
   // Store all subtrees in the newly added tree
   chunk_store_add_tree(data->mutated_tree);
