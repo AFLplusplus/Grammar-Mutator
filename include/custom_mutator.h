@@ -10,8 +10,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <time.h>
 #include <string.h>
+#include <limits.h>
 
 #include "helpers.h"
 #include "tree.h"
@@ -26,8 +28,6 @@ typedef struct afl {
 
 typedef struct my_mutator {
   afl_t *afl;
-
-  uint8_t tree_out_dir_exist;
 
   const uint8_t *filename_cur;
   tree_t *       tree_cur;
@@ -46,6 +46,10 @@ typedef struct my_mutator {
 
   // Reused buffers:
   BUF_VAR(uint8_t, fuzz);
+
+  // Tree output directory
+  char tree_out_dir[PATH_MAX];
+  bool tree_out_dir_exist;
 
 } my_mutator_t;
 

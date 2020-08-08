@@ -1,11 +1,10 @@
 #define _LARGEFILE64_SOURCE
 #define _FILE_OFFSET_BITS 64
 
-#include <cstdint>
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
-#include <string>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -18,15 +17,13 @@
 #include "tree_trimming.h"
 #include "chunk_store.h"
 
-using namespace std;
-
 my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   srandom(seed);
 
   my_mutator_t *data = (my_mutator_t *)calloc(1, sizeof(my_mutator_t));
   if (!data) {
     perror("afl_custom_init alloc");
-    return nullptr;
+    return NULL;
   }
 
   data->afl = afl;
@@ -53,38 +50,39 @@ void afl_custom_deinit(my_mutator_t *data) {
 
 // For each interesting test case in the queue
 uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
-  string fn((const char *)filename);
+  const char *fn = (const char *)filename;
+  size_t fn_len = strlen(fn);
   data->filename_cur = filename;
   if (data->tree_cur) {
     // Clear the previous tree
     tree_free(data->tree_cur);
   }
-  data->tree_cur = nullptr;
+  data->tree_cur = NULL;
 
-  string tree_fn(fn);
-  auto   found = tree_fn.find("/queue/");
-  if (unlikely(found == string::npos)) {
-    // Should not reach here
-    perror("Invalid filename (afl_custom_queue_get)");
-    return 0;
-  }
-  tree_fn.replace(found + 1, 5, "trees");
-
-  // Check the output directory
+  // Check the tree output directory
   if (unlikely(data->tree_out_dir_exist == 0)) {
-    // Retrieve the output directory path
-    found = tree_fn.rfind('/');
-    if (unlikely(found == string::npos)) {
+    const char *last_slash = strrchr(fn, '/');
+    if (unlikely(!last_slash)) {
       // Should not reach here
       perror("Invalid filename (afl_custom_queue_get)");
       return 0;
     }
-    string tree_out_dir = tree_fn.substr(0, found);
+
+    // Set the tree output directory
+    snprintf(data->tree_out_dir, last_slash - fn, "%s", fn);
+    char *found = strstr(data->tree_out_dir, "/queue/");
+    if (unlikely(!found)) {
+      // Should not reach here
+      perror("Invalid filename (afl_custom_queue_get)");
+      return 0;
+    }
+    // Replace "queue" with "trees"
+    strncpy(found + 1, "trees", 5);
 
     // Check whether the directory exists
     struct stat info;
-    if (stat(tree_out_dir.c_str(), &info) != 0) {
-      if (mkdir(tree_out_dir.c_str(), 0700) != 0) {
+    if (stat(data->tree_out_dir, &info) != 0) {
+      if (mkdir(data->tree_out_dir, 0700) != 0) {
         // error
         perror("Cannot create the directory");
         return 0;
@@ -156,7 +154,7 @@ int32_t afl_custom_init_trim(my_mutator_t *data, uint8_t *buf,
 }
 
 size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
-  tree_t *trimmed_tree = nullptr;
+  tree_t *trimmed_tree = NULL;
   size_t  trimmed_size = 0;
   tree_t *tree_cur = data->tree_cur;
 
@@ -175,7 +173,7 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
     ++data->cur_recursive_trimming_step;
   } else {
     // should not reach here
-    *out_buf = nullptr;
+    *out_buf = NULL;
     perror("wrong trimming stage");
     return 0;
   }
@@ -189,7 +187,7 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
   uint8_t *trimmed_out =
       (uint8_t *)maybe_grow(BUF_PARAMS(data, fuzz), trimmed_size);
   if (!trimmed_out) {
-    *out_buf = nullptr;
+    *out_buf = NULL;
     perror("custom mutator allocation (maybe_grow)");
     return 0; /* afl-fuzz will very likely error out after this. */
   }
@@ -241,7 +239,7 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     // the trimmed tree will not be saved, so destroy it
     tree_free(data->trimmed_tree);
   }
-  data->trimmed_tree = nullptr;
+  data->trimmed_tree = NULL;
 
   // update trimming stage
   if (data->cur_trimming_stage == 0) {
@@ -264,7 +262,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
                        uint8_t **out_buf, uint8_t *add_buf,
                        size_t add_buf_size,  // add_buf can be NULL
                        size_t max_size) {
-  tree_t *tree = nullptr;
+  tree_t *tree = NULL;
   size_t  mutated_size = 0;
 
   if (data->mutated_tree) {
@@ -272,7 +270,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
       mutation (`afl_custom_queue_new_entry` is not invoked). Therefore, we
       need to free the memory. */
     tree_free(data->mutated_tree);
-    data->mutated_tree = nullptr;
+    data->mutated_tree = NULL;
   }
 
   tree = data->tree_cur;
@@ -318,7 +316,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
   uint8_t *mutated_out =
       (uint8_t *)maybe_grow(BUF_PARAMS(data, fuzz), mutated_size);
   if (!mutated_out) {
-    *out_buf = nullptr;
+    *out_buf = NULL;
     perror("custom mutator allocation (maybe_grow)");
     return 0; /* afl-fuzz will very likely error out after this. */
   }
@@ -358,5 +356,5 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
 
   /* Once the test case is added into the queue, we will clear `mutated_tree` */
   tree_free(data->mutated_tree);
-  data->mutated_tree = nullptr;
+  data->mutated_tree = NULL;
 }
