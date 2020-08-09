@@ -27,7 +27,7 @@ struct tree_node {
   node_t *parent;  // parent node
 
   node_t **subnodes;
-  uint32_t  subnode_count;
+  uint32_t subnode_count;
 
   // The following two sizes are calculated by `node_get_size`
   size_t recursion_edge_size;  // the total number of recursion edges in the

@@ -575,17 +575,16 @@ void tree_get_non_terminal_nodes(tree_t *tree) {
   _node_get_non_terminal_nodes(tree, tree->root);
 }
 
-
 void write_tree_to_file(const char *filename, uint8_t *buf, size_t buf_size,
                         uint8_t updated) {
   int fd, ret;
 
   // Open the file
-//  if (updated) {
-    fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-//  } else {
-//    fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0600);
-//  }
+  //  if (updated) {
+  fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  //  } else {
+  //    fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0600);
+  //  }
   if (unlikely(fd < 0)) {
     perror("Unable to create the file (write_tree_to_file)");
     exit(EXIT_FAILURE);

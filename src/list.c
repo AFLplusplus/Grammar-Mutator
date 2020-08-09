@@ -116,7 +116,7 @@ void *list_pop_front(list_t *list) {
   if (list->size == 0 || list->head == NULL) return NULL;
 
   list_node_t *head = list->head;
-  void *data = head->data;
+  void *       data = head->data;
 
   list->head = head->next;
   if (head == list->tail) {
