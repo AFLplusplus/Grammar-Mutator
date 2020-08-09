@@ -136,3 +136,17 @@ void *list_pop_front(list_t *list) {
 
   return data;
 }
+
+void *list_get(list_t *list, size_t i) {
+  if (!list) return NULL;
+  if (list->size == 0 || list->head == NULL) return NULL;
+  if (i >= list->size) return NULL;
+
+  list_node_t *cur = list->head;
+
+  for (int j = 0; j < i; ++j) {
+    cur = cur->next;
+  }
+
+  return cur->data;
+}

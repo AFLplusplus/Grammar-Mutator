@@ -74,6 +74,14 @@ bool list_remove(list_t *list, void *data);
  */
 void *list_pop_front(list_t *list);
 
+/**
+ * Get the data of the i-th node in the list
+ * @param list A doubly linked list
+ * @param i    The index of the required node. The range is [0, list->size)
+ * @return     The data in the i-th node
+ */
+void *list_get(list_t *list, size_t i);
+
 #ifdef __cplusplus
 }
 #endif

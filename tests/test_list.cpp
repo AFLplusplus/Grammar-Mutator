@@ -5,6 +5,7 @@
 class ListTest : public ::testing::Test {
  protected:
   list_t *list;
+  int _array[3] = {0, 1, 2};
 
   ListTest() {
     list = nullptr;
@@ -12,6 +13,13 @@ class ListTest : public ::testing::Test {
 
   void SetUp() override {
     list = list_create();
+
+    size_t _array_len = sizeof(_array) / sizeof(int);
+    for (int i = 0; i < _array_len; ++i) {
+      list_append(list, _array + i);
+      EXPECT_EQ(list->tail->data, _array + i);
+    }
+    EXPECT_EQ(list->size, _array_len);
   }
 
   void TearDown() override {
@@ -21,47 +29,29 @@ class ListTest : public ::testing::Test {
 };
 
 TEST_F(ListTest, ListInsert) {
-  int _array[] = {0, 1, 2};
-  size_t _array_len = sizeof(_array) / sizeof(int);
-  for (int i = 0; i < _array_len; ++i) {
-    list_insert(list, _array + i);
-    EXPECT_EQ(list->head->data, _array + i);
-  }
-  EXPECT_EQ(list->size, _array_len);
+  size_t list_size = list->size;
   list_insert(list, nullptr);
   EXPECT_EQ(list->head->data, nullptr);
-  EXPECT_EQ(list->size, _array_len + 1);
+  EXPECT_EQ(list->size, list_size + 1);
 }
 
 TEST_F(ListTest, ListAppend) {
-  int _array[3] = {0, 1, 2};
-  size_t _array_len = sizeof(_array) / sizeof(int);
-  for (int i = 0; i < _array_len; ++i) {
-    list_append(list, _array + i);
-    EXPECT_EQ(list->tail->data, _array + i);
-  }
-  EXPECT_EQ(list->size, _array_len);
+  size_t list_size = list->size;
   list_append(list, nullptr);
   EXPECT_EQ(list->tail->data, nullptr);
-  EXPECT_EQ(list->size, _array_len + 1);
+  EXPECT_EQ(list->size, list_size + 1);
 }
 
 TEST_F(ListTest, ListRemove) {
-  int _array[3] = {0, 1, 2};
-  size_t _array_len = sizeof(_array) / sizeof(int);
-  EXPECT_FALSE(list_remove(list, _array + 0));
+  size_t list_size = list->size;
 
-  for (int i = 0; i < 3; ++i) {
-    list_append(list, _array + i);
-  }
   EXPECT_TRUE(list_remove(list, _array + 1));
-  EXPECT_EQ(list->size, _array_len - 1);
-  EXPECT_EQ(list->head->next, list->tail);
-  EXPECT_EQ(list->head, list->tail->prev);
+  EXPECT_EQ(list->size, list_size - 1);
+
+  EXPECT_FALSE(list_remove(list, _array + 1));
 
   EXPECT_TRUE(list_remove(list, _array + 0));
-  EXPECT_EQ(list->size, _array_len - 2);
-  EXPECT_EQ(list->head, list->tail);
+  EXPECT_EQ(list->size, list_size - 2);
 }
 
 struct point {
@@ -90,18 +80,19 @@ TEST_F(ListTest, ListFreeWithDataFreeFunc) {
 }
 
 TEST_F(ListTest, ListPopFront) {
-  int _array[3] = {0, 1, 2};
-  size_t _array_len = sizeof(_array) / sizeof(int);
-  EXPECT_FALSE(list_remove(list, _array + 0));
-
-  for (int i = 0; i < 3; ++i) {
-    list_append(list, _array + i);
-  }
-
+  size_t list_size = list->size;
   int *data = (int *) list_pop_front(list);
-  EXPECT_EQ(list->size, _array_len - 1);
+  EXPECT_EQ(list->size, list_size - 1);
   EXPECT_EQ(data, _array + 0);
   EXPECT_EQ(*data, _array[0]);
+}
+
+TEST_F(ListTest, ListGet) {
+  for (int i = 0; i < list->size; ++i) {
+    int *data = (int *)list_get(list, i);
+    EXPECT_EQ(data, _array + i);
+    EXPECT_EQ(*data, _array[i]);
+  }
 }
 
 int main(int argc, char **argv) {
