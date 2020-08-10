@@ -11,4 +11,5 @@ target_link_libraries(grammarmutator
   PRIVATE rxi_map)
 target_include_directories(grammarmutator
   PUBLIC ${CMAKE_SOURCE_DIR}/include
-  PUBLIC ${CMAKE_BINARY_DIR}/f1/include)  # Generated headers
+  PUBLIC ${CMAKE_BINARY_DIR}/f1/include  # Generated headers
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)

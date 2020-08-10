@@ -114,6 +114,10 @@ void map_deinit_(map_base_t *m) {
     }
   }
   free(m->buckets);
+
+  m->buckets = NULL;
+  m->nbuckets = 0;
+  m->nnodes = 0;
 }
 
 void *map_get_(map_base_t *m, const char *key) {

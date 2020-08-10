@@ -1,11 +1,15 @@
 #ifndef __CHUNK_STORE_INTERNAL_H__
 #define __CHUNK_STORE_INTERNAL_H__
 
+#include "map.h"
 #include "tree.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef map_t(list_t *) list_map_t;
+extern list_map_t  chunk_store;
 
 struct buffer {
   BUF_VAR(uint8_t, data);

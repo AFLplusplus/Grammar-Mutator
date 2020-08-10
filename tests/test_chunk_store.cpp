@@ -1,6 +1,6 @@
-#include <map>
 #include <set>
 
+#include "f1_c_fuzz.h"
 #include "chunk_store.h"
 #include "../src/chunk_store_internal.h"
 
@@ -8,8 +8,7 @@
 
 using namespace std;
 
-extern map<uint32_t, list_t *> chunk_store;
-extern set<buffer>             seen_chunks;
+extern set<buffer> seen_chunks;
 
 extern void chunk_store_add_node(node_t *node);
 
@@ -50,7 +49,10 @@ TEST_F(ChunkStoreTest, AddNode) {
   chunk_store_add_node(node1);
   chunk_store_add_node(node1);
 
-  EXPECT_EQ(seen_chunks.size(), chunk_store[1]->size);
+  list_t **p_node_list = map_get(&chunk_store, node_type_str(node1->id));
+  EXPECT_NE(p_node_list, nullptr);
+  list_t *node_list = *p_node_list;
+  EXPECT_EQ(seen_chunks.size(), node_list->size);
 
   node_free(node1);
 }
@@ -72,8 +74,10 @@ TEST_F(ChunkStoreTest, AddTree) {
 
   chunk_store_add_tree(tree);
   EXPECT_EQ(seen_chunks.size(), 2);
-  EXPECT_NE(chunk_store.find(1), chunk_store.end());
-  EXPECT_EQ(chunk_store[1]->size, 2);
+  list_t **p_node_list = map_get(&chunk_store, node_type_str(node1->id));
+  EXPECT_NE(p_node_list, nullptr);
+  list_t *node_list = *p_node_list;
+  EXPECT_EQ(node_list->size, 2);
 
   tree_free(tree);
 }
