@@ -93,17 +93,25 @@ test_%_memcheck: test_%
 test_%: test_%.o $(LIBS)
 	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS)
 
+.PRECIOUS: test_chunk_store
+test_chunk_store: test_chunk_store.o $(LIBS) $(RXI_MAP_LIB)
+	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(RXI_MAP_LIB)
+
 .PRECIOUS: test_rxi_map
 test_rxi_map: test_rxi_map.o $(LIBS) $(RXI_MAP_LIB)
 	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(RXI_MAP_LIB)
 
-.PRECIOUS: test_rxi_map.o
-test_rxi_map.o: test_rxi_map.cpp
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
-
 .PRECIOUS: test_%.o
 test_%.o: test_%.cpp
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
+
+.PRECIOUS: test_chunk_store.o
+test_chunk_store.o: test_chunk_store.cpp
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
+
+.PRECIOUS: test_rxi_map.o
+test_rxi_map.o: test_rxi_map.cpp
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
 
 $(JSON_PARSER_DIR)/test_json:
 	@$(MAKE) -C $(JSON_PARSER_DIR) all
