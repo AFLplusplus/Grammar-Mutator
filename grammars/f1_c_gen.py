@@ -113,9 +113,11 @@ class TreeNode:
 def bytes_to_c_str(data: bytes):
     return ''.join(["\\x%02X" % x for x in data])
 
+
 class Fuzzer:
     def __init__(self, grammar):
         self.grammar = grammar
+        self.grammar_keys = list(self.grammar.keys())
 
 
 class LimitFuzzer(Fuzzer):
@@ -167,21 +169,22 @@ class PooledFuzzer(LimitFuzzer):
     def __init__(self, grammar):
         super().__init__(grammar)
         self.c_grammar = self.cheap_grammar()
+        self.c_grammar_keys = list(self.c_grammar.keys())
+
         self.MAX_SAMPLE = 255
         self.pool_of_strings = self.completion_strings()
 
         # reorder our grammar rules by cost.
-        for k in self.grammar:
+        for k in self.grammar_keys:
             self.grammar[k] = [r for (i, r) in self.cost[k]]
         self.ordered_grammar = True
 
-        self.grammar_keys = list(self.grammar.keys())
         self.pool_of_trees = self.completion_trees()
 
     def compute_cost(self, grammar):
         return {k: sorted([(self.expansion_cost(grammar, rule, set()), rule)
                            for rule in grammar[k]])
-                for k in self.grammar}
+                for k in self.grammar_keys}
 
     def cheap_grammar(self):
         new_grammar = {}
@@ -208,7 +211,7 @@ class PooledFuzzer(LimitFuzzer):
     def completion_strings(self):
         # we are being choosy
         return {k: self.get_strings_for_key(self.c_grammar, k)
-                for k in self.c_grammar}
+                for k in self.c_grammar_keys}
 
     def k_to_id(self, k):
         return self.grammar_keys.index(k) + 1
@@ -229,7 +232,7 @@ class PooledFuzzer(LimitFuzzer):
 
     def completion_trees(self):
         return {k: self.get_trees_for_key(self.c_grammar, k)
-                for k in self.c_grammar}
+                for k in self.c_grammar_keys}
 
     def gen_key(self, key, depth, max_depth):
         if key not in self.grammar:
@@ -325,15 +328,18 @@ class PyRecCompiledFuzzer(PyCompiledFuzzer):
         return False
 
     def compute_rule_recursion(self):
-        for k in self.grammar:
+        for k in self.grammar_keys:
             for i_rule, rule in enumerate(self.grammar[k]):
                 n = self.kr_to_s(k, i_rule)
                 self.rule_recursion[n] = self.is_rule_recursive(n, rule, set())
-        for k in self.grammar:
+        for k in self.grammar_keys:
             self.key_recursion[k] = self.is_key_recursive(k, k, set())
 
 
 class CFuzzer(PyRecCompiledFuzzer):
+    def __init__(self, grammar):
+        super().__init__(grammar)
+
     def cheap_chars(self, string):
         # to be embedded within single quotes
         escaped = {'t': '\t', 'n': '\n', "'": "\\'", "\\": "\\\\", 'r': '\r'}
@@ -412,7 +418,7 @@ node_t *gen_%(name)s(int depth) {
 
     def string_pool_defs(self):
         result = []
-        for k in self.grammar:
+        for k in self.grammar_keys:
             cheap_strings = self.pool_of_strings[k]
             result.append('''
 const char* pool_%(k)s[] =  {%(cheap_strings)s};
@@ -465,7 +471,7 @@ node_t *gen_%(name)s(int depth) {
 
     def ser_tree_pool_defs(self):
         result = []
-        for k in self.grammar:
+        for k in self.grammar_keys:
             cheap_trees = self.pool_of_trees[k]
             ser_cheap_trees = [tree.to_bytes() for tree in cheap_trees]
             ser_cheap_trees_c_str = [bytes_to_c_str(ser_tree) for ser_tree in ser_cheap_trees]
@@ -479,7 +485,7 @@ const int pool_l_ser_%(k)s[] = {%(ser_trees_len)s};''' % {
 
     def fuzz_fn_decs(self):
         result = []
-        for k in self.grammar:
+        for k in self.grammar_keys:
             result.append('''node_t *gen_%s(int depth);''' % self.k_to_s(k))
         return '\n'.join(result)
 
@@ -498,7 +504,7 @@ enum node_type {
   %s
 };'''
         node_types = []
-        for k in self.grammar:
+        for k in self.grammar_keys:
             node_types.append('%s,' % self.k_to_s(k).upper())
         return result % ('\n  '.join(node_types))
 
@@ -510,11 +516,26 @@ gen_func_t gen_funcs[%d] = {
 };
 '''
         fuzz_fn_names = []
-        for k in self.grammar:
+        for k in self.grammar_keys:
             fuzz_fn_names.append('gen_%s,' % self.k_to_s(k))
         return result % (
-            len(self.grammar.keys()) + 1,
+            len(self.grammar_keys) + 1,
             '\n  '.join(fuzz_fn_names))
+
+    def node_type_str_defs(self):
+        result = '''
+const char *node_type_str(int node_type) {
+  switch (node_type) {
+  case 0: return "TERM_NODE";
+  %s
+  default: return "";
+  }
+}'''
+        node_type_strs = []
+        for k in self.grammar_keys:
+            node_type_strs.append('case %d: return "%s";' % (
+                self.k_to_id(k), self.k_to_s(k).upper()))
+        return result % ('\n  '.join(node_type_strs))
 
     def gen_fuzz_hdr(self):
         hdr_content = '''
@@ -534,6 +555,7 @@ extern int max_depth;
 tree_t *gen_init__();
 
 %(node_type_decs)s
+const char *node_type_str(int node_type);
 
 typedef node_t *(*gen_func_t)(int depth);
 extern gen_func_t gen_funcs[%(num_nodes)d];
@@ -547,7 +569,7 @@ extern gen_func_t gen_funcs[%(num_nodes)d];
         params = {
             "fuzz_fn_decs": self.fuzz_fn_decs(),
             "node_type_decs": self.node_type_decs(),
-            "num_nodes": len(self.grammar.keys()) + 1
+            "num_nodes": len(self.grammar_keys) + 1
         }
 
         return hdr_content % params
@@ -567,6 +589,8 @@ int max_depth = -1;
 static inline int map_rand(int v) {
   return random() %% v;
 }
+%(node_type_str_defs)s
+
 %(string_pool_defs)s
 
 %(fuzz_fn_defs)s
@@ -583,7 +607,8 @@ tree_t *gen_init__() {
             "string_pool_defs": self.string_pool_defs(),
             "ser_tree_pool_defs": self.ser_tree_pool_defs(),
             "fuzz_fn_defs": self.fuzz_fn_defs(),
-            "fuzz_fn_array_defs": self.fuzz_fn_array_defs()
+            "fuzz_fn_array_defs": self.fuzz_fn_array_defs(),
+            "node_type_str_defs": self.node_type_str_defs()
         }
 
         return src_content % params
@@ -604,6 +629,8 @@ int max_depth = -1;
 static inline int map_rand(int v) {
   return random() %% v;
 }
+%(node_type_str_defs)s
+
 %(ser_tree_pool_defs)s
 
 %(fuzz_fn_defs)s
@@ -620,7 +647,8 @@ tree_t *gen_init__() {
             "string_pool_defs": self.string_pool_defs(),
             "ser_tree_pool_defs": self.ser_tree_pool_defs(),
             "fuzz_fn_defs": self.fuzz_fn_defs(),
-            "fuzz_fn_array_defs": self.fuzz_fn_array_defs()
+            "fuzz_fn_array_defs": self.fuzz_fn_array_defs(),
+            "node_type_str_defs": self.node_type_str_defs()
         }
 
         return src_content % params

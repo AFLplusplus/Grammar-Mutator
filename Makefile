@@ -33,8 +33,7 @@ GEN_FILES = .grammar src/f1_c_fuzz.c include/f1_c_fuzz.h
 .PHONY: all
 all: build
 
-src/f1_c_fuzz.c: grammars/f1_c_gen.py .grammar
-include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar
+src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar
 	@echo "Grammar: $(shell cat .grammar)"
 	$(PYTHON) $< $(shell cat .grammar) $(CURDIR)
 
