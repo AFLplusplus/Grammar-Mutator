@@ -152,8 +152,9 @@ endif ()
 # test the third-party C map library
 add_executable(test_rxi_map test_rxi_map.cpp)
 target_link_libraries(test_rxi_map
-  PRIVATE rxi_map
-  PRIVATE gtest_main)
+  PRIVATE gtest_main
+  PRIVATE grammarmutator
+  PRIVATE rxi_map)
 target_include_directories(test_rxi_map
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)
 add_test(
