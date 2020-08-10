@@ -81,9 +81,8 @@ if (result)
   message(FATAL_ERROR "CMake step for f1_c_fuzz failed: ${result}")
 endif ()
 
-include_directories(include)
-include_directories(${CMAKE_BINARY_DIR}/f1/include)  # Generated headers
 add_subdirectory(src)
+add_subdirectory(third_party)
 
 if (ENABLE_TESTING)
   enable_testing()

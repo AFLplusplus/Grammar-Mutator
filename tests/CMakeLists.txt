@@ -26,6 +26,7 @@ add_subdirectory(
   ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
   EXCLUDE_FROM_ALL)
 
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Test suite 1:
 # run a custom mutator library, which generates test cases for a specific
@@ -146,3 +147,15 @@ if (${GRAMMAR_FILE} STREQUAL ${CMAKE_SOURCE_DIR}/grammars/json_grammar.json)
       PROPERTY ENVIRONMENT "AFL_CUSTOM_MUTATOR_LIBRARY=${CMAKE_BINARY_DIR}/src/libgrammarmutator.so")
   endif ()
 endif ()
+
+# Test suite 8:
+# test the third-party C map library
+add_executable(test_rxi_map test_rxi_map.cpp)
+target_link_libraries(test_rxi_map
+  PRIVATE rxi_map
+  PRIVATE gtest_main)
+target_include_directories(test_rxi_map
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)
+add_test(
+  NAME test_rxi_map
+  COMMAND test_rxi_map)

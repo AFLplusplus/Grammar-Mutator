@@ -39,7 +39,7 @@ include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar
 	$(PYTHON) $< $(shell cat .grammar) $(CURDIR)
 
 .PHONY: build
-build: src/f1_c_fuzz.c include/f1_c_fuzz.h
+build: src/f1_c_fuzz.c include/f1_c_fuzz.h third_party
 	@$(MAKE) -C src all
 
 ifdef ENABLE_TESTING
@@ -49,6 +49,10 @@ all: build_test
 build_test:
 	@$(MAKE) -C tests build
 endif
+
+.PHONY: third_party
+third_party:
+	@$(MAKE) -C third_party
 
 .PHONY: test
 test:
@@ -60,8 +64,9 @@ test_memcheck:
 
 .PHONY: clean
 clean:
-	@$(MAKE) -C src clean
-	@$(MAKE) -C tests clean
+	@$(MAKE) -C src $@
+	@$(MAKE) -C tests $@
+	@$(MAKE) -C third_party $@
 	@rm -f $(GEN_FILES)
 	@rm -rf grammars/__pycache__
 

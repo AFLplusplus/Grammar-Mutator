@@ -1,6 +1,5 @@
 #include <map>
 #include <set>
-#include <vector>
 
 #include "chunk_store.h"
 #include "../src/chunk_store_internal.h"
