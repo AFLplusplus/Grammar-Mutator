@@ -6,6 +6,7 @@ MEMCHECK_TARGETS = $(TARGETS:=_memcheck)
 OBJS = $(SRC_FILES:.cpp=.o)
 
 GRAMMAR_MUTATOR_LIB = $(realpath ../src/libgrammarmutator.so)
+RXI_MAP_LIB = $(realpath ../third_party/rxi_map/librxi_map.a)
 
 GTEST_DIR = googletest-download
 GTEST_VERSION = 1.10.0
@@ -92,10 +93,17 @@ test_%_memcheck: test_%
 test_%: test_%.o $(LIBS)
 	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS)
 
+.PRECIOUS: test_rxi_map
+test_rxi_map: test_rxi_map.o $(LIBS) $(RXI_MAP_LIB)
+	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(RXI_MAP_LIB)
+
+.PRECIOUS: test_rxi_map.o
+test_rxi_map.o: test_rxi_map.cpp
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
+
 .PRECIOUS: test_%.o
 test_%.o: test_%.cpp
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
-
 
 $(JSON_PARSER_DIR)/test_json:
 	@$(MAKE) -C $(JSON_PARSER_DIR) all
