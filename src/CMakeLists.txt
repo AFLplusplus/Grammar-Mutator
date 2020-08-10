@@ -8,7 +8,7 @@ add_library(grammarmutator SHARED
   grammar_mutator.c)
 
 target_link_libraries(grammarmutator
-  PARIVATE rxi_map)
+  PRIVATE rxi_map)
 target_include_directories(grammarmutator
   PUBLIC ${CMAKE_SOURCE_DIR}/include
   PUBLIC ${CMAKE_BINARY_DIR}/f1/include)  # Generated headers
