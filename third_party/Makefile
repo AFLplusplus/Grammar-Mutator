@@ -1,4 +1,4 @@
-DIRS = rxi_map
+DIRS = rxi_map barrust_set
 CLEANDIRS = $(DIRS:%=clean-%)
 
 .PHONY: all
