@@ -1,5 +1,5 @@
 add_library(grammarmutator SHARED
-  chunk_store.cpp
+  chunk_store.c
   list.c
   tree.c
   tree_mutation.c
@@ -8,8 +8,10 @@ add_library(grammarmutator SHARED
   grammar_mutator.c)
 
 target_link_libraries(grammarmutator
-  PRIVATE rxi_map)
+  PRIVATE rxi_map
+  PRIVATE barrust_set)
 target_include_directories(grammarmutator
   PUBLIC ${CMAKE_SOURCE_DIR}/include
   PUBLIC ${CMAKE_BINARY_DIR}/f1/include  # Generated headers
-  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/barrust_set)

@@ -75,9 +75,11 @@ add_executable(test_chunk_store test_chunk_store.cpp)
 target_link_libraries(test_chunk_store
   PRIVATE gtest_main
   PRIVATE grammarmutator
-  PRIVATE rxi_map)
+  PRIVATE rxi_map
+  PRIVATE barrust_set)
 target_include_directories(test_chunk_store
-  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/barrust_set)
 add_test(
   NAME test_chunk_store
   COMMAND test_chunk_store)

@@ -1,5 +1,3 @@
-#include <set>
-
 #include "f1_c_fuzz.h"
 #include "chunk_store.h"
 #include "../src/chunk_store_internal.h"
@@ -8,15 +6,12 @@
 
 using namespace std;
 
-extern set<buffer> seen_chunks;
-
-extern void chunk_store_add_node(node_t *node);
-
 class ChunkStoreTest : public ::testing::Test {
  protected:
   ChunkStoreTest() = default;
 
   void SetUp() override {
+    chunk_store_init();
   }
 
   void TearDown() override {
@@ -29,13 +24,15 @@ TEST_F(ChunkStoreTest, SeenChunk) {
   auto node2 = node_clone(node1);
 
   // check the comparator
-  auto ret1 = seen_chunks.insert(buffer(node1));
-  EXPECT_TRUE(ret1.second);
-  auto ret2 = seen_chunks.insert(buffer(node2));
-  EXPECT_FALSE(ret2.second);
+  auto node1_buffer = (char *)buf_from_node(node1);
+  EXPECT_EQ(set_add(&seen_chunks, node1_buffer), SET_TRUE);
+  auto node2_buffer = (char *)buf_from_node(node2);
+  EXPECT_EQ(set_add(&seen_chunks, node2_buffer), SET_ALREADY_PRESENT);
 
-  EXPECT_EQ(seen_chunks.size(), 1);
+  EXPECT_EQ(set_length(&seen_chunks), 1);
 
+  free(node1_buffer);
+  free(node2_buffer);
   node_free(node1);
   node_free(node2);
 }
@@ -52,7 +49,7 @@ TEST_F(ChunkStoreTest, AddNode) {
   list_t **p_node_list = map_get(&chunk_store, node_type_str(node1->id));
   EXPECT_NE(p_node_list, nullptr);
   list_t *node_list = *p_node_list;
-  EXPECT_EQ(seen_chunks.size(), node_list->size);
+  EXPECT_EQ(set_length(&seen_chunks), node_list->size);
 
   node_free(node1);
 }
@@ -73,7 +70,7 @@ TEST_F(ChunkStoreTest, AddTree) {
   tree_get_size(tree);
 
   chunk_store_add_tree(tree);
-  EXPECT_EQ(seen_chunks.size(), 2);
+  EXPECT_EQ(set_length(&seen_chunks), 2);
   list_t **p_node_list = map_get(&chunk_store, node_type_str(node1->id));
   EXPECT_NE(p_node_list, nullptr);
   list_t *node_list = *p_node_list;

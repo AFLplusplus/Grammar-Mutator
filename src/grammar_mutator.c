@@ -20,6 +20,8 @@
 my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   srandom(seed);
 
+  chunk_store_init();
+
   my_mutator_t *data = (my_mutator_t *)calloc(1, sizeof(my_mutator_t));
   if (!data) {
     perror("afl_custom_init alloc");

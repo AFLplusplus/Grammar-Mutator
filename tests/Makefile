@@ -112,7 +112,7 @@ test_%.o: test_%.cpp
 
 .PRECIOUS: test_chunk_store.o
 test_chunk_store.o: test_chunk_store.cpp
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map -I../third_party/barrust_set $(CXX_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_rxi_map.o
 test_rxi_map.o: test_rxi_map.cpp

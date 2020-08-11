@@ -8,6 +8,11 @@ extern "C" {
 #endif
 
 /**
+ * Initialize the chunk store
+ */
+void chunk_store_init();
+
+/**
  * Add all subtrees in a tree to the chunk store
  * @param tree A given tree
  */
