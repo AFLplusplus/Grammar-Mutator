@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 typedef map_t(list_t *) list_map_t;
-extern list_map_t  chunk_store;
+extern list_map_t chunk_store;
 
 struct buffer {
   BUF_VAR(uint8_t, data);
@@ -72,7 +72,7 @@ struct buffer {
 
   bool operator<(const buffer &rhs) const {
     size_t min_len = std::min(data_len, rhs.data_len);
-    int i = 0;
+    int    i = 0;
     for (; i < min_len; ++i) {
       if (data_buf[i] < rhs.data_buf[i]) return true;
       if (rhs.data_buf[i] < data_buf[i]) return false;
