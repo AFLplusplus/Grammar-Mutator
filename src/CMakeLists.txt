@@ -15,3 +15,11 @@ target_include_directories(grammarmutator
   PUBLIC ${CMAKE_BINARY_DIR}/f1/include  # Generated headers
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/barrust_set)
+
+add_executable(grammar_generator
+  grammar_generator.c)
+target_link_libraries(grammar_generator
+  PRIVATE grammarmutator)
+target_include_directories(grammarmutator
+  PUBLIC ${CMAKE_SOURCE_DIR}/include
+  PUBLIC ${CMAKE_BINARY_DIR}/f1/include)

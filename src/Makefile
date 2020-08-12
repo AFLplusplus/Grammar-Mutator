@@ -1,9 +1,13 @@
-TARGET = libgrammarmutator.so
+TARGETS = libgrammarmutator.so grammar_generator
 
-C_SRC_FILES = $(wildcard *.c)
-OBJS = $(C_SRC_FILES:.c=.o)
+LIB_SRC_FILES = chunk_store.c f1_c_fuzz.c grammar_mutator.c list.c tree.c tree_mutation.c tree_trimming.c
+GEN_SRC_FILES = grammar_generator.c
 
-C_FLAGS = -fPIC
+LIB_OBJS = $(LIB_SRC_FILES:.c=.o)
+GEN_OBJS = $(GEN_SRC_FILES:.c=.o)
+OBJS = $(LIB_OBJS) $(GEN_OBJS)
+
+C_FLAGS =
 C_DEFINES =
 C_INCLUDES = -I../include -I../third_party/rxi_map -I../third_party/barrust_set
 
@@ -20,15 +24,21 @@ C_FLAGS += -O3
 endif
 
 .PHONY: all
-all: $(TARGET)
+all: $(TARGETS)
 
-$(TARGET): $(OBJS)
-	$(CC) $(C_FLAGS) -shared $^ -o $@ $(LDFLAGS)
+libgrammarmutator.so: $(LIB_OBJS)
+	$(CC) -fPIC $(C_FLAGS) -shared $^ -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o $@ -c $<
+	$(CC) $(C_DEFINES) $(C_INCLUDES) -fPIC $(C_FLAGS) -o $@ -c $<
+
+grammar_generator: $(GEN_OBJS) libgrammarmutator.so
+	$(CC) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) libgrammarmutator.so
+
+grammar_generator.o: grammar_generator.c
+	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) -o $@ -c $<
 
 .PHONY: clean
 clean:
 	@rm -f $(OBJS)
-	@rm -f $(TARGET)
+	@rm -f $(TARGETS)
