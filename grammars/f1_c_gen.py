@@ -138,23 +138,12 @@ class LimitFuzzer(Fuzzer):
         return v
 
     def expansion_cost(self, grammar, tokens, seen):
-        return max((self.symbol_cost(grammar, token, seen)
-                    for token in tokens if token in grammar), default=0) + 1
-
-    def gen_key(self, key, depth, max_depth):
-        if key not in self.grammar:
-            return key
-        if depth > max_depth:
-            clst = sorted(
-                [(self.cost[key][str(rule)], rule)
-                 for rule in self.grammar[key]])
-            rules = [r for c, r in clst if c == clst[0][0]]
-        else:
-            rules = self.grammar[key]
-        return self.gen_rule(random.choice(rules), depth + 1, max_depth)
-
-    def gen_rule(self, rule, depth, max_depth):
-        return ''.join(self.gen_key(token, depth, max_depth) for token in rule)
+        ret = 1
+        for token in tokens:
+            if token not in grammar:
+                continue
+            ret += self.symbol_cost(grammar, token, seen)
+        return ret
 
     def compute_cost(self, grammar):
         cost = {}
@@ -233,14 +222,6 @@ class PooledFuzzer(LimitFuzzer):
     def completion_trees(self):
         return {k: self.get_trees_for_key(self.c_grammar, k)
                 for k in self.c_grammar_keys}
-
-    def gen_key(self, key, depth, max_depth):
-        if key not in self.grammar:
-            return key
-        if depth > max_depth:
-            return random.choice(self.pool_of_strings[key])
-        return self.gen_rule(
-            random.choice(self.grammar[key]), depth + 1, max_depth)
 
 
 # not clear what is the fastest: + or ''.join
@@ -364,7 +345,7 @@ class CFuzzer(PyRecCompiledFuzzer):
         res.append('node->subnode_count = %d;' % ntokens)
         for i, token in enumerate(rule):
             if token in self.grammar:
-                res.append('subnode = gen_%s(depth +1);' % self.k_to_s(token))
+                res.append('subnode = gen_%s(depth + 1);' % self.k_to_s(token))
                 res.append('node->non_term_size += 1;')
                 if key == token:
                     res.append('node->recursion_edge_size += 1;')
@@ -549,6 +530,7 @@ extern "C" {
 #endif
 
 extern int max_depth;
+extern int max_len;
 
 %(fuzz_fn_decs)s
 
@@ -582,49 +564,11 @@ extern gen_func_t gen_funcs[%(num_nodes)d];
 #include "tree.h"
 #include "f1_c_fuzz.h"
 
-extern node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size, size_t *consumed_size);
-
-int max_depth = -1;
-
-static inline int map_rand(int v) {
-  return random() %% v;
-}
-%(node_type_str_defs)s
-
-%(string_pool_defs)s
-
-%(fuzz_fn_defs)s
-
-%(fuzz_fn_array_defs)s
-
-tree_t *gen_init__() {
-  tree_t *tree = tree_create();
-  tree->root = gen_funcs[1](0);
-  return tree;
-}'''
-
-        params = {
-            "string_pool_defs": self.string_pool_defs(),
-            "ser_tree_pool_defs": self.ser_tree_pool_defs(),
-            "fuzz_fn_defs": self.fuzz_fn_defs(),
-            "fuzz_fn_array_defs": self.fuzz_fn_array_defs(),
-            "node_type_str_defs": self.node_type_str_defs()
-        }
-
-        return src_content % params
-
-    def gen_fuzz_src_ser_tree(self):
-        src_content = '''
-#include <stdlib.h>
-#include <string.h>
-
-#include "tree.h"
-#include "f1_c_fuzz.h"
-
 extern node_t *_node_deserialize(const uint8_t *data_buf,
                                  size_t data_size, size_t *consumed_size);
 
 int max_depth = -1;
+int max_len = -1;
 
 static inline int map_rand(int v) {
   return random() %% v;
@@ -654,9 +598,7 @@ tree_t *gen_init__() {
         return src_content % params
 
     def fuzz_src(self):
-        # return self.gen_fuzz_hdr(), self.gen_fuzz_src()
-        # NOTE: use trees instead
-        return self.gen_fuzz_hdr(), self.gen_fuzz_src_ser_tree()
+        return self.gen_fuzz_hdr(), self.gen_fuzz_src()
 
 
 def main(grammar, root_dir):
