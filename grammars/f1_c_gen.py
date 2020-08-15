@@ -125,33 +125,93 @@ class LimitFuzzer(Fuzzer):
         super().__init__(grammar)
         self.key_cost = {}
         self.cost = self.compute_cost(grammar)
+        # self.key_num_trees = {}
+        # self.num_trees = self.compute_num_trees(grammar)
 
-    def symbol_cost(self, grammar, symbol, seen):
+    def symbol_cost(self, grammar, symbol):
+        if symbol not in grammar:
+            return 0  # terminal node
         if symbol in self.key_cost:
             return self.key_cost[symbol]
-        if symbol in seen:
-            self.key_cost[symbol] = float('inf')
-            return float('inf')
-        v = min((self.expansion_cost(grammar, rule, seen | {symbol})
-                 for rule in grammar.get(symbol, [])), default=0)
-        self.key_cost[symbol] = v
-        return v
+        return float("inf")
 
-    def expansion_cost(self, grammar, tokens, seen):
+    def expansion_cost(self, grammar, rule):
         ret = 1
-        for token in tokens:
+        for token in rule:
             if token not in grammar:
                 continue
-            ret += self.symbol_cost(grammar, token, seen)
+            ret += self.symbol_cost(grammar, token)
+            if ret == float("inf"):
+                return ret
         return ret
 
     def compute_cost(self, grammar):
         cost = {}
-        for k in grammar:
-            cost[k] = {}
-            for rule in grammar[k]:
-                cost[k][str(rule)] = self.expansion_cost(grammar, rule, set())
+        changed = True
+        while changed:
+            changed = False
+            _cost = {}
+            for k in self.grammar_keys:
+                _cost[k] = []
+                for rule in grammar[k]:
+                    rule_cost = self.expansion_cost(grammar, rule)
+                    if rule_cost == float("inf"):
+                        continue
+                    if k not in self.key_cost:
+                        self.key_cost[k] = rule_cost
+                    if self.key_cost[k] > rule_cost:
+                        self.key_cost[k] = rule_cost
+
+                    _cost[k].append((rule_cost, rule))
+            if _cost != cost:
+                cost = _cost
+                changed = True
+
+        # sort
+        for k in self.grammar_keys:
+            cost[k] = sorted(cost[k])
         return cost
+
+    # def symbol_num_trees(self, grammar, symbol):
+    #     assert symbol in grammar
+    #     if symbol in self.key_num_trees:
+    #         return self.key_num_trees[symbol]
+    #     return 1
+    #
+    # def expansion_num_trees(self, grammar, rule):
+    #     ret = 1
+    #     for token in rule:
+    #         if token not in grammar:
+    #             continue
+    #         ret *= self.symbol_num_trees(grammar, token)
+    #     if ret > 65535:  # avoid overflow
+    #         ret = 65535
+    #     return ret
+    #
+    # def compute_num_trees(self, grammar):
+    #     for k in self.grammar_keys:
+    #         self.key_num_trees[k] = len(grammar[k])
+    #
+    #     num_trees = {}
+    #     changed = True
+    #     while changed:
+    #         changed = False
+    #         _num_trees = {}
+    #         for k in self.grammar_keys:
+    #             _num_trees[k] = []
+    #             for rule in grammar[k]:
+    #                 rule_num_trees = self.expansion_num_trees(grammar, rule)
+    #
+    #                 if k not in self.key_num_trees:
+    #                     self.key_num_trees[k] = rule_num_trees
+    #                 if self.key_num_trees[k] < rule_num_trees:
+    #                     self.key_num_trees[k] = rule_num_trees
+    #                     changed = True
+    #
+    #                 _num_trees[k].append((rule_num_trees, rule))
+    #             num_trees = _num_trees
+    #
+    #     return num_trees
 
 
 class PooledFuzzer(LimitFuzzer):
@@ -161,7 +221,6 @@ class PooledFuzzer(LimitFuzzer):
         self.c_grammar_keys = list(self.c_grammar.keys())
 
         self.MAX_SAMPLE = 255
-        self.pool_of_strings = self.completion_strings()
 
         # reorder our grammar rules by cost.
         for k in self.grammar_keys:
@@ -169,11 +228,6 @@ class PooledFuzzer(LimitFuzzer):
         self.ordered_grammar = True
 
         self.pool_of_trees = self.completion_trees()
-
-    def compute_cost(self, grammar):
-        return {k: sorted([(self.expansion_cost(grammar, rule, set()), rule)
-                           for rule in grammar[k]])
-                for k in self.grammar_keys}
 
     def cheap_grammar(self):
         new_grammar = {}
@@ -183,24 +237,6 @@ class PooledFuzzer(LimitFuzzer):
             new_grammar[k] = [r for c, r in crules if c == min_cost]
             assert len(new_grammar[k]) > 0
         return new_grammar
-
-    def get_strings_for_key(self, grammar, key='<start>'):
-        if key not in grammar:
-            return [key]
-        v = sum([self.get_strings_for_rule(grammar, rule)
-                 for rule in grammar[key]], [])
-        return random.sample(v, min(self.MAX_SAMPLE, len(v)))
-
-    def get_strings_for_rule(self, grammar, rule):
-        my_strings_list = [
-            self.get_strings_for_key(grammar, key) for key in rule]
-        v = [''.join(l) for l in itertools.product(*my_strings_list)]
-        return random.sample(v, min(self.MAX_SAMPLE, len(v)))
-
-    def completion_strings(self):
-        # we are being choosy
-        return {k: self.get_strings_for_key(self.c_grammar, k)
-                for k in self.c_grammar_keys}
 
     def k_to_id(self, k):
         return self.grammar_keys.index(k) + 1
@@ -359,56 +395,6 @@ class CFuzzer(PyRecCompiledFuzzer):
             res.append('node->subnodes[%d] = subnode;' % i)
         return '\n    '.join(res)
 
-    def gen_alt_src(self, k):
-        rules = self.grammar[k]
-        cheap_strings = self.pool_of_strings[k]
-        result = list()
-        result.append('''
-node_t *gen_%(name)s(int depth) {
-  node_t *node = node_create(%(node_type)s);
-
-  if (depth > max_depth) {
-    int val = map_rand(%(num_cheap_strings)d);
-    const char* str = pool_%(name)s[val];
-    const int str_l = pool_l_%(name)s[val];
-    node_set_val(node, str, str_l);
-    return node;
-  }
-
-  int val = map_rand(%(nrules)d);
-  node_t *subnode = NULL;
-  switch(val) {''' % {
-            'node_type': self.k_to_s(k).upper(),
-            'name': self.k_to_s(k),
-            'nrules': len(rules),
-            'num_cheap_strings': len(cheap_strings),
-        })
-
-        for i, rule in enumerate(rules):
-            result.append('''
-  case %d:
-    %s
-    break;''' % (i, self.gen_rule_src(rule, k, i)))
-
-        result.append('''
-  }
-
-  return node;
-}''')
-        return '\n'.join(result)
-
-    def string_pool_defs(self):
-        result = []
-        for k in self.grammar_keys:
-            cheap_strings = self.pool_of_strings[k]
-            result.append('''
-const char* pool_%(k)s[] =  {%(cheap_strings)s};
-const int pool_l_%(k)s[] =  {%(cheap_strings_len)s};''' % {
-                'k': self.k_to_s(k),
-                'cheap_strings': ', '.join(['"%s"' % self.esc(s) for s in cheap_strings]),
-                'cheap_strings_len': ', '.join([str(len(s)) for s in cheap_strings])})
-        return '\n'.join(result)
-
     def gen_alt_src_ser_tree(self, k):
         rules = self.grammar[k]
         cheap_trees = self.pool_of_trees[k]
@@ -530,7 +516,6 @@ extern "C" {
 #endif
 
 extern int max_depth;
-extern int max_len;
 
 %(fuzz_fn_decs)s
 
@@ -568,7 +553,6 @@ extern node_t *_node_deserialize(const uint8_t *data_buf,
                                  size_t data_size, size_t *consumed_size);
 
 int max_depth = -1;
-int max_len = -1;
 
 static inline int map_rand(int v) {
   return random() %% v;
@@ -588,7 +572,6 @@ tree_t *gen_init__() {
 }'''
 
         params = {
-            "string_pool_defs": self.string_pool_defs(),
             "ser_tree_pool_defs": self.ser_tree_pool_defs(),
             "fuzz_fn_defs": self.fuzz_fn_defs(),
             "fuzz_fn_array_defs": self.fuzz_fn_array_defs(),
