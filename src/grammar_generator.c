@@ -10,7 +10,7 @@ static void dump_test_case(uint8_t *buf, size_t buf_size) {
 }
 
 int main(int argc, const char *argv[]) {
-  int seed, max_num;
+  int seed, max_num, max_len;
 
   if (argc < 3) {
     printf("%s <seed> <max_num> <max_depth>\\n", argv[0]);
@@ -19,13 +19,13 @@ int main(int argc, const char *argv[]) {
 
   seed = atoi(argv[1]);
   max_num = atoi(argv[2]);
-  max_depth = atoi(argv[3]);
+  max_len = atoi(argv[3]);
 
   srandom(seed);
 
   tree_t *tree = NULL;
   for (int i = 0; i < max_num; ++i) {
-    tree = gen_init__();
+    tree = gen_init__(max_len);
 
     tree_to_buf(tree);
     tree_get_non_terminal_nodes(tree);

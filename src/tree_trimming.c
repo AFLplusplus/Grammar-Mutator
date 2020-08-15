@@ -6,8 +6,8 @@ tree_t *subtree_trimming(tree_t *tree, node_t *node) {
 
   // generate the minimal subtree
   gen_func_t gen_func = gen_funcs[node->id];
-  max_depth = -1;
-  node_t *min_node = gen_func(0);
+  int        consumed = 0;
+  node_t *   min_node = gen_func(0, &consumed);
 
   node_t *parent = node->parent;
   if (!parent) {

@@ -15,9 +15,9 @@ tree_t *random_mutation(tree_t *tree) {
   node_t *parent = node->parent;
 
   // Generate a new node
-  max_depth = random() % 15 + 1;  // randomly pick a `max_depth` within [1, 15]
   gen_func_t gen_func = gen_funcs[node->id];
-  node_t *   replace_node = gen_func(0);
+  int        consumed = 0;
+  node_t *   replace_node = gen_func(1000, &consumed);
 
   if (!parent) {  // no parent, meaning that the picked node is the root node
     // Destroy the original root node

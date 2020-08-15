@@ -372,16 +372,24 @@ class CFuzzer(PyRecCompiledFuzzer):
                 slst.append(c)
         return slst
 
-    def gen_rule_src(self, rule, key, i):
+    def gen_rule_src(self, rule, key, min_rule_cost):
         res = []
         ntokens = len(rule)
+        nkeys = len([token for token in rule if token in self.grammar])
+        res.append('remaining_len = max_len - %d;' % min_rule_cost)
         res.append(
             'node->subnodes = (node_t**)malloc(%d * sizeof(node_t*));' % (
                 ntokens))
         res.append('node->subnode_count = %d;' % ntokens)
         for i, token in enumerate(rule):
             if token in self.grammar:
-                res.append('subnode = gen_%s(depth + 1);' % self.k_to_s(token))
+                res.append('subnode_max_len = get_random_len(%d, remaining_len);' % nkeys)
+                nkeys -= 1
+                res.append('subnode_max_len += %d;' % self.key_cost[token])
+                res.append('remaining_len += %d;' % self.key_cost[token])
+                res.append('subnode = gen_node_%s(subnode_max_len, &subnode_consumed);' % self.k_to_s(token))
+                res.append('remaining_len -= subnode_consumed;')
+                res.append('*consumed += subnode_consumed;')
                 res.append('node->non_term_size += 1;')
                 if key == token:
                     res.append('node->recursion_edge_size += 1;')
@@ -389,21 +397,51 @@ class CFuzzer(PyRecCompiledFuzzer):
                 esc_token_chars = [self.esc_char(c) for c in token]
                 esc_token = ''.join(esc_token_chars)
                 res.append(
-                    'subnode = node_create_with_val(TERM_NODE, "%s", %d);' % (
+                    'subnode = node_create_with_val(NODE_TERM__, "%s", %d);' % (
                         esc_token, len(esc_token_chars)))
-            # res.append('node_append_subnode(node, subnode);')
             res.append('node->subnodes[%d] = subnode;' % i)
         return '\n    '.join(res)
+
+    def gen_num_candidate_rules(self, k):
+        min_rule_sizes = []
+        num_min_rules = []
+        for min_rule_size, _ in self.cost[k]:
+            if min_rule_size not in min_rule_sizes:
+                min_rule_sizes.append(min_rule_size)
+                num_min_rules.append(0)
+            num_min_rules[-1] += 1
+
+        res = []
+        num_candidate_rules = 0
+        min_rule_sizes = min_rule_sizes[1:]
+        for i, min_rule_size in enumerate(min_rule_sizes):
+            num_candidate_rules += num_min_rules[i]
+            if i == 0:
+                res.append('if (max_len < %d) {' % min_rule_size)
+            else:
+                res.append('} else if (max_len < %d) {' % min_rule_size)
+            res.append('  num_rules = %d;' % num_candidate_rules)
+
+        num_candidate_rules += num_min_rules[-1]
+        if len(num_min_rules) == 1:
+            res.append('num_rules = %d;' % num_candidate_rules)
+        else:
+            res.append('} else {')
+            res.append('  num_rules = %d;' % num_candidate_rules)
+            res.append('}')
+        return '\n  '.join(res)
 
     def gen_alt_src_ser_tree(self, k):
         rules = self.grammar[k]
         cheap_trees = self.pool_of_trees[k]
+        min_cost = self.cost[k][0][0]
+        num_min_rules = len(self.c_grammar[k])
         result = list()
         result.append('''
-node_t *gen_%(name)s(int depth) {
+node_t *gen_node_%(name)s(int max_len, int *consumed) {
   node_t *node = NULL;
 
-  if (depth > max_depth) {
+  if (max_len < %(min_cost)d) {
     int val = map_rand(%(num_cheap_trees)d);
     size_t consumed = 0;
     const char* ser_data = pool_ser_%(name)s[val];
@@ -412,22 +450,39 @@ node_t *gen_%(name)s(int depth) {
     return node;
   }
 
-  node = node_create(%(node_type)s);
+  node = node_create(NODE_%(node_type)s);
 
-  int val = map_rand(%(nrules)d);
+  int num_rules = 0;
+  %(gen_num_candidate_rules)s
+
+  int val = 0;
+  if (num_rules == %(num_min_rules)d) {
+    val = map_rand(%(num_min_rules)d);
+  } else {
+    val = map_rand(num_rules - %(num_min_rules)d) + %(num_min_rules)d;
+  }
+
+  *consumed = 1;
+  int remaining_len = 0;
+  int subnode_max_len = 0;
+  int subnode_consumed = 0;
+
   node_t *subnode = NULL;
   switch(val) {''' % {
             'node_type': self.k_to_s(k).upper(),
             'name': self.k_to_s(k),
             'nrules': len(rules),
             'num_cheap_trees': len(cheap_trees),
+            'min_cost': min_cost,
+            'num_min_rules': num_min_rules,
+            'gen_num_candidate_rules': self.gen_num_candidate_rules(k)
         })
 
         for i, rule in enumerate(rules):
             result.append('''
   case %d:
     %s
-    break;''' % (i, self.gen_rule_src(rule, k, i)))
+    break;''' % (i, self.gen_rule_src(rule, k, self.cost[k][i][0])))
 
         result.append('''
   }
@@ -453,7 +508,7 @@ const int pool_l_ser_%(k)s[] = {%(ser_trees_len)s};''' % {
     def fuzz_fn_decs(self):
         result = []
         for k in self.grammar_keys:
-            result.append('''node_t *gen_%s(int depth);''' % self.k_to_s(k))
+            result.append('''node_t *gen_node_%s(int max_len, int *consumed);''' % self.k_to_s(k))
         return '\n'.join(result)
 
     def fuzz_fn_defs(self):
@@ -467,12 +522,12 @@ const int pool_l_ser_%(k)s[] = {%(ser_trees_len)s};''' % {
     def node_type_decs(self):
         result = '''
 enum node_type {
-  TERM_NODE = 0,
+  NODE_TERM__ = 0,
   %s
 };'''
         node_types = []
         for k in self.grammar_keys:
-            node_types.append('%s,' % self.k_to_s(k).upper())
+            node_types.append('NODE_%s,' % self.k_to_s(k).upper())
         return result % ('\n  '.join(node_types))
 
     def fuzz_fn_array_defs(self):
@@ -484,7 +539,7 @@ gen_func_t gen_funcs[%d] = {
 '''
         fuzz_fn_names = []
         for k in self.grammar_keys:
-            fuzz_fn_names.append('gen_%s,' % self.k_to_s(k))
+            fuzz_fn_names.append('gen_node_%s,' % self.k_to_s(k))
         return result % (
             len(self.grammar_keys) + 1,
             '\n  '.join(fuzz_fn_names))
@@ -493,14 +548,14 @@ gen_func_t gen_funcs[%d] = {
         result = '''
 const char *node_type_str(int node_type) {
   switch (node_type) {
-  case 0: return "TERM_NODE";
+  case 0: return "NODE_TERM__";
   %s
   default: return "";
   }
 }'''
         node_type_strs = []
         for k in self.grammar_keys:
-            node_type_strs.append('case %d: return "%s";' % (
+            node_type_strs.append('case %d: return "NODE_%s";' % (
                 self.k_to_id(k), self.k_to_s(k).upper()))
         return result % ('\n  '.join(node_type_strs))
 
@@ -515,16 +570,14 @@ const char *node_type_str(int node_type) {
 extern "C" {
 #endif
 
-extern int max_depth;
-
 %(fuzz_fn_decs)s
 
-tree_t *gen_init__();
+tree_t *gen_init__(int max_len);
 
 %(node_type_decs)s
 const char *node_type_str(int node_type);
 
-typedef node_t *(*gen_func_t)(int depth);
+typedef node_t *(*gen_func_t)(int max_len, int *consumed);
 extern gen_func_t gen_funcs[%(num_nodes)d];
 
 #ifdef __cplusplus
@@ -552,10 +605,18 @@ extern gen_func_t gen_funcs[%(num_nodes)d];
 extern node_t *_node_deserialize(const uint8_t *data_buf,
                                  size_t data_size, size_t *consumed_size);
 
-int max_depth = -1;
-
 static inline int map_rand(int v) {
   return random() %% v;
+}
+
+static int get_random_len(int num_subnodes, int total_remaining_len) {
+  int ret = total_remaining_len;
+  int temp = 0;
+  for (int i = 0; i < num_subnodes - 1; ++i) {
+    temp = map_rand(total_remaining_len + 1);
+    if (temp < ret) ret = temp;
+  }
+  return ret;
 }
 %(node_type_str_defs)s
 
@@ -565,9 +626,10 @@ static inline int map_rand(int v) {
 
 %(fuzz_fn_array_defs)s
 
-tree_t *gen_init__() {
+tree_t *gen_init__(int max_len) {
   tree_t *tree = tree_create();
-  tree->root = gen_funcs[1](0);
+  int consumed = 0;
+  tree->root = gen_funcs[1](max_len, &consumed);
   return tree;
 }'''
 

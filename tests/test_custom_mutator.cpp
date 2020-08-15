@@ -108,8 +108,7 @@ TEST_F(CustomMutatorTest, Trimming) {
   int32_t  stage_max = 0;
 
   // prepare a tree
-  max_depth = 100;
-  auto tree = gen_init__();
+  auto tree = gen_init__(100);
 
   tree_serialize(tree);
   write_tree_to_file("/tmp/afl_test_fuzz_out/trees/trimming_0", tree->ser_buf,
