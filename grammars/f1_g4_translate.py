@@ -46,7 +46,7 @@ class AntlrG(Sanitize):
         lines = ['grammar Grammar;']
         for k in self.g:
             rules = self.g[k]
-            v = '\n    |'.join([self.rule_to_s(rule, self.g)
+            v = '\n    | '.join([self.rule_to_s(rule, self.g)
                                 for rule in rules])
             lines.append('''\
 %s
