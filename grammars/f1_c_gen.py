@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Date    : 2020-06-19 14:45:19
-# @Author  : Shengtuo Hu (h1994st@gmail.com)
-# @Version : 1.0
+# @Author  : Shengtuo Hu
+# @Link    : https://shengtuo.me
+
 import sys
 import itertools
 import random
