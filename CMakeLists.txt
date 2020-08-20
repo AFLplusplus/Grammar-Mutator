@@ -49,16 +49,16 @@ message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 find_package(Java COMPONENTS Runtime REQUIRED)
 
 # ANTLR 4 Jar
-if(NOT ANTLR_JAR_LOCATION)
+if (NOT ANTLR_JAR_LOCATION)
   message(FATAL_ERROR "Missing antlr4.jar location. You can specify it's path using: -DANTLR_JAR_LOCATION=<path>")
-else()
+else ()
   get_filename_component(ANTLR_NAME ${ANTLR_JAR_LOCATION} NAME_WE)
-  if(NOT EXISTS "${ANTLR_JAR_LOCATION}")
+  if (NOT EXISTS "${ANTLR_JAR_LOCATION}")
     message(FATAL_ERROR "Unable to find ${ANTLR_NAME} in ${ANTLR_JAR_LOCATION}")
-  else()
+  else ()
     message(STATUS "Found ${ANTLR_NAME}: ${ANTLR_JAR_LOCATION}")
-  endif()
-endif()
+  endif ()
+endif ()
 
 # Python
 find_program(PYTHON
@@ -78,22 +78,40 @@ if (NOT GRAMMAR_FILE)
 endif ()
 if (NOT IS_ABSOLUTE ${GRAMMAR_FILE})
   message(FATAL_ERROR "Please provide the full path to the grammar file")
-endif()
+endif ()
 if (EXISTS ${GRAMMAR_FILE})
   message(STATUS "Grammar: ${GRAMMAR_FILE}")
 else ()
   message(FATAL_ERROR "The grammar file does not exist: ${GRAMMAR_FILE}")
 endif ()
+get_filename_component(GRAMMAR_FILENAME ${GRAMMAR_FILE} NAME_WE)
 
 # Generate files at configure time
 execute_process(
   COMMAND mkdir -p f1/src
   COMMAND mkdir -p f1/include
   COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_c_gen.py ${GRAMMAR_FILE} ${CMAKE_BINARY_DIR}/f1
+  COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_g4_translate.py ${GRAMMAR_FILE} ${CMAKE_BINARY_DIR}/f1
   RESULT_VARIABLE result
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 if (result)
-  message(FATAL_ERROR "CMake step for f1_c_fuzz failed: ${result}")
+  message(FATAL_ERROR "CMake step for f1_c_fuzz and g4 translation failed: ${result}")
+endif ()
+set(GRAMMAR_G4_FILE "${CMAKE_BINARY_DIR}/f1/${GRAMMAR_FILENAME}.g4")
+
+# Generate lexer and parser
+if (EXISTS ${GRAMMAR_G4_FILE})
+  message(STATUS "Grammar g4: ${GRAMMAR_G4_FILE}")
+else ()
+  message(FATAL_ERROR "The g4 grammar file does not exist: ${GRAMMAR_FILE}")
+endif ()
+execute_process(
+  COMMAND mkdir -p f1/generated
+  COMMAND ${Java_JAVA_EXECUTABLE} -jar ${ANTLR_JAR_LOCATION} -Dlanguage=Cpp -o ${CMAKE_BINARY_DIR}/f1/generated ${GRAMMAR_G4_FILE}
+  RESULT_VARIABLE result
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+if (result)
+  message(FATAL_ERROR "CMake step for ANTLR lexer and parser failed: ${result}")
 endif ()
 
 add_subdirectory(src)
