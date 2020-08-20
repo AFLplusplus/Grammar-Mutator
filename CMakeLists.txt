@@ -45,12 +45,27 @@ set(CMAKE_CXX_STANDARD 14)
 message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 
+# Java
+find_package(Java COMPONENTS Runtime REQUIRED)
+
+# ANTLR 4 Jar
+if(NOT ANTLR_JAR_LOCATION)
+  message(FATAL_ERROR "Missing antlr4.jar location. You can specify it's path using: -DANTLR_JAR_LOCATION=<path>")
+else()
+  get_filename_component(ANTLR_NAME ${ANTLR_JAR_LOCATION} NAME_WE)
+  if(NOT EXISTS "${ANTLR_JAR_LOCATION}")
+    message(FATAL_ERROR "Unable to find ${ANTLR_NAME} in ${ANTLR_JAR_LOCATION}")
+  else()
+    message(STATUS "Found ${ANTLR_NAME}: ${ANTLR_JAR_LOCATION}")
+  endif()
+endif()
+
 # Python
 find_program(PYTHON
   NAMES "python3"
   DOC "Python interpreter")
 if (NOT PYTHON)
-  message(FATAL_ERROR "Python not found!")
+  message(FATAL_ERROR "Unable to find Python!")
 else ()
   message(STATUS "Python: ${PYTHON}")
 endif ()
