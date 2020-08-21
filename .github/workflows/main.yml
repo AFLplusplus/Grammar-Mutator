@@ -39,7 +39,7 @@ jobs:
         bash .github/workflows/setup-deps.sh
     - name: Compile
       run: |
-        make ENABLE_TESTING=1 GRAMMAR_FILE=grammars/ruby_grammar.json
+        make ENABLE_TESTING=1 GRAMMAR_FILE=grammars/ruby_grammar.json ANTLR_JAR_LOCATION=./antlr-4.8-complete.jar
     - name: Unit testing
       run: |
         make test

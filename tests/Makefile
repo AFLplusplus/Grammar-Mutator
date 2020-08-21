@@ -8,6 +8,8 @@ OBJS = $(SRC_FILES:.cpp=.o)
 GRAMMAR_MUTATOR_LIB = $(realpath ../src/libgrammarmutator.so)
 RXI_MAP_LIB = $(realpath ../third_party/rxi_map/librxi_map.a)
 BARRUST_SET_LIB = $(realpath ../third_party/barrust_set/libbarrust_set.a)
+ANTLR4_CXX_RUNTIME_LIB = $(realpath ../third_party/antlr4-cpp-runtime/libantlr4-runtime.a)
+ANTLR4_SHIM_LIB = $(realpath ../lib/antlr4_shim/libantlr4_shim.a)
 
 GTEST_DIR = googletest-download
 GTEST_VERSION = 1.10.0
@@ -94,6 +96,10 @@ test_%_memcheck: test_%
 test_%: test_%.o $(LIBS)
 	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS)
 
+.PRECIOUS: test_tree
+test_tree: test_tree.o $(LIBS) $(ANTLR4_SHIM_LIB) $(ANTLR4_CXX_RUNTIME_LIB)
+	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(ANTLR4_SHIM_LIB) $(ANTLR4_CXX_RUNTIME_LIB)
+
 .PRECIOUS: test_chunk_store
 test_chunk_store: test_chunk_store.o $(LIBS) $(RXI_MAP_LIB)
 	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(RXI_MAP_LIB)
@@ -109,6 +115,10 @@ test_barrust_set: test_barrust_set.o $(LIBS) $(BARRUST_SET_LIB)
 .PRECIOUS: test_%.o
 test_%.o: test_%.cpp
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
+
+.PRECIOUS: test_tree.o
+test_tree.o: test_tree.cpp
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../lib/antlr4_shim $(CXX_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_chunk_store.o
 test_chunk_store.o: test_chunk_store.cpp

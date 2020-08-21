@@ -1,4 +1,4 @@
-DIRS = rxi_map barrust_set
+DIRS = rxi_map barrust_set antlr4-cpp-runtime
 CLEANDIRS = $(DIRS:%=clean-%)
 
 .PHONY: all
