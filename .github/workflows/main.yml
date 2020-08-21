@@ -8,7 +8,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Install Valgrind
+    - name: Install dependencies
       run: |
         bash .github/workflows/setup-deps.sh
     - name: Create build directory
@@ -34,7 +34,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Install Valgrind
+    - name: Install dependencies
       run: |
         bash .github/workflows/setup-deps.sh
     - name: Compile
