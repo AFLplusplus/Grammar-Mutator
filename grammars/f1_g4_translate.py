@@ -22,6 +22,11 @@ class Sanitize:
         s = s.replace('import', 'XimportX')
         s = s.replace('class', 'XclassX')
         s = s.replace('def', 'XdefX')
+
+        # Avoid keyword confliction
+        s = s.replace('int', 'XintX')
+        s = s.replace('float', 'XfloatX')
+        s = s.replace('double', 'XdoubleX')
         return s
 
     def get_entry_key(self):
