@@ -46,7 +46,7 @@ all: antlr4_generated $(TARGET)
 .PHONY: antlr4_generated
 antlr4_generated: ../../grammars/Grammar.g4
 	@mkdir -p generated
-	@java -jar $(realpath $(ANTLR_JAR_LOCATION)) -Dlanguage=Cpp -o generated $(realpath ../../grammars/Grammar.g4)
+	@java -jar $(ANTLR_JAR_LOCATION) -Dlanguage=Cpp -o generated $(realpath ../../grammars/Grammar.g4)
 
 $(TARGET): $(ANTLR4_SHIM_OBJS)
 	$(AR) qc $@ $^

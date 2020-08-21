@@ -61,7 +61,7 @@ grammars/Grammar.g4: grammars/f1_g4_translate.py .grammar
 
 .PHONY: build_lib
 build_lib: grammars/Grammar.g4 third_party
-	@$(MAKE) -C lib all
+	@$(MAKE) -C lib all ANTLR_JAR_LOCATION=$(ANTLR_JAR_LOCATION)
 
 ifdef ENABLE_TESTING
 all: build_test
