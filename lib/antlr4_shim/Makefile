@@ -58,3 +58,5 @@ $(TARGET): $(ANTLR4_SHIM_OBJS)
 .PHONY: clean
 clean:
 	@rm -rf generated
+	@rm -f $(ANTLR4_SHIM_OBJS)
+	@rm -f $(TARGET)
