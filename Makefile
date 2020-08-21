@@ -20,7 +20,10 @@ endif
 
 ifndef GRAMMAR_FILE
 $(info Use default JSON grammar file)
-override GRAMMAR_FILE = grammars/json_grammar.json
+override GRAMMAR_FILE = $(realpath grammars/json_grammar.json)
+else
+TEMP := $(realpath $(GRAMMAR_FILE))
+override GRAMMAR_FILE := $(TEMP)
 endif
 
 ifneq "$(shell cat .grammar 2> /dev/null)" "$(realpath $(GRAMMAR_FILE))"
@@ -30,6 +33,9 @@ endif
 
 ifndef ANTLR_JAR_LOCATION
 $(error Missing antlr4.jar location. Please specify it's path using: make ANTLR_JAR_LOCATION=<path>)
+else
+TEMP := $(realpath $(ANTLR_JAR_LOCATION))
+override ANTLR_JAR_LOCATION := $(TEMP)
 endif
 
 export GRAMMAR_FILE
