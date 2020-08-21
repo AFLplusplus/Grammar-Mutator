@@ -13,6 +13,7 @@ import random
 class Sanitize:
     def __init__(self, g):
         self.g = g
+        self.entry_keys = self.get_entry_key()
 
     def to_key(self, k):
         s = k.replace('-', '_')
@@ -22,6 +23,20 @@ class Sanitize:
         s = s.replace('class', 'XclassX')
         s = s.replace('def', 'XdefX')
         return s
+
+    def get_entry_key(self):
+        key_seen = {}
+        for k in self.g:
+            if k not in key_seen:
+                key_seen[k] = False
+            for rule in self.g[k]:
+                for token in rule:
+                    if token not in self.g:
+                        continue
+                    if token not in key_seen:
+                        key_seen[token] = True
+        entry_keys = [k for k in key_seen if not key_seen[k]]
+        return entry_keys
 
 
 class AntlrG(Sanitize):
@@ -42,8 +57,13 @@ class AntlrG(Sanitize):
                          if t not in grammar else self.to_key(t)
                          for t in rule])
 
-    def translate(self, grammar_filename):
-        lines = ['grammar %s;' % grammar_filename]
+    def translate(self):
+        lines = ['grammar Grammar;']
+        entries = '\n    | '.join([self.to_key(entry_k) + ' EOF' for entry_k in self.entry_keys])
+        lines.append('''\
+entry
+    : %s
+    ;''' % entries)
         for k in self.g:
             rules = self.g[k]
             v = '\n    | '.join([self.rule_to_s(rule, self.g)
@@ -60,10 +80,9 @@ def main(grammar_file_path, root_dir):
 
     with open(grammar_file_path, 'r') as fp:
         grammar = json.load(fp)
-    grammar_filename = os.path.splitext(grammar_file_path)[0].split('/')[-1]
-    g4 = AntlrG(grammar).translate(grammar_filename)
+    g4 = AntlrG(grammar).translate()
     g4_file_path = os.path.join(
-        root_dir, grammar_filename + '.g4')
+        root_dir, 'Grammar.g4')
     with open(g4_file_path, 'w') as fp:
         print(g4, file=fp)
 

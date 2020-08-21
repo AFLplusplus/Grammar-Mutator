@@ -505,10 +505,6 @@ void tree_to_buf(tree_t *tree) {
   _node_to_buf(tree, tree->root);
 }
 
-tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
-  return NULL;  // TODO: implement this function
-}
-
 void tree_serialize(tree_t *tree) {
   if (!tree) return;
 

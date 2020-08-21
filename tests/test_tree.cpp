@@ -1,4 +1,6 @@
 #include "tree.h"
+#include "f1_c_fuzz.h"
+#include "antlr4_shim.h"
 
 #include "gtest/gtest.h"
 #include "gtest_ext.h"
@@ -186,6 +188,15 @@ TEST_F(TreeTest, DumpTreeToBuffer) {
   tree_to_buf(tree);
 
   EXPECT_MEMEQ("{{123}}", tree->data_buf, tree->data_len);
+}
+
+TEST_F(TreeTest, ParseTreeFromBuffer) {
+  tree_t *ruby_tree = gen_init__(1);
+  tree_to_buf(ruby_tree);
+
+  tree_from_buf(ruby_tree->data_buf, ruby_tree->data_len);
+
+  tree_free(ruby_tree);
 }
 
 TEST_F(TreeTest, ClonedTreeShouldEqual) {

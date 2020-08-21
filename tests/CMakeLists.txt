@@ -2,13 +2,15 @@
 configure_file(
   googletest-download/CMakeLists.txt.in
   googletest-download/CMakeLists.txt)
-execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+execute_process(
+  COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
   RESULT_VARIABLE result
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download)
 if (result)
   message(FATAL_ERROR "CMake step for googletest failed: ${result}")
 endif ()
-execute_process(COMMAND ${CMAKE_COMMAND} --build .
+execute_process(
+  COMMAND ${CMAKE_COMMAND} --build .
   RESULT_VARIABLE result
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download)
 if (result)
@@ -44,7 +46,10 @@ add_test(
 add_executable(test_tree test_tree.cpp)
 target_link_libraries(test_tree
   PRIVATE gtest_main
-  PRIVATE grammarmutator)
+  PRIVATE grammarmutator
+  PRIVATE antlr4_shim)
+target_include_directories(test_tree
+  PRIVATE ${CMAKE_SOURCE_DIR}/lib/antlr4_shim)
 add_test(
   NAME test_tree
   COMMAND test_tree)

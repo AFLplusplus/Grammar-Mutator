@@ -6,14 +6,14 @@
 #include "f1_c_fuzz.h"
 
 static void dump_test_case(uint8_t *buf, size_t buf_size) {
-  fprintf(stderr, "%.*s\n", (int)buf_size, buf);
+  fprintf(stdout, "%.*s\n", (int)buf_size, buf);
 }
 
 int main(int argc, const char *argv[]) {
   int seed, max_num, max_len;
 
   if (argc < 3) {
-    printf("%s <seed> <max_num> <max_depth>\\n", argv[0]);
+    printf("%s <seed> <max_num> <max_len>\n", argv[0]);
     return 0;
   }
 

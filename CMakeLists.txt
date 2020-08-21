@@ -97,24 +97,15 @@ execute_process(
 if (result)
   message(FATAL_ERROR "CMake step for f1_c_fuzz and g4 translation failed: ${result}")
 endif ()
-set(GRAMMAR_G4_FILE "${CMAKE_BINARY_DIR}/f1/${GRAMMAR_FILENAME}.g4")
-
-# Generate lexer and parser
+set(GRAMMAR_G4_FILE "${CMAKE_BINARY_DIR}/f1/Grammar.g4")
 if (EXISTS ${GRAMMAR_G4_FILE})
   message(STATUS "Grammar g4: ${GRAMMAR_G4_FILE}")
 else ()
   message(FATAL_ERROR "The g4 grammar file does not exist: ${GRAMMAR_FILE}")
 endif ()
-execute_process(
-  COMMAND mkdir -p f1/generated
-  COMMAND ${Java_JAVA_EXECUTABLE} -jar ${ANTLR_JAR_LOCATION} -Dlanguage=Cpp -o ${CMAKE_BINARY_DIR}/f1/generated ${GRAMMAR_G4_FILE}
-  RESULT_VARIABLE result
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-if (result)
-  message(FATAL_ERROR "CMake step for ANTLR lexer and parser failed: ${result}")
-endif ()
 
 add_subdirectory(src)
+add_subdirectory(lib)
 add_subdirectory(third_party)
 
 if (ENABLE_TESTING)
