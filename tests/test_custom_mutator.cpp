@@ -26,11 +26,27 @@ class CustomMutatorTest : public ::testing::Test {
  protected:
   afl_t *                afl = nullptr;
   struct custom_mutator *mutator = nullptr;
-  string                 tree_out_dir = "/tmp/afl_test_fuzz_out";
+  string                 out_dir = "/tmp/afl_test_fuzz_out";
+  string                 tree_out_dir = out_dir + "/trees";
+  string                 queue_dir = out_dir + "/queue";
 
   CustomMutatorTest() {
     // Check whether the directory exists
     struct stat info;
+    if (stat(out_dir.c_str(), &info) != 0) {
+      if (mkdir(out_dir.c_str(), 0700) != 0) {
+        // error
+        perror("Cannot create the directory (CustomMutatorTest)");
+        exit(EXIT_FAILURE);
+      }
+    } else if (info.st_mode & S_IFDIR) {
+      // directory exist
+    } else {
+      // Not a directory
+      perror("Wrong output path (CustomMutatorTest)");
+      exit(EXIT_FAILURE);
+    }
+
     if (stat(tree_out_dir.c_str(), &info) != 0) {
       if (mkdir(tree_out_dir.c_str(), 0700) != 0) {
         // error
@@ -42,6 +58,20 @@ class CustomMutatorTest : public ::testing::Test {
     } else {
       // Not a directory
       perror("Wrong tree output path (CustomMutatorTest)");
+      exit(EXIT_FAILURE);
+    }
+
+    if (stat(queue_dir.c_str(), &info) != 0) {
+      if (mkdir(queue_dir.c_str(), 0700) != 0) {
+        // error
+        perror("Cannot create the directory (CustomMutatorTest)");
+        exit(EXIT_FAILURE);
+      }
+    } else if (info.st_mode & S_IFDIR) {
+      // directory exist
+    } else {
+      // Not a directory
+      perror("Wrong queue output path (CustomMutatorTest)");
       exit(EXIT_FAILURE);
     }
   }
@@ -69,6 +99,12 @@ class CustomMutatorTest : public ::testing::Test {
 TEST_F(CustomMutatorTest, FuzzNTimes) {
   uint8_t *buf = nullptr;
   size_t   buf_size = 0;
+
+  // prepare a tree
+  auto tree = gen_init__(100);
+  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_0");
+  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
+  tree_free(tree);
 
   uint8_t ret = afl_custom_queue_get(
       mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
@@ -109,10 +145,8 @@ TEST_F(CustomMutatorTest, Trimming) {
 
   // prepare a tree
   auto tree = gen_init__(100);
-
-  tree_serialize(tree);
-  write_tree_to_file("/tmp/afl_test_fuzz_out/trees/trimming_0", tree->ser_buf,
-                     tree->ser_len, 0);
+  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/trimming_0");
+  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/trimming_0");
 
   ret = afl_custom_queue_get(
       mutator->data,
@@ -123,7 +157,8 @@ TEST_F(CustomMutatorTest, Trimming) {
   stage_cur = 0;
   stage_max =
       afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
-//  EXPECT_EQ(stage_max, tree->root->non_term_size + tree->root->recursion_edge_size);
+  //  EXPECT_EQ(stage_max, tree->root->non_term_size +
+  //  tree->root->recursion_edge_size);
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
 #ifdef DEBUG_BUILD
@@ -137,7 +172,8 @@ TEST_F(CustomMutatorTest, Trimming) {
   stage_cur = 0;
   stage_max =
       afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
-//  EXPECT_EQ(stage_max, tree->root->non_term_size + tree->root->recursion_edge_size);
+  //  EXPECT_EQ(stage_max, tree->root->non_term_size +
+  //  tree->root->recursion_edge_size);
   while (stage_cur < stage_max) {
     buf_size = afl_custom_trim(mutator->data, &buf);
 #ifdef DEBUG_BUILD

@@ -30,3 +30,4 @@ target_include_directories(antlr4_shim
   PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(antlr4_shim
   PRIVATE ${ANTLR4_STATIC_LIB})
+set_target_properties(antlr4_shim PROPERTIES COMPILE_FLAGS -fPIC)

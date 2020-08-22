@@ -1,4 +1,6 @@
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
 #include "tree.h"
 
@@ -571,26 +573,113 @@ void tree_get_non_terminal_nodes(tree_t *tree) {
   _node_get_non_terminal_nodes(tree, tree->root);
 }
 
-void write_tree_to_file(const char *filename, uint8_t *buf, size_t buf_size,
-                        uint8_t updated) {
+tree_t *read_tree_from_file(const char *filename) {
+  tree_t *tree = NULL;
+
+  // Read the corresponding serialized tree from file
+  int fd = open(filename, O_RDONLY);
+  if (unlikely(fd < 0)) return NULL;  // may not exist
+
+  struct stat info;
+  if (unlikely(fstat(fd, &info) != 0)) {
+    // error, no file info
+    perror("Cannot get file information");
+    return NULL;
+  }
+  size_t   tree_file_size = info.st_size;
+  uint8_t *tree_buf = (uint8_t *)mmap(0, tree_file_size, PROT_READ | PROT_WRITE,
+                                      MAP_PRIVATE, fd, 0);
+  if (unlikely(tree_buf == MAP_FAILED)) {
+    perror("Cannot map the tree file to the memory");
+    return NULL;
+  }
+  close(fd);
+
+  // Deserialize the data to recover the tree
+  tree = tree_deserialize(tree_buf, tree_file_size);
+  munmap(tree_buf, tree_file_size);
+  if (unlikely(!tree)) {
+    perror("Cannot deserialize the data");
+    return NULL;
+  }
+
+  return tree;
+}
+
+tree_t *load_tree_from_test_case(const char *filename) {
+  tree_t *tree = NULL;
+
+  // Read the corresponding test case from file
+  int fd = open(filename, O_RDONLY);
+  if (unlikely(fd < 0)) return NULL;  // may not exist
+
+  struct stat info;
+  if (unlikely(fstat(fd, &info) != 0)) {
+    // error, no file info
+    perror("Cannot get file information");
+    return NULL;
+  }
+  size_t   file_size = info.st_size;
+  uint8_t *buf =
+      (uint8_t *)mmap(0, file_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+  if (unlikely(buf == MAP_FAILED)) {
+    perror("Cannot map the test case file to the memory");
+    return NULL;
+  }
+  close(fd);
+
+  // Deserialize the data to recover the tree
+  tree = tree_from_buf(buf, file_size);
+  munmap(buf, file_size);
+  if (unlikely(!tree)) {
+    perror("Cannot parse the data");
+    return NULL;
+  }
+
+  return tree;
+}
+
+void write_tree_to_file(tree_t *tree, const char *filename) {
   int fd, ret;
 
+  // Serialize the tree
+  tree_serialize(tree);
+
   // Open the file
-  //  if (updated) {
   fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-  //  } else {
-  //    fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0600);
-  //  }
   if (unlikely(fd < 0)) {
     perror("Unable to create the file (write_tree_to_file)");
+    return;
+  }
+
+  // Write the data
+  ret = write(fd, tree->ser_buf, tree->ser_len);
+  if (unlikely(ret != tree->ser_len)) {
+    perror("Short write to tree file (write_tree_to_file)");
+    return;
+  }
+
+  close(fd);
+}
+
+void dump_tree_to_test_case(tree_t *tree, const char *filename) {
+  int fd, ret;
+
+  // Unparse the tree
+  tree_to_buf(tree);
+
+  // Open the file
+  fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  if (unlikely(fd < 0)) {
+    perror("Unable to create the file (dump_tree_to_test_case)");
     exit(EXIT_FAILURE);
   }
 
   // Write the data
-  ret = write(fd, buf, buf_size);
-  if (unlikely(ret != buf_size)) {
-    perror("Short write to tree file (write_tree_to_file)");
-    exit(EXIT_FAILURE);
+  ret = write(fd, tree->data_buf, tree->data_len);
+  if (unlikely(ret != tree->data_len)) {
+    perror("Short write to tree file (dump_tree_to_test_case)");
+    return;
   }
 
   close(fd);

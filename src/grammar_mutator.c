@@ -7,7 +7,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/mman.h>
 
 #include "helpers.h"
 #include "tree.h"
@@ -112,35 +111,16 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   strncpy(found + 1, "trees", 5);
 
   // Read the corresponding serialized tree from file
-  int fd = open(data->tree_fn_cur, O_RDONLY);
-  if (unlikely(fd < 0)) {
-    // TODO: no tree file
-    // Parse the tree from a test case
-    return 1;
-  }
-  struct stat info;
-  if (unlikely(fstat(fd, &info) != 0)) {
-    // error
-    perror("Cannot get file information");
-    return 0;
-  }
-  size_t   tree_file_size = info.st_size;
-  uint8_t *tree_buf = (uint8_t *)mmap(0, tree_file_size, PROT_READ | PROT_WRITE,
-                                      MAP_PRIVATE, fd, 0);
-  if (unlikely(tree_buf == MAP_FAILED)) {
-    perror("Cannot map the tree file to the memory");
-    return 0;
-  }
-  close(fd);
+  data->tree_cur = read_tree_from_file(data->tree_fn_cur);
+  if (data->tree_cur) goto queue_get_done;
 
-  // Deserialize the data to recover the tree
-  data->tree_cur = tree_deserialize(tree_buf, tree_file_size);
-  munmap(tree_buf, tree_file_size);
-  if (unlikely(!data->tree_cur)) {
-    perror("Cannot deserialize the data");
-    return 0;
-  }
+  // try to parse the test case
+  data->tree_cur = load_tree_from_test_case(fn);
+  if (data->tree_cur) goto queue_get_done;
 
+  return 0;
+
+queue_get_done:
   tree_get_size(data->tree_cur);
 
   return 1;
@@ -219,10 +199,7 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     size_t remaining_edge_size = data->tree_cur->recursion_edge_list->size;
 
     // Update the corresponding tree file
-    tree_serialize(data->trimmed_tree);
-    size_t   ser_len = data->trimmed_tree->ser_len;
-    uint8_t *ser_buf = data->trimmed_tree->ser_buf;
-    write_tree_to_file(data->tree_fn_cur, ser_buf, ser_len, 1);
+    write_tree_to_file(data->trimmed_tree, data->tree_fn_cur);
 
     tree_free(data->tree_cur);
     data->tree_cur = data->trimmed_tree;
@@ -348,13 +325,8 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
   // Replace "queue" with "trees"
   strncpy(found + 1, "trees", 5);
 
-  // Serialize the mutated tree
-  tree_serialize(data->mutated_tree);
-
-  // Write the serialized tree to the file
-  size_t   ser_len = data->mutated_tree->ser_len;
-  uint8_t *ser_buf = data->mutated_tree->ser_buf;
-  write_tree_to_file(data->new_tree_fn, ser_buf, ser_len, 0);
+  // Write the mutated tree to the file
+  write_tree_to_file(data->mutated_tree, data->new_tree_fn);
 
   // Store all subtrees in the newly added tree
   chunk_store_add_tree(data->mutated_tree);

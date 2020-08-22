@@ -185,6 +185,14 @@ void tree_free(tree_t *tree);
 void tree_to_buf(tree_t *tree);
 
 /**
+ * Parse the given buffer to construct a parsing tree
+ * @param  data_buf  The buffer of a test case
+ * @param  data_size The size of the buffer
+ * @return           A newly created tree
+ */
+tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size);
+
+/**
  * Serialize a given tree into binary data
  * @param tree    A given tree
  */
@@ -235,15 +243,32 @@ void tree_get_recursion_edges(tree_t *tree);
 void tree_get_non_terminal_nodes(tree_t *tree);
 
 /**
- * Write a tree to a file. If `updated` is 1, the corresponding file will be
- * updated
+ * Read/Deserialize a tree from a file
  * @param filename The path to the tree file
- * @param buf      The buffer of the serialized tree
- * @param buf_size The buffer size
- * @param updated  Update an existing file or create a new file?
+ * @return         The deserialized tree
  */
-void write_tree_to_file(const char *filename, uint8_t *buf, size_t buf_size,
-                        uint8_t updated);
+tree_t *read_tree_from_file(const char *filename);
+
+/**
+ * Load/Parse a tree from a test case file
+ * @param filename The path to the fuzzing test case
+ * @return         The parsed tree
+ */
+tree_t *load_tree_from_test_case(const char *filename);
+
+/**
+ * Write/Serialize a tree to a file
+ * @param tree     The tree to be written to the file
+ * @param filename The path to the tree file
+ */
+void write_tree_to_file(tree_t *tree, const char *filename);
+
+/**
+ * Dump a tree to a test case file
+ * @param tree     The tree to be written to the file
+ * @param filename The path to the test case file
+ */
+void dump_tree_to_test_case(tree_t *tree, const char *filename);
 
 #ifdef __cplusplus
 }

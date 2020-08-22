@@ -46,10 +46,7 @@ add_test(
 add_executable(test_tree test_tree.cpp)
 target_link_libraries(test_tree
   PRIVATE gtest_main
-  PRIVATE grammarmutator
-  PRIVATE antlr4_shim)
-target_include_directories(test_tree
-  PRIVATE ${CMAKE_SOURCE_DIR}/lib/antlr4_shim)
+  PRIVATE grammarmutator)
 add_test(
   NAME test_tree
   COMMAND test_tree)

@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <sys/stat.h>
+#include <limits.h>
 
 #include "f1_c_fuzz.h"
 
@@ -10,35 +11,52 @@ static void dump_test_case(uint8_t *buf, size_t buf_size) {
 }
 
 int main(int argc, const char *argv[]) {
-  int seed, max_num, max_len;
+  int         seed, max_num, max_len;
+  const char *out_dir;
+  size_t      out_dir_len;
 
-  if (argc < 3) {
-    printf("%s <seed> <max_num> <max_len>\n", argv[0]);
+  if (argc < 4) {
+    printf("%s <seed> <max_num> <max_len> <output_dir>\n", argv[0]);
     return 0;
   }
 
   seed = atoi(argv[1]);
   max_num = atoi(argv[2]);
   max_len = atoi(argv[3]);
+  out_dir = argv[4];
+  out_dir_len = strlen(out_dir);
 
   srandom(seed);
 
+  struct stat info;
+  if (stat(out_dir, &info) != 0) {
+    // The output directory does not exist
+    if (mkdir(out_dir, 0700) != 0) {
+      // error
+      perror("Cannot create the directory");
+      return EXIT_FAILURE;
+    }
+  } else if (info.st_mode & S_IFDIR) {
+    // Exist
+  } else {
+    // Not a directory
+    perror("Wrong tree output path (stat)");
+    return EXIT_FAILURE;
+  }
+
+  char    fn[PATH_MAX];
   tree_t *tree = NULL;
+  strncpy(fn, out_dir, out_dir_len);
   for (int i = 0; i < max_num; ++i) {
     tree = gen_init__(max_len);
 
-    tree_to_buf(tree);
-    tree_get_non_terminal_nodes(tree);
+    snprintf(fn + out_dir_len, PATH_MAX - out_dir_len, "%d", i);
+    dump_tree_to_test_case(tree, fn);
+    snprintf(fn + out_dir_len, PATH_MAX - out_dir_len, "%d.tree", i);
+    write_tree_to_file(tree, fn);
 
-    fprintf(stderr, "=====%d=====\n", i + 1);
-    fprintf(stderr, "Buffer size: %zu\n", tree->data_len);
-    fprintf(stderr, "Tree #non-terminal nodes: %zu\n",
-            tree->non_terminal_node_list->size);
-    dump_test_case(tree->data_buf, tree->data_len);
     tree_free(tree);
   }
-
-  // TODO: write generated trees and corresponding buffer into files
 
   return 0;
 }

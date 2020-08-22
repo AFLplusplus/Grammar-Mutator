@@ -9,7 +9,8 @@ add_library(grammarmutator SHARED
 
 target_link_libraries(grammarmutator
   PRIVATE rxi_map
-  PRIVATE barrust_set)
+  PRIVATE barrust_set
+  PUBLIC antlr4_shim)
 target_include_directories(grammarmutator
   PUBLIC ${CMAKE_SOURCE_DIR}/include
   PUBLIC ${CMAKE_BINARY_DIR}/f1/include  # Generated headers

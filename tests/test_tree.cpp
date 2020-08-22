@@ -1,6 +1,5 @@
 #include "tree.h"
 #include "f1_c_fuzz.h"
-#include "antlr4_shim.h"
 
 #include "gtest/gtest.h"
 #include "gtest_ext.h"
