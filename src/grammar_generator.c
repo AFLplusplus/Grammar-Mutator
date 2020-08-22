@@ -50,9 +50,9 @@ int main(int argc, const char *argv[]) {
   for (int i = 0; i < max_num; ++i) {
     tree = gen_init__(max_len);
 
-    snprintf(fn + out_dir_len, PATH_MAX - out_dir_len, "%d", i);
+    snprintf(fn + out_dir_len, PATH_MAX - out_dir_len, "/%d", i);
     dump_tree_to_test_case(tree, fn);
-    snprintf(fn + out_dir_len, PATH_MAX - out_dir_len, "%d.tree", i);
+    snprintf(fn + out_dir_len, PATH_MAX - out_dir_len, "/%d.tree", i);
     write_tree_to_file(tree, fn);
 
     tree_free(tree);
