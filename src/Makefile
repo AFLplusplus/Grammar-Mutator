@@ -30,7 +30,7 @@ endif
 all: $(TARGETS)
 
 libgrammarmutator.so: $(LIB_OBJS)
-	$(CXX) -fPIC $(C_FLAGS) -shared -Wl,-soname,libgrammarmutator.so -o $^ $@ $(LDFLAGS)
+	$(CXX) -fPIC $(C_FLAGS) -shared -Wl,-soname,libgrammarmutator.so -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(C_DEFINES) $(C_INCLUDES) -fPIC $(C_FLAGS) -o $@ -c $<
