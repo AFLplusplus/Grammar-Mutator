@@ -53,14 +53,14 @@ src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar
 	$(PYTHON) $< $(shell cat .grammar) $(CURDIR)
 
 .PHONY: build
-build: build_lib src/f1_c_fuzz.c include/f1_c_fuzz.h third_party
+build: src/f1_c_fuzz.c include/f1_c_fuzz.h third_party build_lib
 	@$(MAKE) -C src all
 
 grammars/Grammar.g4: grammars/f1_g4_translate.py .grammar
 	$(PYTHON) $< $(shell cat .grammar) ./grammars
 
 .PHONY: build_lib
-build_lib: grammars/Grammar.g4 third_party
+build_lib: grammars/Grammar.g4 src/f1_c_fuzz.c include/f1_c_fuzz.h third_party
 	@$(MAKE) -C lib all ANTLR_JAR_LOCATION=$(ANTLR_JAR_LOCATION)
 
 ifdef ENABLE_TESTING

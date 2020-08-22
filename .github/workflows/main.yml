@@ -17,7 +17,7 @@ jobs:
     - name: CMake
       run: |
         cd ./build
-        cmake -DENABLE_TESTING=ON -DANTLR_JAR_LOCATION=../antlr-4.8-complete.jar -DGRAMMAR_FILE=$(realpath ../grammars/ruby_grammar.json) ../
+        cmake -DENABLE_TESTING=ON -DANTLR_JAR_LOCATION=$(realpath ../antlr-4.8-complete.jar) -DGRAMMAR_FILE=$(realpath ../grammars/ruby_grammar.json) ../
     - name: Compile
       run: cmake --build build
     - name: Unit testing

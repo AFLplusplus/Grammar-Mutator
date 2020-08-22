@@ -8,7 +8,7 @@
 
 using namespace antlr4;
 
-node_t *node_from_parse_tree(antlr4::tree::ParseTree* t) {
+node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
   if (antlrcpp::is<antlr4::tree::ErrorNode *>(t)) {
     // error
     return nullptr;
@@ -44,12 +44,12 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree* t) {
 }
 
 tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
-  ANTLRInputStream input((const char *)data_buf, data_size);
-  GrammarLexer lexer(&input);
+  ANTLRInputStream  input((const char *)data_buf, data_size);
+  GrammarLexer      lexer(&input);
   CommonTokenStream tokens(&lexer);
   tokens.fill();
-  GrammarParser parser(&tokens);
-  antlr4::tree::ParseTree* parse_tree = parser.entry();
+  GrammarParser            parser(&tokens);
+  antlr4::tree::ParseTree *parse_tree = parser.entry();
 
   tree_t *tree = tree_create();
   tree->root = node_from_parse_tree(parse_tree->children[0]);

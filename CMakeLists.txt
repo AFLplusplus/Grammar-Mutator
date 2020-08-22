@@ -51,14 +51,16 @@ find_package(Java COMPONENTS Runtime REQUIRED)
 # ANTLR 4 Jar
 if (NOT ANTLR_JAR_LOCATION)
   message(FATAL_ERROR "Missing antlr4.jar location. You can specify it's path using: -DANTLR_JAR_LOCATION=<path>")
-else ()
-  get_filename_component(ANTLR_NAME ${ANTLR_JAR_LOCATION} NAME_WE)
-  if (NOT EXISTS "${ANTLR_JAR_LOCATION}")
-    message(FATAL_ERROR "Unable to find ${ANTLR_NAME} in ${ANTLR_JAR_LOCATION}")
-  else ()
-    message(STATUS "Found ${ANTLR_NAME}: ${ANTLR_JAR_LOCATION}")
-  endif ()
 endif ()
+if (NOT IS_ABSOLUTE ${ANTLR_JAR_LOCATION})
+  message(FATAL_ERROR "Please provide the full path to antlr4.jar")
+endif ()
+if (NOT EXISTS "${ANTLR_JAR_LOCATION}")
+  message(FATAL_ERROR "Unable to find antlr4.jar in ${ANTLR_JAR_LOCATION}")
+endif ()
+get_filename_component(ANTLR_NAME ${ANTLR_JAR_LOCATION} NAME_WE)
+message(STATUS "Found ${ANTLR_NAME}: ${ANTLR_JAR_LOCATION}")
+
 
 # Python
 find_program(PYTHON
@@ -79,12 +81,11 @@ endif ()
 if (NOT IS_ABSOLUTE ${GRAMMAR_FILE})
   message(FATAL_ERROR "Please provide the full path to the grammar file")
 endif ()
-if (EXISTS ${GRAMMAR_FILE})
-  message(STATUS "Grammar: ${GRAMMAR_FILE}")
-else ()
+if (NOT EXISTS ${GRAMMAR_FILE})
   message(FATAL_ERROR "The grammar file does not exist: ${GRAMMAR_FILE}")
 endif ()
 get_filename_component(GRAMMAR_FILENAME ${GRAMMAR_FILE} NAME_WE)
+message(STATUS "Grammar: ${GRAMMAR_FILE}")
 
 # Generate files at configure time
 execute_process(
