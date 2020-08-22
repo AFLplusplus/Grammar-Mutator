@@ -22,11 +22,6 @@ class Sanitize:
         s = s.replace('import', 'XimportX')
         s = s.replace('class', 'XclassX')
         s = s.replace('def', 'XdefX')
-
-        # Avoid keyword confliction
-        s = s.replace('int', 'XintX')
-        s = s.replace('float', 'XfloatX')
-        s = s.replace('double', 'XdoubleX')
         return s
 
     def get_entry_key(self):
@@ -46,7 +41,7 @@ class Sanitize:
 
 class AntlrG(Sanitize):
     def to_key(self, k):
-        return super().to_key(k)[1:-1]
+        return 'node_%s' % super().to_key(k)[1:-1]
 
     def esc_token(self, t):
         # these are multi-char tokens

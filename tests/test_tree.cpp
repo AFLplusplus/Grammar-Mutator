@@ -194,9 +194,12 @@ TEST_F(TreeTest, ParseTreeFromBuffer) {
   tree_t *ruby_tree = gen_init__(1);
   tree_to_buf(ruby_tree);
 
-  tree_from_buf(ruby_tree->data_buf, ruby_tree->data_len);
+  tree_t *recovered_ruby_tree = tree_from_buf(ruby_tree->data_buf, ruby_tree->data_len);
+
+  EXPECT_TRUE(tree_equal(ruby_tree, recovered_ruby_tree));
 
   tree_free(ruby_tree);
+  tree_free(recovered_ruby_tree);
 }
 
 TEST_F(TreeTest, ClonedTreeShouldEqual) {
