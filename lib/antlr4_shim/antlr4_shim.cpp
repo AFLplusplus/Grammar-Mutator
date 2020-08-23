@@ -50,7 +50,10 @@ tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
   GrammarParser            parser(&tokens);
   antlr4::tree::ParseTree *parse_tree = parser.entry();
 
+  node_t *root = node_from_parse_tree(parse_tree->children[0]);
+  if (!root) return nullptr;  // parse error
+
   tree_t *tree = tree_create();
-  tree->root = node_from_parse_tree(parse_tree->children[0]);
+  tree->root = root;
   return tree;
 }
