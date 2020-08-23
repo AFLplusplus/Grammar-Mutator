@@ -190,15 +190,18 @@ TEST_F(TreeTest, DumpTreeToBuffer) {
 }
 
 TEST_F(TreeTest, ParseTreeFromBuffer) {
-  tree_t *ruby_tree = gen_init__(1);
-  tree_to_buf(ruby_tree);
+  // A manually constructed tree, which does not follow the grammar
+  tree_to_buf(tree);
+  tree_t *recovered_tree = tree_from_buf(tree->data_buf, tree->data_len);
+  EXPECT_FALSE(tree_equal(tree, recovered_tree));
 
-  tree_t *recovered_ruby_tree = tree_from_buf(ruby_tree->data_buf, ruby_tree->data_len);
-
-  EXPECT_TRUE(tree_equal(ruby_tree, recovered_ruby_tree));
-
-  tree_free(ruby_tree);
-  tree_free(recovered_ruby_tree);
+  // Generate a correct tree based on the existing grammar
+  tree_t *tree2 = gen_init__(1);
+  tree_to_buf(tree2);
+  tree_t *recovered_tree2 = tree_from_buf(tree2->data_buf, tree2->data_len);
+  EXPECT_TRUE(tree_equal(tree2, recovered_tree2));
+  tree_free(tree2);
+  tree_free(recovered_tree2);
 }
 
 TEST_F(TreeTest, ClonedTreeShouldEqual) {

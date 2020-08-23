@@ -4,7 +4,6 @@
 #include <antlr4-runtime.h>
 #include <GrammarLexer.h>
 #include <GrammarParser.h>
-#include <GrammarBaseListener.h>
 
 using namespace antlr4;
 
