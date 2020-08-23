@@ -43,11 +43,18 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
 }
 
 tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
-  ANTLRInputStream  input((const char *)data_buf, data_size);
-  GrammarLexer      lexer(&input);
+  ANTLRInputStream input((const char *)data_buf, data_size);
+  GrammarLexer     lexer(&input);
+  // Disable lexer error output
+  lexer.removeErrorListener(&ConsoleErrorListener::INSTANCE);
+
   CommonTokenStream tokens(&lexer);
   tokens.fill();
-  GrammarParser            parser(&tokens);
+
+  GrammarParser parser(&tokens);
+  // Disable parser error output
+  parser.removeErrorListener(&ConsoleErrorListener::INSTANCE);
+
   antlr4::tree::ParseTree *parse_tree = parser.entry();
 
   node_t *root = node_from_parse_tree(parse_tree->children[0]);

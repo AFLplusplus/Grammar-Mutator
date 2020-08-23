@@ -337,6 +337,10 @@ void _node_get_recursion_edges(tree_t *tree, node_t *node) {
   node_t *subnode = NULL;
   for (int i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
+
+    // `subnode` may be NULL due to parsing errors
+    if (!subnode) continue;
+
     if (node->id == subnode->id) {
       edge_t *edge = malloc(sizeof(edge_t));
       edge->parent = node;
