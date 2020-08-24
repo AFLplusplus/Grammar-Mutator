@@ -150,3 +150,9 @@ void *list_get(list_t *list, size_t i) {
 
   return cur->data;
 }
+
+inline bool list_empty(list_t *list) {
+  if (!list) return true;
+  if (list->size == 0 || list->head == NULL) return true;
+  return false;
+}

@@ -32,6 +32,7 @@ tree_t *rules_mutation(tree_t *tree);
  * Pick a random recursion of a tree and repeats that recursion 2^n times
  * (0 < n < 16). This creates trees with higher degree of nesting.
  * @param  tree A parsing tree
+ * @param  n    Recursion factor
  * @return      A mutated parsing tree
  */
 tree_t *random_recursive_mutation(tree_t *tree, uint8_t n);

@@ -270,7 +270,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
         break;
       case 1:
         // random recursive mutation
-        tree = random_recursive_mutation(tree, random() % 6);
+        tree = random_recursive_mutation(tree, random() % 16);
         break;
       case 2:
         // splicing mutation

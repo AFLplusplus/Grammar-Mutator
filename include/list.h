@@ -82,6 +82,13 @@ void *list_pop_front(list_t *list);
  */
 void *list_get(list_t *list, size_t i);
 
+/**
+ * Is the given list empty?
+ * @param list A doubly linked list
+ * @return     True if the list is empty; otherwise, False
+ */
+bool list_empty(list_t *list);
+
 #ifdef __cplusplus
 }
 #endif

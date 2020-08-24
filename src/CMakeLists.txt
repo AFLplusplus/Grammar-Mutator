@@ -1,3 +1,4 @@
+# Grammar mutator
 add_library(grammarmutator SHARED
   chunk_store.c
   list.c
@@ -6,7 +7,6 @@ add_library(grammarmutator SHARED
   tree_trimming.c
   ${CMAKE_BINARY_DIR}/f1/src/f1_c_fuzz.c
   grammar_mutator.c)
-
 target_link_libraries(grammarmutator
   PRIVATE rxi_map
   PRIVATE barrust_set
@@ -17,6 +17,7 @@ target_include_directories(grammarmutator
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/barrust_set)
 
+# Grammar generator
 add_executable(grammar_generator
   grammar_generator.c)
 target_link_libraries(grammar_generator
@@ -24,3 +25,5 @@ target_link_libraries(grammar_generator
 target_include_directories(grammarmutator
   PUBLIC ${CMAKE_SOURCE_DIR}/include
   PUBLIC ${CMAKE_BINARY_DIR}/f1/include)
+
+add_subdirectory(benchmark)
