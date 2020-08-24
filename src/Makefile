@@ -1,11 +1,13 @@
-TARGETS = libgrammarmutator.so grammar_generator
+TARGETS = libgrammarmutator.so grammar_generator benchmark/benchmark
 
 LIB_SRC_FILES = chunk_store.c f1_c_fuzz.c grammar_mutator.c list.c tree.c tree_mutation.c tree_trimming.c
 GEN_SRC_FILES = grammar_generator.c
+BENCHMARK_SRC_FILES = benchmark/benchmark.c
 
 LIB_OBJS = $(LIB_SRC_FILES:.c=.o)
 GEN_OBJS = $(GEN_SRC_FILES:.c=.o)
-OBJS = $(LIB_OBJS) $(GEN_OBJS)
+BENCHMARK_OBJS = $(BENCHMARK_SRC_FILES:.c=.o)
+OBJS = $(LIB_OBJS) $(GEN_OBJS) $(BENCHMARK_OBJS)
 
 C_FLAGS =
 C_DEFINES =
@@ -35,11 +37,17 @@ libgrammarmutator.so: $(LIB_OBJS)
 %.o: %.c
 	$(CC) $(C_DEFINES) $(C_INCLUDES) -fPIC $(C_FLAGS) -o $@ -c $<
 
+grammar_generator.o: grammar_generator.c
+	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) -o $@ -c $<
+
 grammar_generator: $(GEN_OBJS) libgrammarmutator.so
 	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) libgrammarmutator.so
 
-grammar_generator.o: grammar_generator.c
+benchmark/benchmark.o: benchmark/benchmark.c
 	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) -o $@ -c $<
+
+benchmark/benchmark: $(BENCHMARK_OBJS) libgrammarmutator.so
+	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) libgrammarmutator.so -lm
 
 .PHONY: clean
 clean:

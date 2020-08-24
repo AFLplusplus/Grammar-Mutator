@@ -194,6 +194,7 @@ TEST_F(TreeTest, ParseTreeFromBuffer) {
   tree_to_buf(tree);
   tree_t *recovered_tree = tree_from_buf(tree->data_buf, tree->data_len);
   EXPECT_FALSE(tree_equal(tree, recovered_tree));
+  tree_free(recovered_tree);
 
   // Generate a correct tree based on the existing grammar
   tree_t *tree2 = gen_init__(1);

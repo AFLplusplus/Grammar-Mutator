@@ -260,7 +260,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
   if (!tree) {
     // Generation
     // Randomly generate a JSON string
-    tree = gen_init__(1000);
+    tree = gen_init__(500);
   } else {
     mutation_choice = random() % 3;
     switch (mutation_choice) {
@@ -270,7 +270,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
         break;
       case 1:
         // random recursive mutation
-        tree = random_recursive_mutation(tree, random() % 16);
+        tree = random_recursive_mutation(tree, random() % 10);
         break;
       case 2:
         // splicing mutation
