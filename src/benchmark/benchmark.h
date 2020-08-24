@@ -1,6 +1,9 @@
 #ifndef __MUTATOR_BENCHMARK_H__
 #define __MUTATOR_BENCHMARK_H__
 
+void bench_all();
+void bench_parsing_test_case(const char *fn);
+
 void bench_generating();
 void bench_parsing();
 void bench_mutation();

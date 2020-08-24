@@ -2,8 +2,7 @@
 add_executable(benchmark
   benchmark.c)
 target_link_libraries(benchmark
-  PRIVATE grammarmutator
-  PRIVATE -lm)
+  PRIVATE grammarmutator)
 target_include_directories(benchmark
   PUBLIC ${CMAKE_SOURCE_DIR}/include
   PUBLIC ${CMAKE_BINARY_DIR}/f1/include)

@@ -82,6 +82,10 @@ void node_free(node_t *node) {
     node_t *subnode = NULL;
     for (int i = 0; i < node->subnode_count; ++i) {
       subnode = node->subnodes[i];
+
+      // `subnode` may be NULL due to parsing errors
+      if (unlikely(!subnode)) continue;
+
       node_free(subnode);
     }
 
@@ -235,6 +239,10 @@ node_t *node_pick_non_term_subnode(node_t *node) {
   node_t *subnode = NULL;
   for (int i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
+
+    // `subnode` may be NULL due to parsing errors
+    if (unlikely(!subnode)) continue;
+
     if (subnode->id == 0) continue;  // "0" means the terminal node
 
     if (prob < subnode->non_term_size)
@@ -257,6 +265,9 @@ edge_t node_pick_recursion_edge(node_t *node) {
   node_t *subnode = NULL;
   for (int i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
+
+    // `subnode` may be NULL due to parsing errors
+    if (unlikely(!subnode)) continue;
 
     // "node -> subnode" is a recursion edge
     if (node->id == subnode->id) {
@@ -339,7 +350,7 @@ void _node_get_recursion_edges(tree_t *tree, node_t *node) {
     subnode = node->subnodes[i];
 
     // `subnode` may be NULL due to parsing errors
-    if (!subnode) continue;
+    if (unlikely(!subnode)) continue;
 
     if (node->id == subnode->id) {
       edge_t *edge = malloc(sizeof(edge_t));
