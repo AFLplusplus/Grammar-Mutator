@@ -20,8 +20,6 @@ static void dump_test_case(uint8_t *buf, size_t buf_size) {
   fprintf(stderr, "%.*s\n", (int)buf_size, buf);
 }
 
-static int num = 100;
-
 class CustomMutatorTest : public ::testing::Test {
  protected:
   afl_t *                afl = nullptr;
@@ -118,6 +116,8 @@ TEST_F(CustomMutatorTest, FuzzNTimes) {
   ret = afl_custom_queue_get(
       mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_1");
   EXPECT_EQ(ret, 1);
+
+  int num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
   for (int i = 0; i < num; ++i) {
     buf_size =
         afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
@@ -188,7 +188,5 @@ TEST_F(CustomMutatorTest, Trimming) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  if (argc < 2) exit(EXIT_FAILURE);
-  num = atoi(argv[1]);
   return RUN_ALL_TESTS();
 }

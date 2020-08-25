@@ -18,6 +18,7 @@ extern "C" {
 typedef struct tree_node node_t;
 struct tree_node {
   uint32_t id;  // node type
+  uint32_t rule_id;  // rule id
 
   // uint8_t *val_buf;
   // size_t   val_size;
@@ -48,6 +49,14 @@ struct edge {
  * @return    A newly created node
  */
 node_t *node_create(uint32_t id);
+
+/**
+ * Create a node and allocate the memory
+ * @param  id      The type of the node
+ * @param  rule_id The index of the grammar rule of this node
+ * @return         A newly created node
+ */
+node_t *node_create_with_rule_id(uint32_t id, uint32_t rule_id);
 
 /**
  * Create a node and allocate the memory with a given value

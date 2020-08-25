@@ -26,9 +26,9 @@ class TreeTest : public ::testing::Test {
 
   void SetUp() override {
     tree = tree_create();
-    node1 = node_create(1);
+    node1 = node_create_with_rule_id(1, 1);
     node2 = node_create_with_val(0, "{", 1);
-    node3 = node_create(1);
+    node3 = node_create_with_rule_id(1, 0);
     node4 = node_create_with_val(0, "}", 1);
     node5 = node_create_with_val(0, "123", 3);
 
@@ -197,7 +197,7 @@ TEST_F(TreeTest, ParseTreeFromBuffer) {
   tree_free(recovered_tree);
 
   // Generate a correct tree based on the existing grammar
-  tree_t *tree2 = gen_init__(1);
+  tree_t *tree2 = gen_init__(0);
   tree_to_buf(tree2);
   tree_t *recovered_tree2 = tree_from_buf(tree2->data_buf, tree2->data_len);
   EXPECT_TRUE(tree_equal(tree2, recovered_tree2));
@@ -371,7 +371,7 @@ TEST_F(TreeTest, TreeGetNonTerminalNodes) {
 
 TEST_F(TreeTest, TreeSerializeDeserialize) {
   tree_serialize(tree);
-  EXPECT_EQ(tree->ser_len, 12 * 8 + 7);
+  EXPECT_EQ(tree->ser_len, 16 * 8 + 7);
 
   tree_t *new_tree = tree_deserialize(tree->ser_buf, tree->ser_len);
 

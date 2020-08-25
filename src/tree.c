@@ -6,7 +6,7 @@
 
 #define TREE_BUF_PREALLOC_SIZE (64)
 
-inline node_t *node_create(uint32_t id) {
+node_t *node_create(uint32_t id) {
   node_t *node = calloc(1, sizeof(node_t));
   if (!node) {
     perror("node_create (calloc)");
@@ -22,8 +22,13 @@ inline node_t *node_create(uint32_t id) {
   return node;
 }
 
-node_t *node_create_with_val(uint32_t id, const void *val_buf, size_t val_len) {
+node_t *node_create_with_rule_id(uint32_t id, uint32_t rule_id) {
   node_t *node = node_create(id);
+  node->rule_id = rule_id;
+}
+
+node_t *node_create_with_val(uint32_t id, const void *val_buf, size_t val_len) {
+  node_t *node = node_create_with_rule_id(id, 0);
 
   if (val_buf) node_set_val(node, val_buf, val_len);
 
@@ -62,6 +67,9 @@ void node_free(node_t *node) {
 
   // id
   node->id = 0;
+
+  // rule id
+  node->rule_id = 0;
 
   node->recursion_edge_size = 0;
   node->non_term_size = 0;
@@ -133,6 +141,9 @@ node_t *node_clone(node_t *node) {
 
   node_t *new_node = node_create(node->id);
 
+  // rule id
+  new_node->rule_id = node->rule_id;
+
   new_node->recursion_edge_size = node->recursion_edge_size;
   new_node->non_term_size = node->non_term_size;
 
@@ -157,6 +168,7 @@ bool node_equal(node_t *node_a, node_t *node_b) {
   if (node_a == node_b) return true;
   if (!node_a || !node_b) return false;
   if (node_a->id != node_b->id) return false;
+  if (node_a->rule_id != node_b->rule_id) return false;
   if (node_a->val_len != node_b->val_len) return false;
   if (memcmp(node_a->val_buf, node_b->val_buf, node_a->val_len) != 0)
     return false;
@@ -381,8 +393,9 @@ void _node_serialize(tree_t *tree, node_t *node) {
   if (!tree || !node) return;
 
   // allocate or update the buffer
-  size_t len = sizeof(node->id) + sizeof(node->subnode_count) +
-               sizeof(node->val_len) + node->val_len;
+  size_t len = sizeof(node->id) + sizeof(node->rule_id) +
+               sizeof(node->subnode_count) + sizeof(node->val_len) +
+               node->val_len;
   size_t   ser_len = tree->ser_len;
   uint8_t *ser_buf = maybe_grow(BUF_PARAMS(tree, ser), ser_len + len);
   if (!ser_buf) {
@@ -393,6 +406,10 @@ void _node_serialize(tree_t *tree, node_t *node) {
   // save `id`
   memcpy(ser_buf + ser_len, &(node->id), sizeof(node->id));
   ser_len += sizeof(node->id);
+
+  // save `rule_id`
+  memcpy(ser_buf + ser_len, &(node->rule_id), sizeof(node->rule_id));
+  ser_len += sizeof(node->rule_id);
 
   // save `subnode_count`
   memcpy(ser_buf + ser_len, &(node->subnode_count),
@@ -423,8 +440,8 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
   if (!data_buf) return NULL;
 
   node_t *node = node_create(0);
-  size_t  min_len =
-      sizeof(node->id) + sizeof(node->subnode_count) + sizeof(node->val_len);
+  size_t  min_len = sizeof(node->id) + sizeof(node->rule_id) +
+                   sizeof(node->subnode_count) + sizeof(node->val_len);
   if (data_size - (*consumed_size) < min_len) {
     // data is not enough for a node
     node_free(node);
@@ -436,6 +453,10 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
   // `id`
   memcpy(&(node->id), data_buf + ser_len, sizeof(node->id));
   ser_len += sizeof(node->id);
+
+  // `rule_id`
+  memcpy(&(node->rule_id), data_buf + ser_len, sizeof(node->rule_id));
+  ser_len += sizeof(node->rule_id);
 
   // `subnode_count`
   memcpy(&(node->subnode_count), data_buf + ser_len,
@@ -477,6 +498,8 @@ inline tree_t *tree_create() {
 }
 
 void tree_free(tree_t *tree) {
+  if (!tree) return;
+
   // root node
   node_free(tree->root);
   tree->root = NULL;

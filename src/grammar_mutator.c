@@ -238,6 +238,11 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
   return data->cur_subtree_trimming_step + data->cur_recursive_trimming_step;
 }
 
+uint32_t afl_custom_fuzz_count(my_mutator_t *data, const uint8_t *buf,
+                               size_t buf_size) {
+  return 0;
+}
+
 // Fuzz the given test case several times, which is defined by the
 // `custom_mutator_stage` in `afl-fuzz-one.c`
 size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,

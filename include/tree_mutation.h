@@ -3,6 +3,8 @@
 
 #include "tree.h"
 
+#define MAX_TREE_LEN (1000)
+
 #ifdef __cplusplus
 extern "C" {
 #endif

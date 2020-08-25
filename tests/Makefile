@@ -76,19 +76,11 @@ $(GTEST_DIR)/libgtest_main.a:
 
 run_test_%: test_%
 	@echo "Test: $<"
-	@if [ $< = 'test_custom_mutator' ] ; then \
-		./$< 100; \
-	else \
-		./$<; \
-	fi;
+	@./$<
 
 test_%_memcheck: test_%
 	@echo "Test: $<"
-	@if [ $< = 'test_custom_mutator' ] ; then \
-		$(VALGRIND_CMD) --log-file=$(VALGRIND_LOG_DIR)/$<.log ./$< 100; \
-	else \
-		$(VALGRIND_CMD) --log-file=$(VALGRIND_LOG_DIR)/$<.log ./$<; \
-	fi;
+	@$(VALGRIND_CMD) --log-file=$(VALGRIND_LOG_DIR)/$<.log ./$<
 
 .PRECIOUS: test_%
 test_%: test_%.o $(LIBS)

@@ -39,7 +39,7 @@ target_link_libraries(test_custom_mutator
   PRIVATE grammarmutator)
 add_test(
   NAME test_custom_mutator
-  COMMAND test_custom_mutator 100)
+  COMMAND test_custom_mutator)
 
 # Test suite 2:
 # test the tree APIs

@@ -1,6 +1,6 @@
 # Generate lexer and parser
 execute_process(
-  COMMAND ${Java_JAVA_EXECUTABLE} -jar ${ANTLR_JAR_LOCATION} -Dlanguage=Cpp -o ${CMAKE_CURRENT_BINARY_DIR}/generated ${GRAMMAR_G4_FILE}
+  COMMAND ${Java_JAVA_EXECUTABLE} -jar ${ANTLR_JAR_LOCATION} -Dlanguage=Cpp -DcontextSuperClass=antlr4::RuleContextWithAltNum -o ${CMAKE_CURRENT_BINARY_DIR}/generated ${GRAMMAR_G4_FILE}
   RESULT_VARIABLE result
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 if (result)

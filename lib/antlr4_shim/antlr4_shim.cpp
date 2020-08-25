@@ -30,7 +30,8 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
 
   // non-terminal node
   auto non_terminal_node = dynamic_cast<antlr4::ParserRuleContext *>(t);
-  node = node_create(non_terminal_node->getRuleIndex());
+  node = node_create_with_rule_id(non_terminal_node->getRuleIndex(),
+                                  non_terminal_node->getAltNumber() - 1);
   node_init_subnodes(node, t->children.size());
   node_t *subnode;
   for (int i = 0; i < node->subnode_count; ++i) {
