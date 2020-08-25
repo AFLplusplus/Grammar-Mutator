@@ -15,7 +15,7 @@ extern simple_set seen_chunks;
 
 // private functions
 uint8_t *buf_from_node(node_t *node);
-void chunk_store_add_node(node_t *node);
+void     chunk_store_add_node(node_t *node);
 
 #ifdef __cplusplus
 }

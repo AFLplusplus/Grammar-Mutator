@@ -354,8 +354,8 @@ TEST_F(TreeTest, TreeGetRecursionEdges) {
 
   list_t *recursion_edge_list = tree->recursion_edge_list;
   EXPECT_EQ(recursion_edge_list->size, 2);
-  list_node_t  *head = recursion_edge_list->head;
-  auto edge = (edge_t *)head->data;
+  list_node_t *head = recursion_edge_list->head;
+  auto         edge = (edge_t *)head->data;
   EXPECT_EQ(edge->parent, node1);
   EXPECT_EQ(edge->subnode_offset, 1);
 }

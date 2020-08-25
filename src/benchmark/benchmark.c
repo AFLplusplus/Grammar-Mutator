@@ -16,7 +16,7 @@
 #define BENCH_NUM (1000)
 
 #ifdef MAX_TREE_LEN
-#undef MAX_TREE_LEN
+  #undef MAX_TREE_LEN
 #endif
 #define MAX_TREE_LEN (1000 + 1)
 
@@ -183,7 +183,7 @@ inline void bench_trimming() {
 void bench_subtree_trimming() {
   tree_t *tree, *trimmed_tree;
   node_t *node;
-  int max_len;
+  int     max_len;
 
   printf("========== Subtree Trimming, Single Node [START] ==========\n");
   for (int i = 0; i < BENCH_NUM; ++i) {
@@ -209,7 +209,7 @@ void bench_subtree_trimming() {
 void bench_recursive_trimming() {
   tree_t *tree, *trimmed_tree;
   edge_t *edge;
-  int max_len;
+  int     max_len;
 
   printf("========== Recursive Trimming, Single Node [START] ==========\n");
   tree = gen_init__(MAX_TREE_LEN);

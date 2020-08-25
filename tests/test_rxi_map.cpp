@@ -17,7 +17,7 @@ class RxiMapTest : public ::testing::Test {
 
   void TearDown() override {
     const char *key;
-    map_iter_t iter = map_iter(&list_map);
+    map_iter_t  iter = map_iter(&list_map);
     while ((key = map_next(&list_map, &iter))) {
       list_free(*map_get(&list_map, key));
     }

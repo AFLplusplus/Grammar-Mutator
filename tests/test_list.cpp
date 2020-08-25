@@ -5,7 +5,7 @@
 class ListTest : public ::testing::Test {
  protected:
   list_t *list;
-  int _array[3] = {0, 1, 2};
+  int     _array[3] = {0, 1, 2};
 
   ListTest() {
     list = nullptr;
@@ -62,8 +62,8 @@ struct point {
 TEST_F(ListTest, ListFreeWithDataFreeFunc) {
   list_t *points = list_create();
 
-  auto point1 = (point *) malloc(sizeof(point));
-  auto point2 = (point *) malloc(sizeof(point));
+  auto point1 = (point *)malloc(sizeof(point));
+  auto point2 = (point *)malloc(sizeof(point));
 
   point1->x = 100;
   point1->y = -10;
@@ -81,7 +81,7 @@ TEST_F(ListTest, ListFreeWithDataFreeFunc) {
 
 TEST_F(ListTest, ListPopFront) {
   size_t list_size = list->size;
-  int *data = (int *) list_pop_front(list);
+  int *  data = (int *)list_pop_front(list);
   EXPECT_EQ(list->size, list_size - 1);
   EXPECT_EQ(data, _array + 0);
   EXPECT_EQ(*data, _array[0]);

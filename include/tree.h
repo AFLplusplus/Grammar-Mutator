@@ -17,7 +17,7 @@ extern "C" {
 
 typedef struct tree_node node_t;
 struct tree_node {
-  uint32_t id;  // node type
+  uint32_t id;       // node type
   uint32_t rule_id;  // rule id
 
   // uint8_t *val_buf;
