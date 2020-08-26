@@ -108,5 +108,6 @@ help:
 	@echo "ENABLE_TESTING - compiles test cases"
 	@echo "ENABLE_DEBUG - compiles with '-g' option for debug purposes"
 	@echo "GRAMMAR_FILE - the path to the input grammar file (Default: grammars/json_grammar.json)"
+	@echo "ANTLR_JAR_LOCATION" - the path to ANTLR4 jar file
 	@echo "=========================================="
 	@echo "e.g.: make ENABLE_TESTING=1 GRAMMAR_FILE=./grammars/json_grammar.json"

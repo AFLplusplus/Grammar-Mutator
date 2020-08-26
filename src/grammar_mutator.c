@@ -101,6 +101,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   }
 
   strncpy(data->tree_fn_cur, fn, fn_len);
+  data->tree_fn_cur[fn_len] = '\0';
   char *found = strstr(data->tree_fn_cur, "/queue/");
   if (unlikely(!found)) {
     // Should not reach here
@@ -321,6 +322,7 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
   const char *fn = (const char *)filename_new_queue;
   size_t      fn_len = strlen(fn);
   strncpy(data->new_tree_fn, fn, fn_len);
+  data->new_tree_fn[fn_len] = '\0';
   char *found = strstr(data->new_tree_fn, "/queue/");
   if (unlikely(!found)) {
     // Should not reach here
