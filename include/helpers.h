@@ -1,5 +1,5 @@
-#ifndef __COMMON_H__
-#define __COMMON_H__
+#ifndef __HELPERS_H__
+#define __HELPERS_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,13 +61,13 @@ static inline void *maybe_grow(void **buf, size_t *size, size_t size_needed) {
   if (likely(size_needed && *size >= size_needed)) { return *buf; }
 
   /* No initial size was set */
-  if (size_needed < INITIAL_GROWTH_SIZE) { size_needed = INITIAL_GROWTH_SIZE; }
+  if (size_needed < INITIAL_GROWTH_SIZE) size_needed = INITIAL_GROWTH_SIZE;
 
   /* grow exponentially */
   size_t next_size = next_pow2(size_needed);
 
   /* handle overflow and zero size_needed */
-  if (!next_size) { next_size = size_needed; }
+  if (!next_size) next_size = size_needed;
 
   /* alloc */
   *buf = realloc(*buf, next_size);
