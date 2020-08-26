@@ -96,7 +96,7 @@ class CustomMutatorTest : public ::testing::Test {
   }
 };
 
-TEST_F(CustomMutatorTest, FuzzNTimes) {
+TEST_F(CustomMutatorTest, Fuzz100Times) {
   uint8_t *buf = nullptr;
   size_t   buf_size = 0;
 
@@ -111,7 +111,7 @@ TEST_F(CustomMutatorTest, FuzzNTimes) {
   EXPECT_EQ(ret, 1);
 
   int num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
-  for (int i = 0; i < num; ++i) {
+  for (int i = 0; i < 100; ++i) {
     buf_size =
         afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);

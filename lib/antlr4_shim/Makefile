@@ -40,10 +40,11 @@ CXX_FLAGS += -O3
 endif
 
 .PHONY: all
-all: $(TARGET)
+all: $(ANTLR4_GENERATED_SRC_FILES) $(TARGET)
 
 # Generate lexer and parser
 $(ANTLR4_GENERATED_SRC_FILES): ../../grammars/Grammar.g4
+	@mkdir -p generated
 	java -jar $(ANTLR_JAR_LOCATION) -Dlanguage=Cpp -DcontextSuperClass=antlr4::RuleContextWithAltNum -o generated $(realpath ../../grammars/Grammar.g4)
 
 $(TARGET): $(ANTLR4_SHIM_OBJS)
