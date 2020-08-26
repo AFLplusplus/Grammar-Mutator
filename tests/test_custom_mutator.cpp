@@ -16,9 +16,11 @@ struct custom_mutator {
   my_mutator_t *data;
 };
 
+#ifdef DEBUG_BUILD
 static void dump_test_case(uint8_t *buf, size_t buf_size) {
   fprintf(stderr, "%.*s\n", (int)buf_size, buf);
 }
+#endif
 
 class CustomMutatorTest : public ::testing::Test {
  protected:

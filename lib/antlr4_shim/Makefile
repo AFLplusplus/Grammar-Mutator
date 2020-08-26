@@ -1,14 +1,14 @@
 TARGET = libantlr4_shim.a
 
 ANTLR4_GENERATED_SRC_FILES = \
-	GrammarBaseListener.cpp \
-	GrammarLexer.cpp \
-	GrammarListener.cpp \
-	GrammarParser.cpp
+	generated/GrammarBaseListener.cpp \
+	generated/GrammarLexer.cpp \
+	generated/GrammarListener.cpp \
+	generated/GrammarParser.cpp
 
 ANTLR4_SHIM_SRC_FILES = \
 	antlr4_shim.cpp \
-	$(ANTLR4_GENERATED_SRC_FILES:%=generated/%)
+	$(ANTLR4_GENERATED_SRC_FILES)
 
 ANTLR4_SHIM_OBJS = $(ANTLR4_SHIM_SRC_FILES:.cpp=.o)
 
@@ -40,13 +40,11 @@ CXX_FLAGS += -O3
 endif
 
 .PHONY: all
-all: antlr4_generated $(TARGET)
+all: $(TARGET)
 
 # Generate lexer and parser
-.PHONY: antlr4_generated
-antlr4_generated: ../../grammars/Grammar.g4
-	@mkdir -p generated
-	@java -jar $(ANTLR_JAR_LOCATION) -Dlanguage=Cpp -DcontextSuperClass=antlr4::RuleContextWithAltNum -o generated $(realpath ../../grammars/Grammar.g4)
+$(ANTLR4_GENERATED_SRC_FILES): ../../grammars/Grammar.g4
+	java -jar $(ANTLR_JAR_LOCATION) -Dlanguage=Cpp -DcontextSuperClass=antlr4::RuleContextWithAltNum -o generated $(realpath ../../grammars/Grammar.g4)
 
 $(TARGET): $(ANTLR4_SHIM_OBJS)
 	$(AR) qc $@ $^

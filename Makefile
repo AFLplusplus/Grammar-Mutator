@@ -28,6 +28,7 @@ endif
 
 ifneq "$(shell cat .grammar 2> /dev/null)" "$(realpath $(GRAMMAR_FILE))"
 # Create or update .grammar
+$(info Create or update .grammar)
 $(shell echo $(realpath $(GRAMMAR_FILE)) > .grammar)
 endif
 
@@ -37,9 +38,6 @@ else
 TEMP := $(realpath $(ANTLR_JAR_LOCATION))
 override ANTLR_JAR_LOCATION := $(TEMP)
 endif
-
-export GRAMMAR_FILE
-export ANTLR_JAR_LOCATION
 
 PYTHON = python3
 
@@ -68,7 +66,7 @@ all: build_test
 
 .PHONY: build_test
 build_test: third_party
-	@$(MAKE) -C tests build
+	@$(MAKE) -C tests build GRAMMAR_FILE=$(GRAMMAR_FILE)
 endif
 
 .PHONY: third_party

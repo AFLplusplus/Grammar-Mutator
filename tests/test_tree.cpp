@@ -201,6 +201,9 @@ TEST_F(TreeTest, ParseTreeFromBuffer) {
   tree_to_buf(tree2);
   tree_t *recovered_tree2 = tree_from_buf(tree2->data_buf, tree2->data_len);
   EXPECT_TRUE(tree_equal(tree2, recovered_tree2));
+  tree_to_buf(recovered_tree2);
+  EXPECT_MEMEQ(tree2->data_buf, recovered_tree2->data_buf,
+               recovered_tree2->data_len);
   tree_free(tree2);
   tree_free(recovered_tree2);
 }
