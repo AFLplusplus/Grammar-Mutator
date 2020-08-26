@@ -24,15 +24,15 @@ TEST_F(ChunkStoreTest, SeenChunk) {
   auto node2 = node_clone(node1);
 
   // check the comparator
-  auto node1_buffer = (char *)buf_from_node(node1);
-  EXPECT_EQ(set_add(&seen_chunks, node1_buffer), SET_TRUE);
-  auto node2_buffer = (char *)buf_from_node(node2);
-  EXPECT_EQ(set_add(&seen_chunks, node2_buffer), SET_ALREADY_PRESENT);
+  char node1_hash[9];
+  hash_node(node1, node1_hash);
+  EXPECT_EQ(set_add(&seen_chunks, node1_hash), SET_TRUE);
+  char node2_hash[9];
+  hash_node(node1, node2_hash);
+  EXPECT_EQ(set_add(&seen_chunks, node2_hash), SET_ALREADY_PRESENT);
 
   EXPECT_EQ(set_length(&seen_chunks), 1);
 
-  free(node1_buffer);
-  free(node2_buffer);
   node_free(node1);
   node_free(node2);
 }

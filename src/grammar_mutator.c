@@ -240,7 +240,7 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
 
 uint32_t afl_custom_fuzz_count(my_mutator_t *data, const uint8_t *buf,
                                size_t buf_size) {
-  return 0;
+  return 500;
 }
 
 // Fuzz the given test case several times, which is defined by the

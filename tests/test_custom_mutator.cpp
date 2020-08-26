@@ -107,25 +107,16 @@ TEST_F(CustomMutatorTest, FuzzNTimes) {
   uint8_t ret = afl_custom_queue_get(
       mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
   EXPECT_EQ(ret, 1);
-  afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
-  EXPECT_NE(buf, nullptr);
-  afl_custom_queue_new_entry(
-      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_1",
-      (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
-
-  ret = afl_custom_queue_get(
-      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_1");
-  EXPECT_EQ(ret, 1);
 
   int num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
   for (int i = 0; i < num; ++i) {
     buf_size =
         afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
-    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_1_" + to_string(i);
+    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_0_" + to_string(i);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
-        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_1");
+        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
 
 #ifdef DEBUG_BUILD
     fprintf(stderr, "=====%d=====\n", i + 1);
