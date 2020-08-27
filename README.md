@@ -8,6 +8,7 @@ In this project, we developed a grammar mutator to enhance AFL++ such that AFL++
 
 - Tree-based mutation: rules mutation, random mutation, random recursive mutation, splicing mutation
 - Tree-based trimming: subtree trimming, recursive trimming
+- An ANTLR4 shim for parsing fuzzing test cases during the runtime
 - Documents about how to build the grammar mutator, specify custom grammars, and use the grammar mutator
 - Comprehensive test cases for unit testing
 - Sample grammar files and a script to convert nautilus's python grammar file
