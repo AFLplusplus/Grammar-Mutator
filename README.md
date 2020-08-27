@@ -13,7 +13,7 @@ In this project, we developed a grammar mutator to enhance AFL++ such that AFL++
 - Comprehensive test cases for unit testing
 - Sample grammar files and a script to convert nautilus's python grammar file
 
-For mutation and trimming details, please refer to [Nautilus paper](https://www.syssec.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2018/12/17/NDSS19-Nautilus.pdf).
+For more details about tree-based mutation, trimming, and grammar-based fuzzing, please refer to [Nautilus paper](https://www.syssec.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2018/12/17/NDSS19-Nautilus.pdf).
 
 ## Getting Started
 
