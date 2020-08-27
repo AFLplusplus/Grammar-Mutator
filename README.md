@@ -2,6 +2,12 @@
 
 ![Grammar Mutator CI](https://github.com/AFLplusplus/Grammar-Mutator/workflows/Grammar%20Mutator%20CI/badge.svg)
 
+## Overview
+
+AFL++’s mutation engine is optimized for compact data formats, such as images, multimedia, compressed data. However, the current AFL++ does not support grammar and therefore struggles with highly-structured inputs, such as JSON, Ruby, etc. Although AFL++ allows users to define a dictionary, including language keywords, to help generate inputs, it still lacks more structured descriptions of the underlying syntax.
+
+This project provides a grammar mutator, which is based on the custom mutator APIs in AFL++. It leverages the idea of [F1 fuzzer](https://github.com/vrthra/F1) and [Nautilus](https://github.com/nautilus-fuzz/nautilus) for test case generation and mutations.
+
 ## Get started
 
 ### Compile
