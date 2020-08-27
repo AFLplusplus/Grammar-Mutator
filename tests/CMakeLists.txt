@@ -67,6 +67,12 @@ target_link_libraries(test_tree
 add_test(
   NAME test_tree
   COMMAND test_tree)
+if ("${GRAMMAR_FILE}" STREQUAL "${CMAKE_SOURCE_DIR}/grammars/ruby_grammar.json")
+  message(STATUS "Enable testing on parsing 'testcases/array.rb'")
+  target_compile_definitions(test_tree
+    PRIVATE ENABLE_PARSING_ARRAY_RB
+    PRIVATE ARRAY_RB_PATH="${CMAKE_CURRENT_SOURCE_DIR}/testcases/array.rb")
+endif ()
 
 # Test suite 3:
 # test the tree mutation APIs

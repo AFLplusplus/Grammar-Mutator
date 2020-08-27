@@ -26,12 +26,18 @@
 using namespace antlr4;
 
 node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
+  node_t *node = nullptr;
+
   if (antlrcpp::is<antlr4::tree::ErrorNode *>(t)) {
-    // error
-    return nullptr;
+    // error - treat the error portion as a terminal node
+    // we do not want to lose test case information
+    auto terminal_node = dynamic_cast<antlr4::tree::TerminalNode *>(t);
+    auto terminal_node_text = terminal_node->getText();
+    node = node_create(NODE_TERM__);
+    node_set_val(node, terminal_node_text.c_str(), terminal_node_text.length());
+    return node;
   }
 
-  node_t *node = nullptr;
   // terminal node
   if (antlrcpp::is<antlr4::tree::TerminalNode *>(t)) {
     auto terminal_node = dynamic_cast<antlr4::tree::TerminalNode *>(t);

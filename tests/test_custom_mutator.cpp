@@ -156,6 +156,95 @@ TEST_F(CustomMutatorTest, Fuzzing) {
   tree_free(tree);
 }
 
+TEST_F(CustomMutatorTest, FuzzingParsingError) {
+  uint8_t *buf = nullptr;
+  size_t   buf_size = 0;
+
+  // prepare a tree that does not follow the grammar
+  auto tree = tree_create();
+  auto node1 = node_create_with_rule_id(1, 0);
+  auto node2 = node_create_with_val(0, "\x01\x02\x03\x04", 4);
+  node_init_subnodes(node1, 1);
+  node_set_subnode(node1, 0, node2);
+  tree->root = node1;
+
+  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_0");
+  // does not write the tree in advance, ask ANTLR4 shim to parse the test case
+//  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
+
+  uint8_t ret = afl_custom_queue_get(
+      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+  EXPECT_EQ(ret, 1);
+
+  tree_get_size(tree);
+  tree_to_buf(tree);
+  tree_get_recursion_edges(tree);
+  int num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
+  int expected_num = rules_mutation_count(tree) + 100 + 100;
+  if (tree->recursion_edge_list->size > 0) expected_num += 20;
+  EXPECT_NE(num, expected_num);
+  for (int i = 0; i < num; ++i) {
+    buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
+                               &buf, nullptr, 0, 4096);
+    EXPECT_NE(buf, nullptr);
+    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_0_" + to_string(i);
+    afl_custom_queue_new_entry(
+        mutator->data, (const uint8_t *)fn_new.c_str(),
+        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+
+#ifdef DEBUG_BUILD
+    fprintf(stderr, "=====%d=====\n", i + 1);
+    dump_test_case(buf, buf_size);
+#endif
+  }
+
+  tree_free(tree);
+}
+
+TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
+  uint8_t *buf = nullptr;
+  size_t   buf_size = 0;
+
+  // prepare a tree that does not follow the grammar
+  auto tree = tree_create();
+  auto node1 = node_create_with_rule_id(1, 0);
+  auto node2 = node_create_with_val(0, "test", 4);
+  node_init_subnodes(node1, 1);
+  node_set_subnode(node1, 0, node2);
+  tree->root = node1;
+
+  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_0");
+  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
+
+  uint8_t ret = afl_custom_queue_get(
+      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+  EXPECT_EQ(ret, 1);
+
+  tree_get_size(tree);
+  tree_to_buf(tree);
+  tree_get_recursion_edges(tree);
+  int num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
+  int expected_num = rules_mutation_count(tree) + 100 + 100;
+  if (tree->recursion_edge_list->size > 0) expected_num += 20;
+  EXPECT_EQ(num, expected_num);
+  for (int i = 0; i < num; ++i) {
+    buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
+                               &buf, nullptr, 0, 4096);
+    EXPECT_NE(buf, nullptr);
+    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_0_" + to_string(i);
+    afl_custom_queue_new_entry(
+        mutator->data, (const uint8_t *)fn_new.c_str(),
+        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+
+#ifdef DEBUG_BUILD
+    fprintf(stderr, "=====%d=====\n", i + 1);
+    dump_test_case(buf, buf_size);
+#endif
+  }
+
+  tree_free(tree);
+}
+
 TEST_F(CustomMutatorTest, Trimming) {
   srandom(1234);
 

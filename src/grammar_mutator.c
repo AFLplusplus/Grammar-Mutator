@@ -285,27 +285,35 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *data, const uint8_t *buf,
   }
   data->total_splicing_mutation_steps = 100;
 
-  data->cur_rules_mutation_node =
-      (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
-  data->cur_rules_mutation_rule_id = 0;
+  if (data->total_rules_mutation_steps > 0) {
+    // find `node` and `rule_id`
+    data->cur_rules_mutation_node =
+        (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
+    data->cur_rules_mutation_rule_id = 0;
 
-  int num_rules = 0;
-  while (true) {
-    num_rules = node_num_rules[data->cur_rules_mutation_node->id];
-    if (data->cur_rules_mutation_rule_id >= num_rules) {
-      // next node
-      data->cur_rules_mutation_node =
-          (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
-      // next rule id
-      data->cur_rules_mutation_rule_id = 0;
+    int num_rules = 0;
+    while (true) {
+      num_rules = node_num_rules[data->cur_rules_mutation_node->id];
+      if (data->cur_rules_mutation_rule_id >= num_rules) {
+        // next node
+        data->cur_rules_mutation_node =
+            (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
+        // next rule id
+        data->cur_rules_mutation_rule_id = 0;
+      }
+
+      if (data->cur_rules_mutation_rule_id !=
+          data->cur_rules_mutation_node->rule_id)
+        break;
+
+      // skip the current rule id
+      ++data->cur_rules_mutation_rule_id;
     }
-
-    if (data->cur_rules_mutation_rule_id !=
-        data->cur_rules_mutation_node->rule_id)
-      break;
-
-    // skip the current rule id
-    ++data->cur_rules_mutation_rule_id;
+  } else {
+    // no rules mutation stage
+    // move to next stage
+    ++data->cur_fuzzing_stage;
+    data->cur_fuzzing_step = 0;
   }
 
   return data->total_rules_mutation_steps + data->total_random_mutation_steps +

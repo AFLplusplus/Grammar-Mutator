@@ -401,6 +401,15 @@ TEST_F(TreeTest, TreeSerializeDeserialize) {
   tree_free(new_tree);
 }
 
+#if defined(ENABLE_PARSING_ARRAY_RB) && defined(ARRAY_RB_PATH)
+TEST_F(TreeTest, ParseArrayRb) {
+  tree_t *array_rb_tree = load_tree_from_test_case(ARRAY_RB_PATH);
+  tree_to_buf(array_rb_tree);
+  EXPECT_EQ(array_rb_tree->data_len, 4052);
+  tree_free(array_rb_tree);
+}
+#endif
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
