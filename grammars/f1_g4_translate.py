@@ -84,8 +84,7 @@ class Sanitize:
                 for token in rule:
                     if token not in self.grammar_keys:
                         continue
-                    if token not in key_seen:
-                        key_seen[token] = True
+                    key_seen[token] = True
         entry_keys = [k for k in key_seen if not key_seen[k]]
         return entry_keys
 
