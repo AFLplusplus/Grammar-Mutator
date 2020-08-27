@@ -34,7 +34,7 @@ int main(int argc, const char *argv[]) {
 //  size_t      out_dir_len, tree_out_dir_len;
 
   if (argc < 5) {
-    printf("%s <seed> <max_num> <max_len> <output_dir> <tree_output_dir>\n",
+    printf("%s <random seed> <max_num> <max_size> <output_dir> <tree_output_dir>\n",
            argv[0]);
     return 0;
   }

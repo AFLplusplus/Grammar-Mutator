@@ -1,108 +1,91 @@
-# Grammar-Mutator
+# Grammar Mutator - AFL++
 
 ![Grammar Mutator CI](https://github.com/AFLplusplus/Grammar-Mutator/workflows/Grammar%20Mutator%20CI/badge.svg)
 
 ## Overview
 
-AFL++’s mutation engine is optimized for compact data formats, such as images, multimedia, compressed data. However, the current AFL++ does not support grammar and therefore struggles with highly-structured inputs, such as JSON, Ruby, etc. Although AFL++ allows users to define a dictionary, including language keywords, to help generate inputs, it still lacks more structured descriptions of the underlying syntax.
+In this project, we developed a grammar mutator to enhance AFL++ such that AFL++ can handle highly-structured inputs, such as JSON, Ruby, etc. The grammar mutator leverages the idea of [F1 fuzzer](https://github.com/vrthra/F1) and [Nautilus](https://github.com/nautilus-fuzz/nautilus) for test case generation and mutations. In summary, this repository includes:
 
-This project provides a grammar mutator, which is based on the custom mutator APIs in AFL++. It leverages the idea of [F1 fuzzer](https://github.com/vrthra/F1) and [Nautilus](https://github.com/nautilus-fuzz/nautilus) for test case generation and mutations.
+- Tree-based mutation: rules mutation, random mutation, random recursive mutation, splicing mutation
+- Tree-based trimming: subtree trimming, recursive trimming
+- Documents about how to build the grammar mutator, specify custom grammars, and use the grammar mutator
+- Comprehensive test cases for unit testing
+- Sample grammar files and a script to convert nautilus's python grammar file
 
-## Get started
+For mutation and trimming details, please refer to [Nautilus paper](https://www.syssec.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2018/12/17/NDSS19-Nautilus.pdf).
 
-### Compile
+## Getting Started
 
-#### CMake
+### Prerequisites
+
+Before getting started, the following tools/packages should be installed:
 
 ```bash
-# Grammar-Mutator
-git clone https://github.com/AFLplusplus/Grammar-Mutator.git
-cd Grammar-Mutator
-git checkout dev
-
-# Download ANTLR4.8 jar file
+sudo apt install valgrind uuid-dev default-jre python3
 wget https://www.antlr.org/download/antlr-4.8-complete.jar
-
-# Create CMake working directory
-mkdir build
-cd build
-
-# Default grammar: JSON (./grammars/json_grammar.json)
-cmake -DENABLE_TESTING=ON -DANTLR_JAR_LOCATION=$(realpath ../antlr-4.8-complete.jar) ../
-make
-make test
-make test_memcheck
-
-# Make sure afl-fuzz/afl-clang/afl-clang++ are installed
-# The last test case will run afl-fuzz with the grammar mutator on json-parser
-
-# Grammar: ./grammars/ruby_grammar.json
-cmake -DENABLE_TESTING=ON -DANTLR_JAR_LOCATION=$(realpath ../antlr-4.8-complete.jar) -DGRAMMAR_FILE=$(realpath ../grammars/ruby_grammar.json) ../
-make
-make test
-make test_memcheck
+sudo mv antlr-4.8-complete.jar /usr/local/lib
 ```
 
-#### Makefile
+### Building Grammar Mutator
+
+Then, you need to build the grammar mutator. Assuming that you want to have a JSON grammar mutator.
 
 ```bash
-git clone https://github.com/AFLplusplus/Grammar-Mutator.git
+git clone https://github.com/AFLplusplus/Grammar-Mutator
 cd Grammar-Mutator
-git checkout dev
-
-# Download ANTLR4.8 jar file
-wget https://www.antlr.org/download/antlr-4.8-complete.jar
-
-# Default grammar: JSON (./grammars/json_grammar.json)
-make ENABLE_TESTING=1 ANTLR_JAR_LOCATION=./antlr-4.8-complete.jar
-make test
-make test_memcheck
-
-# Grammar: ./grammars/ruby_grammar.json
-make ENABLE_TESTING=1 ANTLR_JAR_LOCATION=./antlr-4.8-complete.jar GRAMMAR_FILE=grammars/ruby_grammar.json
-make test
-make test_memcheck
+make ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar
 ```
 
-### Generate fuzzing corpus
-
-`grammar_generator` can be used to generate input fuzzing seeds and corresponding tree files:
+To specify other grammar files, like Ruby, you can use `GRAMMAR_FILE` environment variable.
+There are several grammar files in `grammars` directory, such as `json_grammar.json` and `ruby_grammar.json`.
+Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about the input grammar file.
 
 ```bash
-./grammar_generator <seed> <max_num> <max_len> <output_dir>
-
-# e.g.
-./grammar_generator 123 100 1000 /tmp/seeds
+make GRAMMAR_FILE=grammars/ruby_grammar.json ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar
 ```
 
-### Fuzz targets
+Now, you should have `libgrammarmutator.so` under `src` directory
 
-#### `json-parser`
+If you would like to fork the project and fix bugs or contribute to the project, you can take a look at [building-grammar-mutator.md](doc/building-grammar-mutator.md) for full building instructions.
+
+### Generating Fuzzing Corpus
+
+Before fuzzing the real program, you need to prepare the input fuzzing seeds.
+`grammar_generator` can be used to generate input fuzzing seeds and corresponding tree files.
+You can also control the number of generated seeds and the maximal size of the corresponding trees.
+Usually, the larger the tree size is, the more complex the corresponding input seed is.
 
 ```bash
-git clone https://github.com/h1994st/json-parser.git
-cd json-parser
-CC=afl-clang CXX=afl-clang++ ./configure
-make
-afl-clang examples/test_json.c -I. libjsonparser.a -lm -o test_json
-# Target: `test_json`
+./grammar_generator 123 100 1000 /tmp/seeds /tmp/trees
+
+# Usage
+# ./grammar_generator <random seed> <max_num> <max_size> <output_dir> <tree_output_dir>
 ```
 
-#### `mruby`
+### Instrumenting Fuzzing targets
 
-Reference: <https://github.com/putsi/afl-mruby>
+You can refer to [sample-fuzzing-targets.md](doc/sample-fuzzing-targets.md) to build the fuzzing targets.
+
+### Fuzzing the Target with the Grammar Mutator!
 
 ```bash
-git clone https://github.com/mruby/mruby.git
-cd mruby
-mv build_config.rb build_config.rb.bak
-wget https://github.com/putsi/afl-mruby/raw/master/build_config.rb
-cd mrbgems/mruby-bin-mruby/tools/mruby
-mv mruby.c mruby.c.bak
-wget https://github.com/putsi/afl-mruby/raw/master/stub.c
-mv stub.c mruby.c
-cd ../../../..
-sudo apt install ruby-full
-./minirake
-# Target: ./bin/mruby
+export export AFL_CUSTOM_MUTATOR_LIBRARY=/path/to/libgrammarmutator.so
+export AFL_CUSTOM_MUTATOR_ONLY=1
+afl-fuzz -i /tmp/seeds -o /tmp/out -- /path/to/target @@
 ```
+
+Since the input seeds are in string format, the grammar mutator needs to parse them into tree representations at first.
+To avoid such parsing time, you could feed the generated tree files into the grammar mutator.
+In this case, the grammar mutator will directly read trees from files.
+
+```bash
+export export AFL_CUSTOM_MUTATOR_LIBRARY=/path/to/libgrammarmutator.so
+export AFL_CUSTOM_MUTATOR_ONLY=1
+mkdir /tmp/out
+cp -r /tmp/trees /tmp/out
+afl-fuzz -i /tmp/seeds -o /tmp/out -- /path/to/target @@
+```
+
+## Contact & Contributions
+
+We welcome any questions and contributions! Feel free to open an issue or submit a pull request!
