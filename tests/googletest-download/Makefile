@@ -22,13 +22,16 @@ GTEST_TAR = release-$(GTEST_VERSION).tar.gz
 GTEST_DOWNLOAD_URL = https://github.com/google/googletest/archive/$(GTEST_TAR)
 GTEST_ROOT_DIR = googletest-release-$(GTEST_VERSION)
 GTEST_DIR = $(GTEST_ROOT_DIR)/googletest
-GTEST_HEADERS = $(wildcard $(GTEST_DIR)/include/gtest/*.h) \
-				$(wildcard $(GTEST_DIR)/include/gtest/internal/*.h)
+# GTEST_HEADERS = $(wildcard $(GTEST_DIR)/include/gtest/*.h) \
+# 				$(wildcard $(GTEST_DIR)/include/gtest/internal/*.h)
 
-GTEST_SRC_FILES = $(wildcard $(GTEST_DIR)/src/*.cc) \
-				  $(wildcard $(GTEST_DIR)/src/*.h) \
-				  $(GTEST_HEADERS)
-GTEST_OBJS = gtest-all.o gtest_main.o
+# GTEST_SRC_FILES = $(wildcard $(GTEST_DIR)/src/*.cc) \
+# 				  $(wildcard $(GTEST_DIR)/src/*.h) \
+# 				  $(GTEST_HEADERS)
+GTEST_SRC_FILES = \
+	$(GTEST_DIR)/src/gtest-all.cc \
+	$(GTEST_DIR)/src/gtest_main.cc
+GTEST_OBJS = $(GTEST_SRC_FILES:.cc=.o)
 
 
 CXX_FLAGS = -Wall -Wshadow -Werror -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -std=c++11
@@ -43,7 +46,7 @@ CXX_FLAGS += -O3
 endif
 
 .PHONY: all
-all: $(GTEST_ROOT_DIR) $(TARGETS)
+all: $(TARGETS)
 
 $(GTEST_TAR):
 	@wget -q $(GTEST_DOWNLOAD_URL) > /dev/null
@@ -51,19 +54,18 @@ $(GTEST_TAR):
 $(GTEST_ROOT_DIR): | $(GTEST_TAR)
 	@tar -xzvf $(GTEST_TAR) > /dev/null
 
-gtest-all.o: $(GTEST_SRC_FILES)
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $(GTEST_DIR)/src/gtest-all.cc
+$(GTEST_SRC_FILES): $(GTEST_ROOT_DIR)
 
-libgtest.a: gtest-all.o
-	$(AR) qc libgtest.a gtest-all.o
+libgtest.a: $(GTEST_DIR)/src/gtest-all.o
+	$(AR) qc libgtest.a $^
 	ranlib libgtest.a
 
-gtest_main.o: $(GTEST_SRC_FILES)
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $(GTEST_DIR)/src/gtest_main.cc
-
-libgtest_main.a: gtest_main.o
-	$(AR) qc libgtest_main.a gtest_main.o
+libgtest_main.a: $(GTEST_DIR)/src/gtest_main.o
+	$(AR) qc libgtest_main.a $^
 	ranlib libgtest_main.a
+
+%.o: %.cc
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
 
 .PHONY: clean
 clean:

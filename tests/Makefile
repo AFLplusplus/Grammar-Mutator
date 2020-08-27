@@ -25,11 +25,14 @@ VALGRIND = valgrind
 VALGRIND_LOG_DIR = valgrind_logs
 VALGRIND_CMD = $(VALGRIND) -q --tool=memcheck --leak-check=full --show-leak-kinds=all
 
+GTEST_LIBS = $(GTEST_DIR)/libgtest_main.a $(GTEST_DIR)/libgtest.a
+GTEST_INCLUDE = $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest/include
+
 CXX_FLAGS = -std=gnu++14
 CXX_DEFINES =
 CXX_INCLUDES = -I../include -isystem $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest/include -isystem $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest
 
-LIBS = $(GTEST_DIR)/libgtest_main.a $(GRAMMAR_MUTATOR_LIB) $(GTEST_DIR)/libgtest.a
+LIBS = $(GTEST_LIBS) $(GRAMMAR_MUTATOR_LIB)
 LDFLAGS = $(LIBS) -lpthread
 
 ifdef ENABLE_DEBUG
@@ -70,8 +73,7 @@ endif
 
 export GTEST_VERSION
 
-$(GTEST_DIR)/libgtest.a:
-$(GTEST_DIR)/libgtest_main.a:
+$(GTEST_LIBS) $(GTEST_INCLUDE):
 	@$(MAKE) -C $(GTEST_DIR) all
 
 run_test_%: test_%
@@ -99,19 +101,19 @@ test_barrust_set: test_barrust_set.o $(LIBS) $(BARRUST_SET_LIB)
 	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(BARRUST_SET_LIB)
 
 .PRECIOUS: test_%.o
-test_%.o: test_%.cpp
+test_%.o: test_%.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_chunk_store.o
-test_chunk_store.o: test_chunk_store.cpp
+test_chunk_store.o: test_chunk_store.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map -I../third_party/barrust_set $(CXX_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_rxi_map.o
-test_rxi_map.o: test_rxi_map.cpp
+test_rxi_map.o: test_rxi_map.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_barrust_set.o
-test_barrust_set.o: test_barrust_set.cpp
+test_barrust_set.o: test_barrust_set.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/barrust_set $(CXX_FLAGS) -o $@ -c $<
 
 $(JSON_PARSER_DIR)/test_json:
