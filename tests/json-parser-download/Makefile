@@ -9,7 +9,7 @@ JSON_PARSER_SRC_FILES = $(wildcard $(JSON_PARSER_DIR)/src/*.cc)
 
 CC = afl-clang
 CXX = afl-clang++
-C_FLAGS =
+C_FLAGS = -Wno-switch
 C_INCLUDES = -I./$(JSON_PARSER_DIR)
 
 LIBS = $(JSON_PARSER_DIR)/libjsonparser.a

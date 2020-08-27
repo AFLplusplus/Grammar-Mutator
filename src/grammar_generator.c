@@ -12,11 +12,12 @@ static void dump_test_case(uint8_t *buf, size_t buf_size) {
 
 int main(int argc, const char *argv[]) {
   int         seed, max_num, max_len;
-  const char *out_dir;
-  size_t      out_dir_len;
+  const char *out_dir, *tree_out_dir;
+//  size_t      out_dir_len, tree_out_dir_len;
 
-  if (argc < 4) {
-    printf("%s <seed> <max_num> <max_len> <output_dir>\n", argv[0]);
+  if (argc < 5) {
+    printf("%s <seed> <max_num> <max_len> <output_dir> <tree_output_dir>\n",
+           argv[0]);
     return 0;
   }
 
@@ -24,7 +25,9 @@ int main(int argc, const char *argv[]) {
   max_num = atoi(argv[2]);
   max_len = atoi(argv[3]);
   out_dir = argv[4];
-  out_dir_len = strlen(out_dir);
+//  out_dir_len = strlen(out_dir);
+  tree_out_dir = argv[5];
+//  tree_out_dir_len = strlen(tree_out_dir);
 
   srandom(seed);
 
@@ -33,7 +36,22 @@ int main(int argc, const char *argv[]) {
     // The output directory does not exist
     if (mkdir(out_dir, 0700) != 0) {
       // error
-      perror("Cannot create the directory");
+      perror("Cannot create the output directory");
+      return EXIT_FAILURE;
+    }
+  } else if (info.st_mode & S_IFDIR) {
+    // Exist
+  } else {
+    // Not a directory
+    perror("Wrong output path (stat)");
+    return EXIT_FAILURE;
+  }
+
+  if (stat(tree_out_dir, &info) != 0) {
+    // The output directory does not exist
+    if (mkdir(tree_out_dir, 0700) != 0) {
+      // error
+      perror("Cannot create the tree output directory");
       return EXIT_FAILURE;
     }
   } else if (info.st_mode & S_IFDIR) {
@@ -46,13 +64,12 @@ int main(int argc, const char *argv[]) {
 
   char    fn[PATH_MAX];
   tree_t *tree = NULL;
-  strncpy(fn, out_dir, out_dir_len);
   for (int i = 0; i < max_num; ++i) {
     tree = gen_init__(max_len);
 
-    snprintf(fn + out_dir_len, PATH_MAX - out_dir_len, "/%d", i);
+    snprintf(fn, PATH_MAX, "%s/%d", out_dir, i);
     dump_tree_to_test_case(tree, fn);
-    snprintf(fn + out_dir_len, PATH_MAX - out_dir_len, "/%d.tree", i);
+    snprintf(fn, PATH_MAX, "%s/id:%06d,time:0,orig:%d", tree_out_dir, i, i);
     write_tree_to_file(tree, fn);
 
     tree_free(tree);

@@ -4,6 +4,6 @@ ExternalProject_Add(antlr4-cpp-runtime
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/antlr4-cpp-runtime-src"
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/antlr4-cpp-runtime-build"
   CONFIGURE_COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_BINARY_DIR}/antlr4-cpp-runtime-src -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_CXX_FLAGS=-fPIC
-  BUILD_COMMAND ${CMAKE_COMMAND} --build .
+  BUILD_COMMAND ${CMAKE_COMMAND} --build . --target antlr4_static
   INSTALL_COMMAND ""
   TEST_COMMAND "")
