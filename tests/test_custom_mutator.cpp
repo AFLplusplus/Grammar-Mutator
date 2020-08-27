@@ -105,7 +105,7 @@ TEST_F(CustomMutatorTest, Fuzzing) {
   size_t   buf_size = 0;
 
   // prepare a tree
-  auto tree = gen_init__(20);
+  auto tree = gen_init__(0);
   dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_0");
   write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
 
