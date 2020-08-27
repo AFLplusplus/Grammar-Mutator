@@ -7,6 +7,7 @@
 #include "custom_mutator.h"
 #include "f1_c_fuzz.h"
 #include "tree.h"
+#include "tree_mutation.h"
 
 #include "gtest/gtest.h"
 
@@ -74,6 +75,9 @@ class CustomMutatorTest : public ::testing::Test {
       perror("Wrong queue output path (CustomMutatorTest)");
       exit(EXIT_FAILURE);
     }
+
+    // Set max tree length
+    tree_set_max_len(100);
   }
 
   ~CustomMutatorTest() override = default;
@@ -96,24 +100,29 @@ class CustomMutatorTest : public ::testing::Test {
   }
 };
 
-TEST_F(CustomMutatorTest, Fuzz10Times) {
+TEST_F(CustomMutatorTest, Fuzzing) {
   uint8_t *buf = nullptr;
   size_t   buf_size = 0;
 
   // prepare a tree
-  auto tree = gen_init__(100);
+  auto tree = gen_init__(20);
   dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_0");
   write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
-  tree_free(tree);
 
   uint8_t ret = afl_custom_queue_get(
       mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
   EXPECT_EQ(ret, 1);
 
+  tree_get_size(tree);
+  tree_to_buf(tree);
+  tree_get_recursion_edges(tree);
   int num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
-  for (int i = 0; i < 10; ++i) {
-    buf_size =
-        afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
+  int expected_num = rules_mutation_count(tree) + 100 + 100;
+  if (tree->recursion_edge_list->size > 0) expected_num += 20;
+  EXPECT_EQ(num, expected_num);
+  for (int i = 0; i < num; ++i) {
+    buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
+                               &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
     string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_0_" + to_string(i);
     afl_custom_queue_new_entry(
@@ -125,6 +134,8 @@ TEST_F(CustomMutatorTest, Fuzz10Times) {
     dump_test_case(buf, buf_size);
 #endif
   }
+
+  tree_free(tree);
 }
 
 TEST_F(CustomMutatorTest, Trimming) {
@@ -137,7 +148,7 @@ TEST_F(CustomMutatorTest, Trimming) {
   int32_t  stage_max = 0;
 
   // prepare a tree
-  auto tree = gen_init__(100);
+  auto tree = gen_init__(20);
   dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/trimming_0");
   write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/trimming_0");
 

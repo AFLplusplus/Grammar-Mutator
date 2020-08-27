@@ -37,6 +37,16 @@ void afl_custom_deinit(my_mutator_t *data) {
   if (data->mutated_tree) tree_free(data->mutated_tree);
   if (data->trimmed_tree) tree_free(data->trimmed_tree);
 
+  data->cur_fuzzing_stage = 0;
+  data->cur_fuzzing_step = 0;
+  data->total_rules_mutation_steps = 0;
+  data->total_random_mutation_steps = 0;
+  data->total_random_recursive_mutation_steps = 0;
+  data->total_splicing_mutation_steps = 0;
+
+  data->cur_rules_mutation_node = NULL;
+  data->cur_rules_mutation_rule_id = 0;
+
   data->cur_trimming_stage = 0;
   data->cur_subtree_trimming_step = 0;
   data->total_subtree_trimming_steps = 0;
@@ -241,7 +251,48 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
 
 uint32_t afl_custom_fuzz_count(my_mutator_t *data, const uint8_t *buf,
                                size_t buf_size) {
-  return 500;
+  if (!data->tree_cur) return 0;
+
+  tree_get_non_terminal_nodes(data->tree_cur);
+  tree_get_recursion_edges(data->tree_cur);
+
+  data->cur_fuzzing_stage = 0;
+  data->cur_fuzzing_step = 0;
+  data->total_rules_mutation_steps = rules_mutation_count(data->tree_cur);
+  data->total_random_mutation_steps = 100;
+  if (data->tree_cur->recursion_edge_list->size > 0) {
+    data->total_random_recursive_mutation_steps = 20;
+  } else {
+    data->total_random_recursive_mutation_steps = 0;
+  }
+  data->total_splicing_mutation_steps = 100;
+
+  data->cur_rules_mutation_node =
+      (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
+  data->cur_rules_mutation_rule_id = 0;
+
+  int num_rules = 0;
+  while (true) {
+    num_rules = node_num_rules[data->cur_rules_mutation_node->id];
+    if (data->cur_rules_mutation_rule_id >= num_rules) {
+      // next node
+      data->cur_rules_mutation_node =
+          (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
+      // next rule id
+      data->cur_rules_mutation_rule_id = 0;
+    }
+
+    if (data->cur_rules_mutation_rule_id !=
+        data->cur_rules_mutation_node->rule_id)
+      break;
+
+    // skip the current rule id
+    ++data->cur_rules_mutation_rule_id;
+  }
+
+  return data->total_rules_mutation_steps + data->total_random_mutation_steps +
+         data->total_random_recursive_mutation_steps +
+         data->total_splicing_mutation_steps;
 }
 
 // Fuzz the given test case several times, which is defined by the
@@ -262,34 +313,89 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
   }
 
   tree = data->tree_cur;
-  int mutation_choice = -1;
-  if (!tree) {
-    // Generation
-    // Randomly generate a JSON string
+  if (unlikely(!tree)) {
+    // Randomly generate a test case
     tree = gen_init__(500);
-  } else {
-    mutation_choice = random() % 3;
-    switch (mutation_choice) {
-      case 0:
-        // random mutation
-        tree = random_mutation(tree);
-        break;
-      case 1:
-        // random recursive mutation
-        tree = random_recursive_mutation(tree, random() % 10);
-        break;
-      case 2:
-        // splicing mutation
-        tree = splicing_mutation(tree);
-        break;
-      default:
-        perror("mutation error (invalid choice)");
-        break;
-    }
+    tree_get_non_terminal_nodes(tree);
+    tree_get_size(tree);
+  }
 
-    if (!tree) {
-      perror("mutation error");
-      return 0;
+  switch (data->cur_fuzzing_stage) {
+    case 0:
+      // rules mutation
+      tree = rules_mutation(tree, data->cur_rules_mutation_node,
+                            data->cur_rules_mutation_rule_id);
+      break;
+    case 1:
+      // random mutation
+      tree = random_mutation(tree);
+      break;
+    case 2:
+      // random recursive mutation
+      tree = random_recursive_mutation(tree, random() % 10);
+      break;
+    case 3:
+      // splicing mutation
+      tree = splicing_mutation(tree);
+      break;
+    default:
+      perror("mutation error (invalid choice)");
+      break;
+  }
+
+  if (!tree) {
+    perror("mutation error");
+    return 0;
+  }
+
+  // update internal status
+  ++data->cur_fuzzing_step;
+  if (data->cur_fuzzing_stage == 0) {
+    // rules mutation
+    if (data->cur_fuzzing_step >= data->total_rules_mutation_steps) {
+      ++data->cur_fuzzing_stage;
+      data->cur_fuzzing_step = 0;
+    } else {
+      // update node and rule id
+      ++data->cur_rules_mutation_rule_id;  // next rule id
+      int num_rules = 0;
+      while (true) {
+        num_rules = node_num_rules[data->cur_rules_mutation_node->id];
+        if (data->cur_rules_mutation_rule_id >= num_rules) {
+          // next node
+          data->cur_rules_mutation_node =
+              (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
+          // next rule id
+          data->cur_rules_mutation_rule_id = 0;
+        }
+        if (data->cur_rules_mutation_rule_id !=
+            data->cur_rules_mutation_node->rule_id)
+          break;
+
+        // skip the current rule id
+        ++data->cur_rules_mutation_rule_id;
+      }
+    }
+  }
+  if (data->cur_fuzzing_stage == 1) {
+    // random mutation
+    if (data->cur_fuzzing_step >= data->total_random_mutation_steps) {
+      ++data->cur_fuzzing_stage;
+      data->cur_fuzzing_step = 0;
+    }
+  }
+  if (data->cur_fuzzing_stage == 2) {
+    // random recursive mutation
+    if (data->cur_fuzzing_step >= data->total_random_recursive_mutation_steps) {
+      ++data->cur_fuzzing_stage;
+      data->cur_fuzzing_step = 0;
+    }
+  }
+  if (data->cur_fuzzing_stage == 3) {
+    // splicing mutation
+    if (data->cur_fuzzing_step >= data->total_splicing_mutation_steps) {
+      ++data->cur_fuzzing_stage;
+      data->cur_fuzzing_step = 0;
     }
   }
 

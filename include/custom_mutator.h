@@ -46,6 +46,22 @@ typedef struct my_mutator {
   size_t cur_recursive_trimming_step;
   size_t total_recursive_trimming_steps;
 
+  // Fuzzing
+  uint8_t cur_fuzzing_stage;  // 0: rules mutation
+                              // 1: random mutation (100 times)
+                              // 2: random recursive mutation (20 times)
+                              // 3: splicing mutation (100 times)
+
+  size_t cur_fuzzing_step;
+  size_t total_rules_mutation_steps;
+  size_t total_random_mutation_steps;
+  size_t total_random_recursive_mutation_steps;
+  size_t total_splicing_mutation_steps;
+
+  // Rules mutation
+  node_t *cur_rules_mutation_node;
+  uint32_t cur_rules_mutation_rule_id;
+
   // Reused buffers:
   BUF_VAR(uint8_t, fuzz);
 

@@ -14,12 +14,7 @@
 #include "tree_trimming.h"
 
 #define BENCH_NUM (1000)
-
-#ifdef MAX_TREE_LEN
-  #undef MAX_TREE_LEN
-#endif
 #define MAX_TREE_LEN (1000 + 1)
-
 #define MAX_LABEL_LEN (100)
 
 static double current_time() {

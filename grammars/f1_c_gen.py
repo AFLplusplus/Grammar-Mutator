@@ -412,7 +412,7 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
     val = rule_index;
   }
 
-  node = node_create_with_rule_id(NODE_%(node_type)s, rule_index);
+  node = node_create_with_rule_id(NODE_%(node_type)s, val);
 
   *consumed = 1;
   int remaining_len = 0;
@@ -510,7 +510,7 @@ const char *node_type_str(int node_type) {
                 self.k_to_id(k), self.k_to_s(k).upper()))
         return result % ('\n  '.join(node_type_strs))
 
-    def fuzz_node_cost_array_defs(self):
+    def node_cost_array_defs(self):
         result = '''
 int node_min_lens[%d] = {
   0,
@@ -522,6 +522,19 @@ int node_min_lens[%d] = {
         return result % (
             len(self.grammar_keys) + 1,
             '\n  '.join(node_min_lens))
+
+    def node_num_rules_array_defs(self):
+        result = '''
+int node_num_rules[%d] = {
+  0,
+  %s
+};'''
+        node_num_rules = []
+        for k in self.grammar_keys:
+            node_num_rules.append('%d,' % len(self.grammar[k]))
+        return result % (
+            len(self.grammar_keys) + 1,
+            '\n  '.join(node_num_rules))
 
     def gen_fuzz_hdr(self):
         hdr_content = '''
@@ -544,6 +557,7 @@ const char *node_type_str(int node_type);
 typedef node_t *(*gen_func_t)(int max_len, int *consumed, int rule_index);
 extern gen_func_t gen_funcs[%(num_nodes)d];
 extern int node_min_lens[%(num_nodes)d];
+extern int node_num_rules[%(num_nodes)d];
 
 #ifdef __cplusplus
 }
@@ -587,7 +601,8 @@ static int get_random_len(int num_subnodes, int total_remaining_len) {
 %(ser_tree_pool_defs)s
 %(fuzz_fn_defs)s
 %(fuzz_fn_array_defs)s
-%(fuzz_node_cost_array_defs)s
+%(node_cost_array_defs)s
+%(node_num_rules_array_defs)s
 
 tree_t *gen_init__(int max_len) {
   tree_t *tree = tree_create();
@@ -601,7 +616,8 @@ tree_t *gen_init__(int max_len) {
             "fuzz_fn_defs": self.fuzz_fn_defs(),
             "fuzz_fn_array_defs": self.fuzz_fn_array_defs(),
             "node_type_str_defs": self.node_type_str_defs(),
-            "fuzz_node_cost_array_defs": self.fuzz_node_cost_array_defs()
+            "node_cost_array_defs": self.node_cost_array_defs(),
+            "node_num_rules_array_defs": self.node_num_rules_array_defs()
         }
 
         return src_content % params

@@ -3,11 +3,15 @@
 
 #include "tree.h"
 
-#define MAX_TREE_LEN (1000)
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * Set the max tree length for the mutation module. The default valude is 1000
+ * @param max_len The maximal tree length
+ */
+void tree_set_max_len(size_t max_len);
 
 /**
  * Reference: "NAUTILUS: Fishing for Deep Bugs with Grammars", NDSS 2019
@@ -25,10 +29,19 @@ tree_t *random_mutation(tree_t *tree);
 /**
  * Sequentially replace each node of the input tree with one subtree generated
  * by all other possible rules.
- * @param  tree A parsing tree
- * @return      A mutated parsing tree
+ * @param  tree    A parsing tree
+ * @param  node    A non-terminal node in the tree
+ * @param  rule_id A possible rule index to replace the non-terminal node
+ * @return         A mutated parsing tree
  */
-tree_t *rules_mutation(tree_t *tree);
+tree_t *rules_mutation(tree_t *tree, node_t *node, uint32_t rule_id);
+
+/**
+ * Calculate the total number of possible rules mutations.
+ * @param  tree A parsing tree
+ * @return      The total number of possible rules mutations
+ */
+size_t rules_mutation_count(tree_t *tree);
 
 /**
  * Pick a random recursion of a tree and repeats that recursion 2^n times
