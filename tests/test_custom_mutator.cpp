@@ -168,12 +168,12 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
   node_set_subnode(node1, 0, node2);
   tree->root = node1;
 
-  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_0");
+  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
   // does not write the tree in advance, ask ANTLR4 shim to parse the test case
 //  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
 
   uint8_t ret = afl_custom_queue_get(
-      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
   EXPECT_EQ(ret, 1);
 
   tree_get_size(tree);
@@ -187,10 +187,10 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
     buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
-    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_0_" + to_string(i);
+    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0_" + to_string(i);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
-        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
 
 #ifdef DEBUG_BUILD
     fprintf(stderr, "=====%d=====\n", i + 1);
@@ -213,11 +213,11 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
   node_set_subnode(node1, 0, node2);
   tree->root = node1;
 
-  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_0");
-  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
+  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
+  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_no_rules_mut_0");
 
   uint8_t ret = afl_custom_queue_get(
-      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
   EXPECT_EQ(ret, 1);
 
   tree_get_size(tree);
@@ -231,10 +231,10 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
     buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
-    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_0_" + to_string(i);
+    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0_" + to_string(i);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
-        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
 
 #ifdef DEBUG_BUILD
     fprintf(stderr, "=====%d=====\n", i + 1);
