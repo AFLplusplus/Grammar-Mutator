@@ -36,7 +36,9 @@ ANTLR_JAR_LOCATION - the path to ANTLR4 jar file
 ### Makefile
 
 ```bash
-make ENABLE_TESTING=1 ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar GRAMMAR_FILE=grammars/ruby_grammar.json
+make ENABLE_TESTING=1 \
+     ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar \
+     GRAMMAR_FILE=grammars/ruby_grammar.json
 make test
 make test_memcheck  # if with Valgrind installed
 ```
@@ -46,7 +48,8 @@ make test_memcheck  # if with Valgrind installed
 ```bash
 mkdir build
 cd build
-cmake -DENABLE_TESTING=ON -DANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar \
+cmake -DENABLE_TESTING=ON \
+      -DANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar \
       -DGRAMMAR_FILE=$(realpath ../grammars/ruby_grammar.json) ../
 make test
 make test_memcheck  # if with Valgrind installed

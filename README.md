@@ -42,7 +42,8 @@ There are several grammar files in `grammars` directory, such as `json_grammar.j
 Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about the input grammar file.
 
 ```bash
-make GRAMMAR_FILE=grammars/ruby_grammar.json ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar
+make GRAMMAR_FILE=grammars/ruby_grammar.json \
+     ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar
 ```
 
 Now, you should have `libgrammarmutator.so` under `src` directory
