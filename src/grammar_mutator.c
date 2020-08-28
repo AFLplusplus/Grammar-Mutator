@@ -80,7 +80,6 @@ void afl_custom_deinit(my_mutator_t *data) {
 // For each interesting test case in the queue
 uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   const char *fn = (const char *)filename;
-  size_t      fn_len = strlen(fn);
   data->filename_cur = filename;
   if (data->tree_cur) {
     // Clear the previous tree
@@ -128,8 +127,8 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     free(tree_out_dir);
   }
 
-  strncpy(data->tree_fn_cur, fn, fn_len);
-  data->tree_fn_cur[fn_len] = '\0';
+  snprintf(data->tree_fn_cur, PATH_MAX - 1, "%s", fn);
+  data->tree_fn_cur[PATH_MAX - 1] = '\0';
   char *found = strstr(data->tree_fn_cur, "/queue/");
   if (unlikely(!found)) {
     // Should not reach here
@@ -456,9 +455,8 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
   if (!filename_orig_queue) return;
 
   const char *fn = (const char *)filename_new_queue;
-  size_t      fn_len = strlen(fn);
-  strncpy(data->new_tree_fn, fn, fn_len);
-  data->new_tree_fn[fn_len] = '\0';
+  snprintf(data->new_tree_fn, PATH_MAX - 1, "%s", fn);
+  data->new_tree_fn[PATH_MAX - 1] = '\0';
   char *found = strstr(data->new_tree_fn, "/queue/");
   if (unlikely(!found)) {
     // Should not reach here
