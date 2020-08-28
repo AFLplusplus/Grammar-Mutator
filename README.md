@@ -59,11 +59,15 @@ You can refer to [sample-fuzzing-targets.md](doc/sample-fuzzing-targets.md) to b
 
 ### Fuzzing the Target with the Grammar Mutator!
 
+Before fuzzing the real program, you need to prepare the input fuzzing seeds. You can either:
+
+- Generating seeds for a given grammar
+- Using existing seeds
+
 #### Using Generated Corpus
 
-Before fuzzing the real program, you need to prepare the input fuzzing seeds for a given grammar that you specified during the compilation.
-`grammar_generator` can be used to generate input fuzzing seeds and corresponding tree files.
-You can also control the number of generated seeds and the maximal size of the corresponding trees.
+`grammar_generator` can be used to generate input fuzzing seeds and corresponding tree files, following the grammar file that you specified during the compilation of the grammar mutator (i.e., `GRAMMAR_FILE`).
+You can control the number of generated seeds and the maximal size of the corresponding trees.
 Usually, the larger the tree size is, the more complex the corresponding input seed is.
 
 ```bash
