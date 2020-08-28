@@ -113,7 +113,7 @@ size_t _node_rules_mutation_count(node_t *node) {
   size_t ret = node_num_rules[node->id] - 1;
 
   node_t *subnode;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (size_t i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
     ret += _node_rules_mutation_count(subnode);
   }
@@ -142,9 +142,9 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
   tail->parent = NULL;
   parent->subnodes[offset] = NULL;
 
-  int     num = 1 << n;
+  size_t  num = 1 << n;
   node_t *cloned_part = NULL;
-  for (int i = 0; i < num; ++i) {
+  for (size_t i = 0; i < num; ++i) {
     cloned_part = node_clone(parent);
 
     // attach the tail to the cloned part

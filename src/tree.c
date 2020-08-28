@@ -43,6 +43,7 @@ node_t *node_create(uint32_t id) {
 node_t *node_create_with_rule_id(uint32_t id, uint32_t rule_id) {
   node_t *node = node_create(id);
   node->rule_id = rule_id;
+  return node;
 }
 
 node_t *node_create_with_val(uint32_t id, const void *val_buf, size_t val_len) {
@@ -106,7 +107,7 @@ void node_free(node_t *node) {
   // subnodes
   if (node->subnode_count != 0) {
     node_t *subnode = NULL;
-    for (int i = 0; i < node->subnode_count; ++i) {
+    for (uint32_t i = 0; i < node->subnode_count; ++i) {
       subnode = node->subnodes[i];
 
       // `subnode` may be NULL due to parsing errors
@@ -173,7 +174,7 @@ node_t *node_clone(node_t *node) {
   if (node->subnode_count != 0) {
     node_init_subnodes(new_node, node->subnode_count);
     node_t *subnode = NULL;
-    for (int i = 0; i < node->subnode_count; ++i) {
+    for (uint32_t i = 0; i < node->subnode_count; ++i) {
       subnode = node->subnodes[i];
       node_set_subnode(new_node, i, node_clone(subnode));
     }
@@ -196,7 +197,7 @@ bool node_equal(node_t *node_a, node_t *node_b) {
   // subnodes
   if (node_a->subnode_count != node_b->subnode_count) return false;
 
-  for (int i = 0; i < node_a->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node_a->subnode_count; ++i) {
     if (!node_equal(node_a->subnodes[i], node_b->subnodes[i])) return false;
   }
 
@@ -217,7 +218,7 @@ void node_get_size(node_t *node) {
   node->recursion_edge_size = 0;
 
   node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
     if (unlikely(!subnode)) continue;
 
@@ -239,7 +240,7 @@ bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
   if (root != subnode->parent) return false;
 
   node_t *cur = NULL;
-  for (int i = 0; i < root->subnode_count; ++i) {
+  for (uint32_t i = 0; i < root->subnode_count; ++i) {
     cur = root->subnodes[i];
 
     if (cur == subnode) {
@@ -261,13 +262,13 @@ node_t *node_pick_non_term_subnode(node_t *node) {
   if (node->non_term_size == 0) return NULL;
 
   size_t non_term_size = node->non_term_size;
-  int    prob = random() % non_term_size;
+  size_t prob = random() % non_term_size;
 
   if (prob < 1) return node;
   prob -= 1;
 
   node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
 
     // `subnode` may be NULL due to parsing errors
@@ -290,10 +291,10 @@ edge_t node_pick_recursion_edge(node_t *node) {
   if (node->recursion_edge_size == 0) return ret;
 
   size_t recursion_edge_size = node->recursion_edge_size;
-  int    prob = random() % recursion_edge_size;
+  size_t prob = random() % recursion_edge_size;
 
   node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
 
     // `subnode` may be NULL due to parsing errors
@@ -331,7 +332,7 @@ edge_t node_get_parent_edge(node_t *node) {
   ret.subnode = node;
 
   node_t *parent = node->parent;
-  for (int i = 0; i < parent->subnode_count; ++i) {
+  for (uint32_t i = 0; i < parent->subnode_count; ++i) {
     if (node == parent->subnodes[i]) {
       ret.subnode_offset = i;
       break;
@@ -364,7 +365,7 @@ void _node_to_buf(tree_t *tree, node_t *node) {
 
   // subnodes
   node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
     _node_to_buf(tree, subnode);
   }
@@ -376,7 +377,7 @@ void _node_get_recursion_edges(tree_t *tree, node_t *node) {
 
   // subnodes
   node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
 
     // `subnode` may be NULL due to parsing errors
@@ -401,7 +402,7 @@ void _node_get_non_terminal_nodes(tree_t *tree, node_t *node) {
 
   // subnodes
   node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
     _node_get_non_terminal_nodes(tree, subnode);
   }
@@ -447,7 +448,7 @@ void _node_serialize(tree_t *tree, node_t *node) {
 
   // subnodes
   node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
     _node_serialize(tree, subnode);
   }
@@ -498,7 +499,7 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
   node_init_subnodes(node, node->subnode_count);
 
   node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     subnode = _node_deserialize(data_buf, data_size, consumed_size);
     if (unlikely(!subnode)) {
       // unlikely reach here
@@ -710,7 +711,11 @@ void write_tree_to_file(tree_t *tree, const char *filename) {
 
   // Write the data
   ret = write(fd, tree->ser_buf, tree->ser_len);
-  if (unlikely(ret != tree->ser_len)) {
+  if (unlikely(ret < 0)) {
+    perror("Unable to write (write_tree_to_file)");
+    return;
+  }
+  if (unlikely((size_t)ret != tree->ser_len)) {
     perror("Short write to tree file (write_tree_to_file)");
     return;
   }
@@ -733,7 +738,11 @@ void dump_tree_to_test_case(tree_t *tree, const char *filename) {
 
   // Write the data
   ret = write(fd, tree->data_buf, tree->data_len);
-  if (unlikely(ret != tree->data_len)) {
+  if (unlikely(ret < 0)) {
+    perror("Unable to write (write_tree_to_file)");
+    return;
+  }
+  if (unlikely((size_t)ret != tree->data_len)) {
     perror("Short write to tree file (dump_tree_to_test_case)");
     return;
   }

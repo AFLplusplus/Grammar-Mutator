@@ -38,9 +38,18 @@ void initialize_set(simple_set *set, int start, int elements, int itter,
 
 class BarrustSet : public ::testing::Test {
  protected:
-  simple_set set_a = {nullptr};
-  simple_set set_b = {nullptr};
-  simple_set set_c = {nullptr};
+  simple_set set_a = {.nodes = nullptr,
+                      .number_nodes = 0,
+                      .used_nodes = 0,
+                      .hash_function = nullptr};
+  simple_set set_b = {.nodes = nullptr,
+                      .number_nodes = 0,
+                      .used_nodes = 0,
+                      .hash_function = nullptr};
+  simple_set set_c = {.nodes = nullptr,
+                      .number_nodes = 0,
+                      .used_nodes = 0,
+                      .hash_function = nullptr};
 
   uint64_t elements = 1000;
 

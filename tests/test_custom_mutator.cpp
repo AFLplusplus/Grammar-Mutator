@@ -119,8 +119,8 @@ class CustomMutatorTest : public ::testing::Test {
 };
 
 TEST_F(CustomMutatorTest, Fuzzing) {
-  uint8_t *buf = nullptr;
-  size_t   buf_size = 0;
+  uint8_t *                      buf = nullptr;
+  __attribute__((unused)) size_t buf_size;
 
   // prepare a tree
   auto tree = gen_init__(0);
@@ -157,8 +157,8 @@ TEST_F(CustomMutatorTest, Fuzzing) {
 }
 
 TEST_F(CustomMutatorTest, FuzzingParsingError) {
-  uint8_t *buf = nullptr;
-  size_t   buf_size = 0;
+  uint8_t *                      buf = nullptr;
+  __attribute__((unused)) size_t buf_size;
 
   // prepare a tree that does not follow the grammar
   auto tree = tree_create();
@@ -168,12 +168,14 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
   node_set_subnode(node1, 0, node2);
   tree->root = node1;
 
-  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
+  dump_tree_to_test_case(tree,
+                         "/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
   // does not write the tree in advance, ask ANTLR4 shim to parse the test case
-//  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
+  //  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
 
   uint8_t ret = afl_custom_queue_get(
-      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
+      mutator->data,
+      (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
   EXPECT_EQ(ret, 1);
 
   tree_get_size(tree);
@@ -187,7 +189,8 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
     buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
-    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0_" + to_string(i);
+    string fn_new =
+        "/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0_" + to_string(i);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
         (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
@@ -202,8 +205,8 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
 }
 
 TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
-  uint8_t *buf = nullptr;
-  size_t   buf_size = 0;
+  uint8_t *                      buf = nullptr;
+  __attribute__((unused)) size_t buf_size;
 
   // prepare a tree that does not follow the grammar
   auto tree = tree_create();
@@ -213,11 +216,13 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
   node_set_subnode(node1, 0, node2);
   tree->root = node1;
 
-  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
+  dump_tree_to_test_case(tree,
+                         "/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
   write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_no_rules_mut_0");
 
   uint8_t ret = afl_custom_queue_get(
-      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
+      mutator->data,
+      (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
   EXPECT_EQ(ret, 1);
 
   tree_get_size(tree);
@@ -231,7 +236,8 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
     buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
-    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0_" + to_string(i);
+    string fn_new =
+        "/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0_" + to_string(i);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
         (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
@@ -248,11 +254,11 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
 TEST_F(CustomMutatorTest, Trimming) {
   srandom(1234);
 
-  uint8_t *buf = nullptr;
-  size_t   buf_size = 0;
-  uint8_t  ret = 0;
-  int32_t  stage_cur = 0;
-  int32_t  stage_max = 0;
+  uint8_t *                      buf = nullptr;
+  __attribute__((unused)) size_t buf_size;
+  uint8_t                        ret;
+  int32_t                        stage_cur;
+  int32_t                        stage_max;
 
   // prepare a tree
   auto tree = gen_init__(20);

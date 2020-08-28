@@ -17,6 +17,7 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "list.h"
@@ -162,7 +163,7 @@ void *list_get(list_t *list, size_t i) {
 
   list_node_t *cur = list->head;
 
-  for (int j = 0; j < i; ++j) {
+  for (uint32_t j = 0; j < i; ++j) {
     cur = cur->next;
   }
 

@@ -81,7 +81,7 @@ void chunk_store_add_node(node_t *node) {
 
   // process subnodes
   node_t *subnode = NULL;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     subnode = node->subnodes[i];
     chunk_store_add_node(subnode);
   }

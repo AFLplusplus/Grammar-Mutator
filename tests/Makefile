@@ -28,7 +28,7 @@ VALGRIND_CMD = $(VALGRIND) -q --tool=memcheck --leak-check=full --show-leak-kind
 GTEST_LIBS = $(GTEST_DIR)/libgtest_main.a $(GTEST_DIR)/libgtest.a
 GTEST_INCLUDE = $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest/include
 
-CXX_FLAGS = -std=gnu++14
+CXX_FLAGS = -std=gnu++14 $(CXX_FLAGS_OPT)
 CXX_DEFINES =
 CXX_INCLUDES = -I../include -isystem $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest/include -isystem $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest
 

@@ -67,7 +67,7 @@ find_package(Java COMPONENTS Runtime REQUIRED)
 
 # ANTLR 4 Jar
 if (NOT ANTLR_JAR_LOCATION)
-  message(FATAL_ERROR "Missing antlr4.jar location. You can specify it's path using: -DANTLR_JAR_LOCATION=<path>")
+  message(FATAL_ERROR "Missing antlr4.jar path. You can specify it's path using: -DANTLR_JAR_LOCATION=<path>")
 endif ()
 if (NOT IS_ABSOLUTE ${ANTLR_JAR_LOCATION})
   message(FATAL_ERROR "Please provide the full path to antlr4.jar")
@@ -92,8 +92,7 @@ endif ()
 # Generate "f1_c_fuzz.c" and "f1_c_fuzz.h"
 # Check the input grammar file
 if (NOT GRAMMAR_FILE)
-  message(STATUS "Use default JSON grammar")
-  set(GRAMMAR_FILE "${CMAKE_SOURCE_DIR}/grammars/json_grammar.json")
+  message(FATAL_ERROR "Missing the grammar file path. You can specify it's path using: -DGRAMMAR_FILE=<path>")
 endif ()
 if (NOT IS_ABSOLUTE ${GRAMMAR_FILE})
   message(FATAL_ERROR "Please provide the full path to the grammar file")
@@ -102,7 +101,7 @@ if (NOT EXISTS ${GRAMMAR_FILE})
   message(FATAL_ERROR "The grammar file does not exist: ${GRAMMAR_FILE}")
 endif ()
 get_filename_component(GRAMMAR_FILENAME ${GRAMMAR_FILE} NAME_WE)
-message(STATUS "Grammar: ${GRAMMAR_FILE}")
+message(STATUS "Found ${GRAMMAR_FILENAME}: ${GRAMMAR_FILE}")
 
 # Generate files at configure time
 execute_process(

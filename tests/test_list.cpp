@@ -16,6 +16,7 @@
 
  */
 
+#include <cstdint>
 #include "list.h"
 
 #include "gtest/gtest.h"
@@ -33,7 +34,7 @@ class ListTest : public ::testing::Test {
     list = list_create();
 
     size_t _array_len = sizeof(_array) / sizeof(int);
-    for (int i = 0; i < _array_len; ++i) {
+    for (uint32_t i = 0; i < _array_len; ++i) {
       list_append(list, _array + i);
       EXPECT_EQ(list->tail->data, _array + i);
     }
@@ -106,7 +107,7 @@ TEST_F(ListTest, ListPopFront) {
 }
 
 TEST_F(ListTest, ListGet) {
-  for (int i = 0; i < list->size; ++i) {
+  for (uint32_t i = 0; i < list->size; ++i) {
     int *data = (int *)list_get(list, i);
     EXPECT_EQ(data, _array + i);
     EXPECT_EQ(*data, _array[i]);

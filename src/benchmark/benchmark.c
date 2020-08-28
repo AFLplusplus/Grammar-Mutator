@@ -222,7 +222,6 @@ void bench_subtree_trimming() {
 void bench_recursive_trimming() {
   tree_t *tree, *trimmed_tree;
   edge_t *edge;
-  int     max_len;
 
   printf("========== Recursive Trimming, Single Node [START] ==========\n");
   tree = gen_init__(MAX_TREE_LEN);

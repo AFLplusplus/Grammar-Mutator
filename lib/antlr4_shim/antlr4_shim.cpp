@@ -58,7 +58,7 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
                                   non_terminal_node->getAltNumber() - 1);
   node_init_subnodes(node, t->children.size());
   node_t *subnode;
-  for (int i = 0; i < node->subnode_count; ++i) {
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
     auto &child = t->children[i];
     subnode = node_from_parse_tree(child);
     node->subnodes[i] = subnode;

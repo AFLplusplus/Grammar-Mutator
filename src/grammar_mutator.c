@@ -156,8 +156,9 @@ queue_get_done:
 }
 
 // Trimming
-int32_t afl_custom_init_trim(my_mutator_t *data, uint8_t *buf,
-                             size_t buf_size) {
+int32_t afl_custom_init_trim(my_mutator_t *                   data,
+                             __attribute__((unused)) uint8_t *buf,
+                             __attribute__((unused)) size_t   buf_size) {
   if (!data->tree_cur) return 0;
 
   tree_get_non_terminal_nodes(data->tree_cur);
@@ -235,7 +236,7 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
 
     // Update the non-terminal node list
     tree_get_non_terminal_nodes(data->tree_cur);
-    for (int i = 0; i < data->cur_subtree_trimming_step; ++i)
+    for (uint32_t i = 0; i < data->cur_subtree_trimming_step; ++i)
       list_pop_front(data->tree_cur->non_terminal_node_list);
     size_t new_node_size = data->tree_cur->non_terminal_node_list->size;
 
@@ -267,8 +268,9 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
   return data->cur_subtree_trimming_step + data->cur_recursive_trimming_step;
 }
 
-uint32_t afl_custom_fuzz_count(my_mutator_t *data, const uint8_t *buf,
-                               size_t buf_size) {
+uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
+                               __attribute__((unused)) const uint8_t *buf,
+                               __attribute__((unused)) size_t buf_size) {
   if (!data->tree_cur) return 0;
 
   tree_get_non_terminal_nodes(data->tree_cur);
@@ -291,7 +293,7 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *data, const uint8_t *buf,
         (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
     data->cur_rules_mutation_rule_id = 0;
 
-    int num_rules = 0;
+    size_t num_rules = 0;
     while (true) {
       num_rules = node_num_rules[data->cur_rules_mutation_node->id];
       if (data->cur_rules_mutation_rule_id >= num_rules) {
@@ -323,10 +325,12 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *data, const uint8_t *buf,
 
 // Fuzz the given test case several times, which is defined by the
 // `custom_mutator_stage` in `afl-fuzz-one.c`
-size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
-                       uint8_t **out_buf, uint8_t *add_buf,
-                       size_t add_buf_size,  // add_buf can be NULL
-                       size_t max_size) {
+size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
+                       __attribute__((unused)) size_t   buf_size,
+                       uint8_t **                       out_buf,
+                       __attribute__((unused)) uint8_t *add_buf,
+                       __attribute__((unused)) size_t   add_buf_size,
+                       size_t                           max_size) {
   tree_t *tree = NULL;
   size_t  mutated_size = 0;
 
@@ -384,7 +388,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
     } else {
       // update node and rule id
       ++data->cur_rules_mutation_rule_id;  // next rule id
-      int num_rules = 0;
+      size_t num_rules = 0;
       while (true) {
         num_rules = node_num_rules[data->cur_rules_mutation_node->id];
         if (data->cur_rules_mutation_rule_id >= num_rules) {

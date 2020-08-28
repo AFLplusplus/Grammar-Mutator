@@ -393,8 +393,8 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
     val = map_rand(%(num_cheap_trees)d);
     size_t consumed = 0;
     const char* ser_data = pool_ser_%(name)s[val];
-    const int ser_data_l = pool_l_ser_%(name)s[val];
-    node = _node_deserialize(ser_data, ser_data_l, &consumed);
+    const size_t ser_data_l = pool_l_ser_%(name)s[val];
+    node = _node_deserialize((const uint8_t*)ser_data, ser_data_l, &consumed);
     return node;
   }
 
@@ -415,9 +415,9 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
   node = node_create_with_rule_id(NODE_%(node_type)s, val);
 
   *consumed = 1;
-  int remaining_len = 0;
-  int subnode_max_len = 0;
-  int subnode_consumed = 0;
+  int __attribute__((unused)) remaining_len = 0;
+  int __attribute__((unused)) subnode_max_len = 0;
+  int __attribute__((unused)) subnode_consumed = 0;
 
   node_t *subnode = NULL;
   switch(val) {''' % {
@@ -451,7 +451,7 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
             ser_cheap_trees_c_str = [bytes_to_c_str(ser_tree) for ser_tree in ser_cheap_trees]
             result.append('''
 const char* pool_ser_%(k)s[] = {%(ser_trees)s};
-const int pool_l_ser_%(k)s[] = {%(ser_trees_len)s};''' % {
+const size_t pool_l_ser_%(k)s[] = {%(ser_trees_len)s};''' % {
                 'k': self.k_to_s(k),
                 'ser_trees': ', '.join(['"%s"' % ser_tree_c_str for ser_tree_c_str in ser_cheap_trees_c_str]),
                 'ser_trees_len': ', '.join([str(len(ser_tree)) for ser_tree in ser_cheap_trees])})
@@ -512,7 +512,7 @@ const char *node_type_str(int node_type) {
 
     def node_cost_array_defs(self):
         result = '''
-int node_min_lens[%d] = {
+size_t node_min_lens[%d] = {
   0,
   %s
 };'''
@@ -525,7 +525,7 @@ int node_min_lens[%d] = {
 
     def node_num_rules_array_defs(self):
         result = '''
-int node_num_rules[%d] = {
+size_t node_num_rules[%d] = {
   0,
   %s
 };'''
@@ -540,6 +540,8 @@ int node_num_rules[%d] = {
         hdr_content = '''
 #ifndef __F1_C_FUZZ_H__
 #define __F1_C_FUZZ_H__
+
+#include <stdint.h>
 
 #include "tree.h"
 
@@ -556,8 +558,8 @@ const char *node_type_str(int node_type);
 
 typedef node_t *(*gen_func_t)(int max_len, int *consumed, int rule_index);
 extern gen_func_t gen_funcs[%(num_nodes)d];
-extern int node_min_lens[%(num_nodes)d];
-extern int node_num_rules[%(num_nodes)d];
+extern size_t node_min_lens[%(num_nodes)d];
+extern size_t node_num_rules[%(num_nodes)d];
 
 #ifdef __cplusplus
 }

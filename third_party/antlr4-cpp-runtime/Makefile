@@ -197,7 +197,8 @@ ANTLR4_CXX_RUNTIME_SRC_FILES = \
 
 ANTLR4_CXX_RUNTIME_OBJS = $(ANTLR4_CXX_RUNTIME_SRC_FILES:.cpp=.o)
 
-CXX_FLAGS = -std=gnu++14 -fPIC -Wno-attributes
+# "-Wno-attributes -Wno-overloaded-virtual -Wno-multichar" are for external ANTLR4 runtime codes
+CXX_FLAGS = -std=gnu++14 -fPIC -Wno-attributes -Wno-overloaded-virtual -Wno-multichar
 CXX_DEFINES =
 CXX_INCLUDES = \
 	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src \

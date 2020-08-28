@@ -15,7 +15,8 @@ ANTLR4_SHIM_OBJS = $(ANTLR4_SHIM_SRC_FILES:.cpp=.o)
 ANTLR4_CXX_RUNTIME_LIB = $(realpath ../../third_party/antlr4-cpp-runtime/libantlr4-runtime.a)
 ANTLR4_CXX_RUNTIME_DIR = $(realpath ../../third_party/antlr4-cpp-runtime/antlr4-cpp-runtime-src)
 
-CXX_FLAGS = -std=gnu++14 -fPIC -Wno-attributes
+# "-Wno-attributes" is only for generated codes, we cannot do more about it
+CXX_FLAGS = -std=gnu++14 -fPIC -Wno-attributes $(CXX_FLAGS_OPT)
 CXX_DEFINES =
 CXX_INCLUDES = \
 	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src \

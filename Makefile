@@ -36,8 +36,7 @@ override ANTLR_JAR_LOCATION = ""
 endif
 
 ifndef GRAMMAR_FILE
-$(info Use default JSON grammar file)
-override GRAMMAR_FILE = $(realpath grammars/json_grammar.json)
+$(error Missing the grammar file path. Please specify it's path using: make GRAMMAR_FILE=<path>)
 else
 TEMP := $(realpath $(GRAMMAR_FILE))
 override GRAMMAR_FILE := $(TEMP)
@@ -50,13 +49,17 @@ $(shell echo $(realpath $(GRAMMAR_FILE)) > .grammar)
 endif
 
 ifndef ANTLR_JAR_LOCATION
-$(error Missing antlr4.jar location. Please specify it's path using: make ANTLR_JAR_LOCATION=<path>)
+$(error Missing antlr4.jar path. Please specify it's path using: make ANTLR_JAR_LOCATION=<path>)
 else
 TEMP := $(realpath $(ANTLR_JAR_LOCATION))
 override ANTLR_JAR_LOCATION := $(TEMP)
 endif
 
 PYTHON = python3
+C_FLAGS_OPT = -Wall -Wextra -Werror
+CXX_FLAGS_OPT = -Wall -Wextra -Werror
+export C_FLAGS_OPT
+export CXX_FLAGS_OPT
 
 GEN_FILES = .grammar src/f1_c_fuzz.c include/f1_c_fuzz.h grammars/Grammar.g4
 

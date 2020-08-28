@@ -20,7 +20,7 @@ TARGET = libxxhash.a
 C_SRC_FILES = $(wildcard *.c)
 OBJS = $(C_SRC_FILES:.c=.o)
 
-C_FLAGS = -fPIC
+C_FLAGS = -fPIC $(C_FLAGS_OPT)
 C_DEFINES =
 C_INCLUDES =
 

@@ -26,7 +26,7 @@ GEN_OBJS = $(GEN_SRC_FILES:.c=.o)
 BENCHMARK_OBJS = $(BENCHMARK_SRC_FILES:.c=.o)
 OBJS = $(LIB_OBJS) $(GEN_OBJS) $(BENCHMARK_OBJS)
 
-C_FLAGS =
+C_FLAGS = $(C_FLAGS_OPT)
 C_DEFINES =
 C_INCLUDES = -I../include -I../third_party/rxi_map -I../third_party/barrust_set -I../third_party/Cyan4973_xxHash
 
