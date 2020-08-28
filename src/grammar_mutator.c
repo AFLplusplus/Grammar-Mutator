@@ -41,7 +41,7 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
 
   my_mutator_t *data = (my_mutator_t *)calloc(1, sizeof(my_mutator_t));
   if (!data) {
-    perror("afl_custom_init alloc");
+    perror("custom mutator structure allocation error (afl_custom_init)");
     return NULL;
   }
 
@@ -197,7 +197,7 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
   } else {
     // should not reach here
     *out_buf = NULL;
-    perror("wrong trimming stage");
+    perror("wrong trimming stage (afl_custom_trim)");
     return 0;
   }
 
@@ -368,12 +368,12 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
       tree = splicing_mutation(tree);
       break;
     default:
-      perror("mutation error (invalid choice)");
-      break;
+      perror("mutation error, invalid choice (afl_custom_fuzz)");
+      return 0;
   }
 
   if (!tree) {
-    perror("mutation error");
+    perror("mutation error, empty tree (afl_custom_fuzz)");
     return 0;
   }
 
@@ -438,7 +438,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
       (uint8_t *)maybe_grow(BUF_PARAMS(data, fuzz), mutated_size);
   if (!mutated_out) {
     *out_buf = NULL;
-    perror("custom mutator allocation (maybe_grow)");
+    perror("custom mutator, fuzzing buffer allocation error (afl_custom_fuzz)");
     return 0; /* afl-fuzz will very likely error out after this. */
   }
 
