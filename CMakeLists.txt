@@ -47,6 +47,10 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     "None" "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
+# Set -Wall -Wextra -Werror
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
+
 # Do not disable assertions based on CMAKE_BUILD_TYPE.
 foreach (_build_type "Release" "MinSizeRel" "RelWithDebInfo")
   foreach (_lang C CXX)
