@@ -49,7 +49,7 @@ make GRAMMAR_FILE=grammars/ruby_grammar.json \
      ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar
 ```
 
-Now, you should have `libgrammarmutator.so` and `grammar_generator` under `src` directory
+Now, you should be able to see two symbolic files `libgrammarmutator.so` and `grammar_generator` under the root directory. These two files actually locate in `src` directory.
 
 If you would like to fork the project and fix bugs or contribute to the project, you can take a look at [building-grammar-mutator.md](doc/building-grammar-mutator.md) for full building instructions.
 
@@ -64,7 +64,7 @@ Before fuzzing the real program, you need to prepare the input fuzzing seeds. Yo
 - Generating seeds for a given grammar
 - Using existing seeds
 
-#### Using Generated Corpus
+#### Using Generated Seeds
 
 `grammar_generator` can be used to generate input fuzzing seeds and corresponding tree files, following the grammar file that you specified during the compilation of the grammar mutator (i.e., `GRAMMAR_FILE`).
 You can control the number of generated seeds and the maximal size of the corresponding trees.
@@ -103,9 +103,9 @@ cp -r trees out
 afl-fuzz -i seeds -o out -- /path/to/target @@
 ```
 
-#### Using Other Corpus
+#### Using Existing Seeds
 
-Of course, you can feed your own fuzzing corpus to the fuzzer, which does not need to match with your input grammar file.
+Of course, you can feed your own fuzzing seeds to the fuzzer, which does not need to match with your input grammar file.
 Assuming that the grammar mutator is built with `grammars/ruby_grammar.json`, which is a simplified Ruby grammar and does not cover all Ruby syntax.
 Then, let's use test cases in `mruby` project as input fuzzing seeds.
 In this case, the parsing error will definitely occur.
