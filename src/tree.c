@@ -689,7 +689,7 @@ tree_t *load_tree_from_test_case(const char *filename) {
   tree = tree_from_buf(buf, file_size);
   munmap(buf, file_size);
   if (unlikely(!tree)) {
-    perror("Cannot parse the data");
+    // error, cannot parse the data
     return NULL;
   }
 

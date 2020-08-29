@@ -15,7 +15,7 @@ GTEST_VERSION = 1.10.0
 JSON_PARSER_DIR = json-parser-download
 
 AFL_FUZZ = afl-fuzz
-AFL_FUZZ_OUT_DIR = /tmp/afl_fuzz_out
+AFL_FUZZ_OUT_DIR = afl_fuzz_out
 AFL_FUZZ_ENVS = AFL_SKIP_CPUFREQ=1 \
                 AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
                 AFL_CUSTOM_MUTATOR_ONLY=1 \
@@ -73,8 +73,10 @@ endif
 
 export GTEST_VERSION
 
-$(GTEST_LIBS) $(GTEST_INCLUDE):
+$(GTEST_DIR)/googletest-release-$(GTEST_VERSION):
 	@$(MAKE) -C $(GTEST_DIR) all
+
+$(GTEST_LIBS) $(GTEST_INCLUDE): $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)
 
 run_test_%: test_%
 	@echo "Test: $<"

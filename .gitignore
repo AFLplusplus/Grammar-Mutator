@@ -44,3 +44,6 @@ f1_c_fuzz.h
 
 # Python
 __pycache__/
+
+# afl-fuzz
+out/

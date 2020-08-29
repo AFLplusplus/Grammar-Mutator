@@ -255,7 +255,7 @@ void bench_recursive_trimming() {
  * Reference:
  * https://stackoverflow.com/questions/1930454/what-is-a-good-solution-for-calculating-an-average-where-the-sum-of-all-values-e
  */
-void bench_stats_print(const char *label) {
+void bench_stats_print(const char *prefix_label) {
   double time_avg = 0, time_var = 0, time_std = 0;
   // Avoid overflow
   for (int i = 0; i < BENCH_NUM; ++i) {
@@ -266,7 +266,7 @@ void bench_stats_print(const char *label) {
   }
   time_std = sqrt(time_var);
 
-  printf("%s - avg: %lf s, std: %lf\n", label, time_avg, time_std);
+  printf("%s - avg: %lf s, std: %lf\n", prefix_label, time_avg, time_std);
 #ifdef DEBUG_BUILD
   if (time_std < time_avg) return;
 

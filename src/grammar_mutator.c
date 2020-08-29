@@ -33,6 +33,7 @@
 #include "tree_mutation.h"
 #include "tree_trimming.h"
 #include "chunk_store.h"
+#include "utils.h"
 
 my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   srandom(seed);
@@ -108,19 +109,9 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     strncpy(found + 1, "trees", 5);
 
     // Check whether the directory exists
-    struct stat info;
-    if (stat(tree_out_dir, &info) != 0) {
-      if (mkdir(tree_out_dir, 0700) != 0) {
-        // error
-        perror("Cannot create the directory");
-        return 0;
-      }
-      data->tree_out_dir_exist = 1;
-    } else if (info.st_mode & S_IFDIR) {
-      data->tree_out_dir_exist = 1;
-    } else {
-      // Not a directory
-      perror("Wrong tree output path (stat)");
+    if (!create_directory(tree_out_dir)) {
+      // error
+      perror("Cannot create the output directory (afl_custom_queue_get)");
       return 0;
     }
 
@@ -146,6 +137,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   data->tree_cur = load_tree_from_test_case(fn);
   if (data->tree_cur) goto queue_get_done;
 
+  // parsing error, skip the current test case
   return 0;
 
 queue_get_done:

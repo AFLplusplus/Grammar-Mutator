@@ -26,6 +26,7 @@
 #include "f1_c_fuzz.h"
 #include "tree.h"
 #include "tree_mutation.h"
+#include "utils.h"
 
 #include "gtest/gtest.h"
 
@@ -45,52 +46,24 @@ class CustomMutatorTest : public ::testing::Test {
  protected:
   afl_t *                afl = nullptr;
   struct custom_mutator *mutator = nullptr;
-  string                 out_dir = "/tmp/afl_test_fuzz_out";
+  string                 out_dir = "afl_test_fuzz_out";
   string                 tree_out_dir = out_dir + "/trees";
   string                 queue_dir = out_dir + "/queue";
 
   CustomMutatorTest() {
     // Check whether the directory exists
-    struct stat info;
-    if (stat(out_dir.c_str(), &info) != 0) {
-      if (mkdir(out_dir.c_str(), 0700) != 0) {
-        // error
-        perror("Cannot create the directory (CustomMutatorTest)");
-        exit(EXIT_FAILURE);
-      }
-    } else if (info.st_mode & S_IFDIR) {
-      // directory exist
-    } else {
-      // Not a directory
-      perror("Wrong output path (CustomMutatorTest)");
+    if (!create_directory(out_dir.c_str())) {
+      perror("Cannot create the output directory (CustomMutatorTest)");
       exit(EXIT_FAILURE);
     }
 
-    if (stat(tree_out_dir.c_str(), &info) != 0) {
-      if (mkdir(tree_out_dir.c_str(), 0700) != 0) {
-        // error
-        perror("Cannot create the directory (CustomMutatorTest)");
-        exit(EXIT_FAILURE);
-      }
-    } else if (info.st_mode & S_IFDIR) {
-      // directory exist
-    } else {
-      // Not a directory
-      perror("Wrong tree output path (CustomMutatorTest)");
+    if (!create_directory(tree_out_dir.c_str())) {
+      perror("Cannot create the tree output directory (CustomMutatorTest)");
       exit(EXIT_FAILURE);
     }
 
-    if (stat(queue_dir.c_str(), &info) != 0) {
-      if (mkdir(queue_dir.c_str(), 0700) != 0) {
-        // error
-        perror("Cannot create the directory (CustomMutatorTest)");
-        exit(EXIT_FAILURE);
-      }
-    } else if (info.st_mode & S_IFDIR) {
-      // directory exist
-    } else {
-      // Not a directory
-      perror("Wrong queue output path (CustomMutatorTest)");
+    if (!create_directory(queue_dir.c_str())) {
+      perror("Cannot create the queue output directory (CustomMutatorTest)");
       exit(EXIT_FAILURE);
     }
 
@@ -98,7 +71,9 @@ class CustomMutatorTest : public ::testing::Test {
     tree_set_max_len(100);
   }
 
-  ~CustomMutatorTest() override = default;
+  ~CustomMutatorTest() override {
+    remove_directory(out_dir.c_str());
+  }
 
   void SetUp() override {
     mutator = (struct custom_mutator *)calloc(1, sizeof(struct custom_mutator));
@@ -124,11 +99,11 @@ TEST_F(CustomMutatorTest, Fuzzing) {
 
   // prepare a tree
   auto tree = gen_init__(0);
-  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/fuzz_0");
-  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/fuzz_0");
+  write_tree_to_file(tree, "afl_test_fuzz_out/trees/fuzz_0");
 
   uint8_t ret = afl_custom_queue_get(
-      mutator->data, (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+      mutator->data, (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_0");
   EXPECT_EQ(ret, 1);
 
   tree_get_size(tree);
@@ -142,10 +117,10 @@ TEST_F(CustomMutatorTest, Fuzzing) {
     buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
-    string fn_new = "/tmp/afl_test_fuzz_out/queue/fuzz_0_" + to_string(i);
+    string fn_new = "afl_test_fuzz_out/queue/fuzz_0_" + to_string(i);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
-        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_0");
+        (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_0");
 
 #ifdef DEBUG_BUILD
     fprintf(stderr, "=====%d=====\n", i + 1);
@@ -168,14 +143,13 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
   node_set_subnode(node1, 0, node2);
   tree->root = node1;
 
-  dump_tree_to_test_case(tree,
-                         "/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/fuzz_parsing_error_0");
   // does not write the tree in advance, ask ANTLR4 shim to parse the test case
-  //  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_0");
+  //  write_tree_to_file(tree, "afl_test_fuzz_out/trees/fuzz_0");
 
   uint8_t ret = afl_custom_queue_get(
       mutator->data,
-      (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
+      (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_parsing_error_0");
   EXPECT_EQ(ret, 1);
 
   tree_get_size(tree);
@@ -190,10 +164,10 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
     string fn_new =
-        "/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0_" + to_string(i);
+        "afl_test_fuzz_out/queue/fuzz_parsing_error_0_" + to_string(i);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
-        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_parsing_error_0");
+        (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_parsing_error_0");
 
 #ifdef DEBUG_BUILD
     fprintf(stderr, "=====%d=====\n", i + 1);
@@ -216,13 +190,12 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
   node_set_subnode(node1, 0, node2);
   tree->root = node1;
 
-  dump_tree_to_test_case(tree,
-                         "/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
-  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/fuzz_no_rules_mut_0");
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
+  write_tree_to_file(tree, "afl_test_fuzz_out/trees/fuzz_no_rules_mut_0");
 
   uint8_t ret = afl_custom_queue_get(
       mutator->data,
-      (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
+      (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
   EXPECT_EQ(ret, 1);
 
   tree_get_size(tree);
@@ -237,10 +210,10 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
     string fn_new =
-        "/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0_" + to_string(i);
+        "afl_test_fuzz_out/queue/fuzz_no_rules_mut_0_" + to_string(i);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
-        (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
+        (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
 
 #ifdef DEBUG_BUILD
     fprintf(stderr, "=====%d=====\n", i + 1);
@@ -262,12 +235,11 @@ TEST_F(CustomMutatorTest, Trimming) {
 
   // prepare a tree
   auto tree = gen_init__(20);
-  dump_tree_to_test_case(tree, "/tmp/afl_test_fuzz_out/queue/trimming_0");
-  write_tree_to_file(tree, "/tmp/afl_test_fuzz_out/trees/trimming_0");
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/trimming_0");
+  write_tree_to_file(tree, "afl_test_fuzz_out/trees/trimming_0");
 
   ret = afl_custom_queue_get(
-      mutator->data,
-      (const uint8_t *)"/tmp/afl_test_fuzz_out/queue/trimming_0");
+      mutator->data, (const uint8_t *)"afl_test_fuzz_out/queue/trimming_0");
   ASSERT_EQ(ret, 1);
 
   // always fail in trimming

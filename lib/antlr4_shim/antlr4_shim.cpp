@@ -16,12 +16,14 @@
 
  */
 
-#include "antlr4_shim.h"
-#include "f1_c_fuzz.h"
+#include <exception>
 
 #include <antlr4-runtime.h>
 #include <GrammarLexer.h>
 #include <GrammarParser.h>
+
+#include "antlr4_shim.h"
+#include "f1_c_fuzz.h"
 
 using namespace antlr4;
 
@@ -68,21 +70,37 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
 }
 
 tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
-  ANTLRInputStream input((const char *)data_buf, data_size);
-  GrammarLexer     lexer(&input);
-  // Disable lexer error output
-  lexer.removeErrorListener(&ConsoleErrorListener::INSTANCE);
+  node_t *root;
 
-  CommonTokenStream tokens(&lexer);
-  tokens.fill();
+  /**
+   * Use try/catch to handle exceptions from ANTLR4 runtime library. If any
+   * errors occur, a nullptr will be returned.
+   *
+   * A known issue: ANTLRInputStream does not accept string with special
+   * character (https://github.com/antlr/antlr4/issues/2036)
+   */
+  try {
+    ANTLRInputStream input((const char *)data_buf, data_size);
+    GrammarLexer     lexer(&input);
+    // Disable lexer error output
+    lexer.removeErrorListener(&ConsoleErrorListener::INSTANCE);
 
-  GrammarParser parser(&tokens);
-  // Disable parser error output
-  parser.removeErrorListener(&ConsoleErrorListener::INSTANCE);
+    CommonTokenStream tokens(&lexer);
+    tokens.fill();
 
-  antlr4::tree::ParseTree *parse_tree = parser.entry();
+    GrammarParser parser(&tokens);
+    // Disable parser error output
+    parser.removeErrorListener(&ConsoleErrorListener::INSTANCE);
 
-  node_t *root = node_from_parse_tree(parse_tree->children[0]);
+    antlr4::tree::ParseTree *parse_tree = parser.entry();
+    root = node_from_parse_tree(parse_tree->children[0]);
+  } catch (std::exception &e) {
+#ifdef DEBUG_BUILD
+    fprintf(stderr, "ANTLR4 parsing error: %s\n", e.what());
+#endif
+    return nullptr;
+  }
+
   if (!root) return nullptr;  // parse error
 
   tree_t *tree = tree_create();

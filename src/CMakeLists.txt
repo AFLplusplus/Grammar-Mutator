@@ -24,7 +24,8 @@ add_library(grammarmutator SHARED
   tree_mutation.c
   tree_trimming.c
   ${CMAKE_BINARY_DIR}/f1/src/f1_c_fuzz.c
-  grammar_mutator.c)
+  grammar_mutator.c
+  utils.c)
 target_link_libraries(grammarmutator
   PRIVATE rxi_map
   PRIVATE barrust_set

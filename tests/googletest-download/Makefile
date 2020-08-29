@@ -22,12 +22,6 @@ GTEST_TAR = release-$(GTEST_VERSION).tar.gz
 GTEST_DOWNLOAD_URL = https://github.com/google/googletest/archive/$(GTEST_TAR)
 GTEST_ROOT_DIR = googletest-release-$(GTEST_VERSION)
 GTEST_DIR = $(GTEST_ROOT_DIR)/googletest
-# GTEST_HEADERS = $(wildcard $(GTEST_DIR)/include/gtest/*.h) \
-# 				$(wildcard $(GTEST_DIR)/include/gtest/internal/*.h)
-
-# GTEST_SRC_FILES = $(wildcard $(GTEST_DIR)/src/*.cc) \
-# 				  $(wildcard $(GTEST_DIR)/src/*.h) \
-# 				  $(GTEST_HEADERS)
 GTEST_SRC_FILES = \
 	$(GTEST_DIR)/src/gtest-all.cc \
 	$(GTEST_DIR)/src/gtest_main.cc

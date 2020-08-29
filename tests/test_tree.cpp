@@ -410,6 +410,17 @@ TEST_F(TreeTest, ParseArrayRb) {
 }
 #endif
 
+/**
+ * A known issue: ANTLRInputStream does not accept string with special
+ * character (https://github.com/antlr/antlr4/issues/2036)
+ */
+TEST_F(TreeTest, ParseSpecialCharacter) {
+  char special_str[] = "\xFD";
+  auto len = strlen(special_str);
+  auto tree = tree_from_buf((const uint8_t *)special_str, len);
+  EXPECT_EQ(tree, nullptr);
+}
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
