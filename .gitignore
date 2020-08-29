@@ -47,3 +47,7 @@ __pycache__/
 
 # afl-fuzz
 out/
+
+# Generated targets
+grammar_generator
+libgrammarmutator.so
