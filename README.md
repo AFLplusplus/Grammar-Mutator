@@ -2,10 +2,11 @@
 
 ![Grammar Mutator CI](https://github.com/AFLplusplus/Grammar-Mutator/workflows/Grammar%20Mutator%20CI/badge.svg)
 
-A grammar-based custom mutator written for GSoC '20.
+A grammar-based custom mutator for AFL++ during GSoC '20.
 
-- GSoC '20 Developer: [Shengtuo Hu (h1994st)](https://github.com/h1994st)
-- GSoC '20 Mentors: [Marc Heuse](https://github.com/vanhauser-thc), [Andrea Fioraldi](https://github.com/andreafioraldi)
+- Developer: [Shengtuo Hu (h1994st)](https://github.com/h1994st)
+- Mentors: [Marc Heuse](https://github.com/vanhauser-thc), [Andrea Fioraldi](https://github.com/andreafioraldi)
+- [GSoC task tracking](https://github.com/AFLplusplus/Grammar-Mutator/projects/1)
 
 ## Overview
 
