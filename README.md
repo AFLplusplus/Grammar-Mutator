@@ -34,7 +34,7 @@ wget https://www.antlr.org/download/antlr-4.8-complete.jar
 sudo mv antlr-4.8-complete.jar /usr/local/lib
 ```
 
-Note that the grammar mutator is based on the latest custom mutator APIs in AFL++, so please use the latest `dev` branch of [AFL++](https://github.com/AFLplusplus/AFLplusplus).
+Note that the grammar mutator is based on the latest custom mutator APIs in AFL++, so please use the latest `dev` branch of [AFL++](https://github.com/AFLplusplus/AFLplusplus/tree/dev) or, at least, commit https://github.com/AFLplusplus/AFLplusplus/commit/b44620f0b01733512b8da6e73f75113db9a8ca8d of AFL++.
 
 ```bash
 git clone https://github.com/AFLplusplus/AFLplusplus.git
