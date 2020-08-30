@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # american fuzzy lop++ - grammar mutator
 # --------------------------------------
@@ -15,7 +16,6 @@
 # A grammar-based custom mutator written for GSoC '20.
 #
 
-#!/bin/bash
 set -e
 set -x
 

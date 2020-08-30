@@ -2,9 +2,16 @@
 
 ![Grammar Mutator CI](https://github.com/AFLplusplus/Grammar-Mutator/workflows/Grammar%20Mutator%20CI/badge.svg)
 
+A grammar-based custom mutator written for GSoC '20.
+
+- GSoC '20 Developer: [Shengtuo Hu (h1994st)](https://github.com/h1994st)
+- GSoC '20 Mentors: [Marc Heuse](https://github.com/vanhauser-thc), [Andrea Fioraldi](https://github.com/andreafioraldi)
+
 ## Overview
 
-In this project, we developed a grammar mutator to enhance AFL++ such that AFL++ can handle highly-structured inputs, such as JSON, Ruby, etc. The grammar mutator leverages the idea of [F1 fuzzer](https://github.com/vrthra/F1) and [Nautilus](https://github.com/nautilus-fuzz/nautilus) for test case generation and mutations. In summary, this repository includes:
+We developed a grammar mutator to enhance AFL++ such that AFL++ can handle highly-structured inputs, such as JSON, Ruby, etc.
+The grammar mutator leverages the idea of [F1 fuzzer](https://github.com/vrthra/F1) and [Nautilus](https://github.com/nautilus-fuzz/nautilus) for test case generation and mutations.
+In summary, this repository includes:
 
 - Tree-based mutation: rules mutation, random mutation, random recursive mutation, splicing mutation
 - Tree-based trimming: subtree trimming, recursive trimming
@@ -49,7 +56,8 @@ make GRAMMAR_FILE=grammars/ruby_grammar.json \
      ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar
 ```
 
-Now, you should be able to see two symbolic files `libgrammarmutator.so` and `grammar_generator` under the root directory. These two files actually locate in `src` directory.
+Now, you should be able to see two symbolic files `libgrammarmutator.so` and `grammar_generator` under the root directory.
+These two files actually locate in `src` directory.
 
 If you would like to fork the project and fix bugs or contribute to the project, you can take a look at [building-grammar-mutator.md](doc/building-grammar-mutator.md) for full building instructions.
 

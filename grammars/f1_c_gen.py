@@ -1,8 +1,29 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Date    : 2020-06-19 14:45:19
-# @Author  : Shengtuo Hu
-# @Link    : https://shengtuo.me
+
+#
+# american fuzzy lop++ - grammar mutator
+# --------------------------------------
+#
+# Written by Shengtuo Hu
+#
+# Copyright 2020 AFLplusplus Project. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at:
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# A grammar-based custom mutator written for GSoC '20.
+#
+
+#
+# The original version of this file is borrowed from F1 fuzzer:
+# https://github.com/vrthra/F1
+#
+# We have made lots of changes to this file to satisfy our requirements.
+#
 
 import sys
 import itertools
