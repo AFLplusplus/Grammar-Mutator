@@ -106,7 +106,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
       return 0;
     }
     // Replace "queue" with "trees"
-    strncpy(found + 1, "trees", 5);
+    memcpy(found + 1, "trees", 5);
 
     // Check whether the directory exists
     if (!create_directory(tree_out_dir)) {
@@ -127,7 +127,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     return 0;
   }
   // Replace "queue" with "trees"
-  strncpy(found + 1, "trees", 5);
+  memcpy(found + 1, "trees", 5);
 
   // Read the corresponding serialized tree from file
   data->tree_cur = read_tree_from_file(data->tree_fn_cur);
@@ -456,7 +456,7 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
     return;
   }
   // Replace "queue" with "trees"
-  strncpy(found + 1, "trees", 5);
+  memcpy(found + 1, "trees", 5);
 
   // Write the mutated tree to the file
   write_tree_to_file(data->mutated_tree, data->new_tree_fn);

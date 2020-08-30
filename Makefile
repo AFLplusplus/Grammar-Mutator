@@ -73,8 +73,8 @@ src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar
 .PHONY: build
 build: src/f1_c_fuzz.c include/f1_c_fuzz.h third_party build_lib
 	@$(MAKE) -C src all
-	@ln -s src/grammar_generator grammar_generator
-	@ln -s src/libgrammarmutator.so libgrammarmutator.so
+	@ln -sf src/grammar_generator grammar_generator
+	@ln -sf src/libgrammarmutator.so libgrammarmutator.so
 
 grammars/Grammar.g4: grammars/f1_g4_translate.py .grammar
 	$(PYTHON) $< $(shell cat .grammar) ./grammars
