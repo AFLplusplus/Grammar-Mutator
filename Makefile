@@ -111,7 +111,7 @@ clean:
 	@$(MAKE) -C third_party $@
 	@rm -f $(GEN_FILES)
 	@rm -rf grammars/__pycache__
-	@rm grammar_generator libgrammarmutator.so
+	@rm -f grammar_generator libgrammarmutator.so
 
 .PHONY: help
 help:
