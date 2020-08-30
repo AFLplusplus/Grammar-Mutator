@@ -1,8 +1,8 @@
 Customizing Grammars
 ===
 
-The grammar file is specified in JSON and is shown as A collection of key/value pairs.
-Each key represents a grammar token, which is surrounded by angle brackets, and the corresponding value of a key is a list of grammar rules.
+The grammar file is specified in JSON and is shown as a collection of key/value pairs.
+Each key represents a grammar token that is surrounded by angle brackets, and the corresponding value of a key is a list of grammar rules.
 In the following case, `<START>` has two rules.
 
 ```json
