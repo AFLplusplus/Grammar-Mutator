@@ -23,7 +23,7 @@
 #include "chunk_store_internal.h"
 
 // the list, in `chunk_store`, contains a collection of `node_t`
-list_map_t chunk_store = {NULL};
+list_map_t chunk_store;
 simple_set seen_chunks;
 
 // temporary tree
