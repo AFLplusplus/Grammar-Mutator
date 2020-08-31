@@ -35,22 +35,22 @@ wget https://www.antlr.org/download/antlr-4.8-complete.jar
 sudo mv antlr-4.8-complete.jar /usr/local/lib
 ```
 
-Note that the grammar mutator is based on the latest custom mutator APIs in AFL++, so please use the latest `dev` branch of [AFL++](https://github.com/AFLplusplus/AFLplusplus/tree/dev) or, at least, commit [`b44620`](https://github.com/AFLplusplus/AFLplusplus/commit/b44620f0b01733512b8da6e73f75113db9a8ca8d) of AFL++.
+Note that the grammar mutator is based on the latest custom mutator APIs in AFL++, so please use the latest `dev` or `stable` branch of [AFL++](https://github.com/AFLplusplus/AFLplusplus/tree/dev).
 
 ```bash
 git clone https://github.com/AFLplusplus/AFLplusplus.git
 cd AFLplusplus
-git checkout dev
 make distrib
 sudo make install
 ```
 
-### Building Grammar Mutator
+### Building the Grammar Mutator
 
-Then, you need to build the grammar mutator.
-To specify the grammar file, like Ruby, you can use `GRAMMAR_FILE` environment variable.
+Next you need to build the grammar mutator.
+To specify the grammar file, eg. Ruby, you can use `GRAMMAR_FILE` environment variable.
 There are several grammar files in `grammars` directory, such as `json_grammar.json` and `ruby_grammar.json`.
 Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about the input grammar file.
+Note that pull requests with new grammars are welcome! :-)
 
 ```bash
 make GRAMMAR_FILE=grammars/ruby_grammar.json \
@@ -58,20 +58,32 @@ make GRAMMAR_FILE=grammars/ruby_grammar.json \
 ```
 
 Now, you should be able to see two symbolic files `libgrammarmutator.so` and `grammar_generator` under the root directory.
-These two files actually locate in `src` directory.
+These two files are actually locate in the `src` directory.
 
 If you would like to fork the project and fix bugs or contribute to the project, you can take a look at [building-grammar-mutator.md](doc/building-grammar-mutator.md) for full building instructions.
 
-### Instrumenting Fuzzing targets
+### Instrumenting Fuzzing Targets
 
-You can refer to [sample-fuzzing-targets.md](doc/sample-fuzzing-targets.md) to build the fuzzing targets.
+You can refer to [sample-fuzzing-targets.md](doc/sample-fuzzing-targets.md) to build the example fuzzing targets.
 
-### Fuzzing the Target with the Grammar Mutator!
+### Seeds
 
 Before fuzzing the real program, you need to prepare the input fuzzing seeds. You can either:
 
 - Generating seeds for a given grammar
 - Using existing seeds
+
+#### Using Existing Seeds
+
+You can feed your own fuzzing seeds to the fuzzer, which does not need to match with your input grammar file.
+Assuming that the grammar mutator is built with `grammars/ruby_grammar.json`, which is a simplified Ruby grammar and does not cover all Ruby syntax.
+In this case, the parsing error will definitely occur.
+For any parsing errors, the grammar mutator will not terminate but save the error portion as a terminal node in the tree, such that we will not lose too much information on the original test case.
+
+To e.g. use the test cases of the `mruby` project as input fuzzing seeds just pass the `-i mruby/test/t` to afl-fuzz
+when we run the fuzzer (if it has been checked out with `git clone https://github.com/mruby/mruby.git` in the current directory).
+
+
 
 #### Using Generated Seeds
 
@@ -80,55 +92,35 @@ You can control the number of generated seeds and the maximal size of the corres
 Usually, the larger the tree size is, the more complex the corresponding input seed is.
 
 ```bash
-./grammar_generator 123 100 1000 ./seeds ./trees
-
 # Usage
-# ./grammar_generator <random seed> <max_num> <max_size> <output_dir> <tree_output_dir>
+# ./grammar_generator <random seed> <max_num> <max_size> <seed_output_dir> <tree_output_dir>
+# eg:
+./grammar_generator 123 100 1000 ./seeds ./trees
 ```
 
+Afterwards copy the `trees` folder with that exact name to the output directory that you will use with afl-fuzz (e.g. `-o out`):
+```bash
+mkdir out
+cp -r trees out
+```
+
+### Fuzzing the Target with the Grammar Mutator!
+
 Let's start running the fuzzer.
+
 You may notice that the fuzzer will be stuck for a while at the beginning of fuzzing.
-One reason for the stuck is the large `max_size` (i.e., 1000) we choose, which results in a large size of test cases.
-It will take the fuzzer some time to load them.
+One reason for the stuck is the large `max_size` (i.e., 1000) we choose, which results in a large size of test cases that increases the loading time.
 Another reason is the costly parsing operations in the grammar mutator.
 Since the input seeds are in string format, the grammar mutator needs to parse them into tree representations at first, which is costly.
 The large `max_size` passed into `grammar_generator` does help us generate deeply nested trees, but it further increases the parsing overhead.
 
+The default memory limit for child process is `75M` in `afl-fuzz`.
+This may not be enough for some test cases, so it is recommended to increase it to `128M` by adding an option `-m 128`.
 
 ```bash
 export AFL_CUSTOM_MUTATOR_LIBRARY=/path/to/libgrammarmutator.so
 export AFL_CUSTOM_MUTATOR_ONLY=1
-afl-fuzz -i seeds -o out -- /path/to/target @@
-```
-
-To avoid the parsing time, you could feed the generated tree files into the grammar mutator.
-In this case, the grammar mutator will directly read trees from files.
-
-```bash
-export AFL_CUSTOM_MUTATOR_LIBRARY=/path/to/libgrammarmutator.so
-export AFL_CUSTOM_MUTATOR_ONLY=1
-mkdir out
-cp -r trees out
-afl-fuzz -i seeds -o out -- /path/to/target @@
-```
-
-#### Using Existing Seeds
-
-Of course, you can feed your own fuzzing seeds to the fuzzer, which does not need to match with your input grammar file.
-Assuming that the grammar mutator is built with `grammars/ruby_grammar.json`, which is a simplified Ruby grammar and does not cover all Ruby syntax.
-Then, let's use test cases in `mruby` project as input fuzzing seeds.
-In this case, the parsing error will definitely occur.
-For any parsing errors, the grammar mutator will not terminate but save the error portion as a terminal node in the tree, such that we will not lose too much information on the original test case.
-
-Besides, the default memory limit for child process is `75M` in `afl-fuzz`.
-This may not be enough for some test cases, so we increase it to `128M` by adding an option `-m 128M`.
-
-```bash
-git clone https://github.com/mruby/mruby.git
-
-export AFL_CUSTOM_MUTATOR_LIBRARY=/path/to/libgrammarmutator.so
-export AFL_CUSTOM_MUTATOR_ONLY=1
-afl-fuzz -m 128M -i mruby/test/t -o ./out -- /path/to/target @@
+afl-fuzz -m 128 -i seeds -o out -- /path/to/target @@
 ```
 
 ## Contact & Contributions
