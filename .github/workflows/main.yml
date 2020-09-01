@@ -34,7 +34,7 @@ jobs:
     - name: CMake
       run: |
         cd ./build
-        cmake -DENABLE_TESTING=ON -DANTLR_JAR_LOCATION=$(realpath ../antlr-4.8-complete.jar) -DGRAMMAR_FILE=$(realpath ../grammars/ruby_grammar.json) ../
+        cmake -DENABLE_TESTING=ON -DANTLR_JAR_LOCATION=$(realpath ../antlr-4.8-complete.jar) -DGRAMMAR_FILE=$(realpath ../grammars/Ruby.json) ../
     - name: Compile
       run: cmake --build build --parallel $(nproc)
     - name: Unit testing
@@ -56,7 +56,7 @@ jobs:
         bash .github/workflows/setup-deps.sh
     - name: Compile
       run: |
-        make ENABLE_TESTING=1 GRAMMAR_FILE=grammars/ruby_grammar.json ANTLR_JAR_LOCATION=./antlr-4.8-complete.jar -j$(nproc)
+        make ENABLE_TESTING=1 GRAMMAR_FILE=grammars/Ruby.json ANTLR_JAR_LOCATION=./antlr-4.8-complete.jar -j$(nproc)
     - name: Unit testing
       run: |
         make test
