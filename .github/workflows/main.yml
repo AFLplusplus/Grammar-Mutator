@@ -40,11 +40,11 @@ jobs:
     - name: Unit testing
       run: |
         cd ./build
-        make test
+        gmake test
     - name: Valgrind memcheck on unit testing
       run: |
         cd ./build
-        make test_memcheck
+        gmake test_memcheck
 
   make-build:
     runs-on: ubuntu-latest
@@ -56,10 +56,10 @@ jobs:
         bash .github/workflows/setup-deps.sh
     - name: Compile
       run: |
-        make ENABLE_TESTING=1 GRAMMAR_FILE=grammars/Ruby.json ANTLR_JAR_LOCATION=./antlr-4.8-complete.jar -j$(nproc)
+        gmake ENABLE_TESTING=1 GRAMMAR_FILE=grammars/Ruby.json ANTLR_JAR_LOCATION=./antlr-4.8-complete.jar -j$(nproc)
     - name: Unit testing
       run: |
-        make test
+        gmake test
     - name: Valgrind memcheck on unit testing
       run: |
-        make test_memcheck
+        gmake test_memcheck
