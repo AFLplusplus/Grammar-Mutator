@@ -40,11 +40,11 @@ jobs:
     - name: Unit testing
       run: |
         cd ./build
-        make -f GNUmakefile test
+        make test
     - name: Valgrind memcheck on unit testing
       run: |
         cd ./build
-        make -f GNUmakefile test_memcheck
+        make test_memcheck
 
   make-build:
     runs-on: ubuntu-latest
