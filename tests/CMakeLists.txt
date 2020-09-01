@@ -120,65 +120,6 @@ add_test(
   COMMAND test_tree_trimming)
 
 # Test suite 7:
-# test the JSON grammar mutator with AFL++
-if (${GRAMMAR_FILE} STREQUAL ${CMAKE_SOURCE_DIR}/grammars/json_grammar.json)
-  find_program(AFL_FUZZ
-    NAMES "afl-fuzz"
-    DOC "american fuzzy lop")
-  if (NOT AFL_FUZZ)
-    message(STATUS "afl-fuzz not found!")
-  else ()
-    message(STATUS "afl-fuzz found: ${AFL_FUZZ}")
-    set(AFL_FUZZ_OUT_DIR "afl_fuzz_out")
-    if (NOT EXISTS ${AFL_FUZZ_OUT_DIR})
-      file(MAKE_DIRECTORY ${AFL_FUZZ_OUT_DIR})
-      message(STATUS "Create afl-fuzz output directory: ${AFL_FUZZ_OUT_DIR}")
-    else ()
-      message(STATUS "afl-fuzz output directory: ${AFL_FUZZ_OUT_DIR}")
-    endif ()
-
-    # Download and unpack json-parser at configure time
-    configure_file(
-      json-parser-download/CMakeLists.txt.in
-      json-parser-download/CMakeLists.txt)
-    execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-      RESULT_VARIABLE result
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/json-parser-download)
-    if (result)
-      message(FATAL_ERROR "CMake step for json-parser failed: ${result}")
-    endif ()
-    execute_process(COMMAND ${CMAKE_COMMAND} --build .
-      RESULT_VARIABLE result
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/json-parser-download)
-    if (result)
-      message(FATAL_ERROR "Build step for json-parser failed: ${result}")
-    endif ()
-    set(FUZZING_TARGET ${CMAKE_CURRENT_BINARY_DIR}/json-parser-src/test_json)
-
-    # Run afl-fuzz for 10 seconds, with fixed seed 0
-    add_test(
-      NAME fuzz_json_parser
-      COMMAND ${AFL_FUZZ} -V 10 -s 0 -i ${CMAKE_SOURCE_DIR}/examples/JSON/in -o ${AFL_FUZZ_OUT_DIR} -- ${FUZZING_TARGET} @@)
-    # Set environment variables
-    set_property(
-      TEST fuzz_json_parser
-      PROPERTY ENVIRONMENT "AFL_SKIP_CPUFREQ=1")
-    set_property(
-      TEST fuzz_json_parser
-      APPEND
-      PROPERTY ENVIRONMENT "AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1")
-    set_property(
-      TEST fuzz_json_parser
-      APPEND
-      PROPERTY ENVIRONMENT "AFL_CUSTOM_MUTATOR_ONLY=1")
-    set_property(
-      TEST fuzz_json_parser
-      APPEND
-      PROPERTY ENVIRONMENT "AFL_CUSTOM_MUTATOR_LIBRARY=${CMAKE_BINARY_DIR}/src/libgrammarmutator.so")
-  endif ()
-endif ()
-
-# Test suite 8:
 # test the third-party C map library
 add_executable(test_rxi_map test_rxi_map.cpp)
 target_link_libraries(test_rxi_map
@@ -191,7 +132,7 @@ add_test(
   NAME test_rxi_map
   COMMAND test_rxi_map)
 
-# Test suite 9:
+# Test suite 8:
 # test the third-party C set library
 add_executable(test_barrust_set test_barrust_set.cpp)
 target_link_libraries(test_barrust_set

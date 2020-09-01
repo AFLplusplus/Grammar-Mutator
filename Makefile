@@ -88,7 +88,7 @@ src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar
 
 lib/antlr4_shim/generated: grammars/f1_g4_translate.py .grammar
 	$(PYTHON) grammars/f1_g4_translate.py $(shell cat .grammar) ./grammars
-	@rm -rf lib/antlr4_shim/generated
+	@$(MAKE) -C lib clean
 	java -jar $(ANTLR_JAR_LOCATION) \
 	     -Dlanguage=Cpp -DcontextSuperClass=antlr4::RuleContextWithAltNum \
 	     -o lib/antlr4_shim/generated \
@@ -102,13 +102,13 @@ build: src/f1_c_fuzz.c include/f1_c_fuzz.h third_party build_lib
 
 .PHONY: build_lib
 build_lib: lib/antlr4_shim/generated src/f1_c_fuzz.c include/f1_c_fuzz.h third_party
-	@$(MAKE) -C lib all ANTLR_JAR_LOCATION=$(ANTLR_JAR_LOCATION)
+	@$(MAKE) -C lib all
 
 ifdef ENABLE_TESTING
 all: build_test
 
 .PHONY: build_test
-build_test: third_party
+build_test: build third_party
 	@$(MAKE) -C tests build GRAMMAR_FILE=$(GRAMMAR_FILE) GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
 endif
 
@@ -118,7 +118,7 @@ third_party:
 
 .PHONY: test
 test:
-	@$(MAKE) -C tests all
+	@$(MAKE) -C tests all GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
 
 .PHONY: test_memcheck
 test_memcheck:

@@ -23,7 +23,6 @@
 #include <GrammarParser.h>
 
 #include "antlr4_shim.h"
-#include "f1_c_fuzz.h"
 
 using namespace antlr4;
 
@@ -35,7 +34,7 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
     // we do not want to lose test case information
     auto terminal_node = dynamic_cast<antlr4::tree::TerminalNode *>(t);
     auto terminal_node_text = terminal_node->getText();
-    node = node_create(NODE_TERM__);
+    node = node_create(0);
     node_set_val(node, terminal_node_text.c_str(), terminal_node_text.length());
     return node;
   }
@@ -44,7 +43,7 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
   if (antlrcpp::is<antlr4::tree::TerminalNode *>(t)) {
     auto terminal_node = dynamic_cast<antlr4::tree::TerminalNode *>(t);
     auto terminal_node_text = terminal_node->getText();
-    node = node_create(NODE_TERM__);
+    node = node_create(0);
     node_set_val(node, terminal_node_text.c_str(), terminal_node_text.length());
     return node;
   }

@@ -1,6 +1,0 @@
-# Ignore everything
-*
-
-!.gitignore
-!Makefile
-!CMakeLists.txt.in

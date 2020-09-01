@@ -1,25 +1,33 @@
 export ENABLE_DEBUG
 
+BUILD = no
+ifeq "$(filter $(MAKECMDGOALS),build)" "build"
+override BUILD = yes
+endif
+
+ifeq ($(BUILD),yes)
+
+# Check GRAMMAR_FILENAME
+ifndef GRAMMAR_FILENAME
+$(error Please specify the grammar filename)
+endif
+ifeq (,$(GRAMMAR_FILENAME))
+$(error Please specify the grammar filename)
+endif
+
+endif
+
 SRC_FILES = $(wildcard test_*.cpp)
 TARGETS = $(SRC_FILES:.cpp=)
 MEMCHECK_TARGETS = $(TARGETS:=_memcheck)
 OBJS = $(SRC_FILES:.cpp=.o)
 
-GRAMMAR_MUTATOR_LIB = $(realpath ../src/libgrammarmutator.so)
+GRAMMAR_MUTATOR_LIB = $(realpath ../src/libgrammarmutator-$(GRAMMAR_FILENAME).so)
 RXI_MAP_LIB = $(realpath ../third_party/rxi_map/librxi_map.a)
 BARRUST_SET_LIB = $(realpath ../third_party/barrust_set/libbarrust_set.a)
 
 GTEST_DIR = googletest-download
 GTEST_VERSION = 1.10.0
-
-JSON_PARSER_DIR = json-parser-download
-
-AFL_FUZZ = afl-fuzz
-AFL_FUZZ_OUT_DIR = afl_fuzz_out
-AFL_FUZZ_ENVS = AFL_SKIP_CPUFREQ=1 \
-                AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
-                AFL_CUSTOM_MUTATOR_ONLY=1 \
-                AFL_CUSTOM_MUTATOR_LIBRARY=$(GRAMMAR_MUTATOR_LIB)
 
 VALGRIND = valgrind
 VALGRIND_LOG_DIR = valgrind_logs
@@ -43,19 +51,13 @@ CXX_FLAGS += -O3
 endif
 
 .PHONY: all
-all: check_grammarmutator run_test
+all: run_test
 
 .PHONY: build
 build: $(TARGETS)
 ifneq "$(shell command -v $(AFL_FUZZ) 2>/dev/null)" ""
 build: $(JSON_PARSER_DIR)/test_json
 endif
-
-.PHONY: check_grammarmutator
-check_grammarmutator:
-	@if [ "$(GRAMMAR_MUTATOR_LIB)x" = "x" ] ; then \
-		echo "Error: Please compile the grammar mutator at first."; exit 2; \
-	fi; \
 
 .PHONY: check_test_programs
 check_test_programs:
@@ -65,11 +67,6 @@ check_test_programs:
 			echo "Error: Please compile test programs at first (make ENABLE_TESTING=1)."; exit 2; \
 		fi; \
 	done
-ifneq "$(shell command -v $(AFL_FUZZ) 2>/dev/null)" ""
-	@if [ ! -f $(JSON_PARSER_DIR)/test_json ] ; then \
-		echo "Error: Please compile test programs at first (make ENABLE_TESTING=1)."; exit 2; \
-	fi;
-endif
 
 export GTEST_VERSION
 
@@ -124,68 +121,20 @@ test_rxi_map.o: test_rxi_map.cpp $(GTEST_INCLUDE)
 test_barrust_set.o: test_barrust_set.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/barrust_set $(CXX_FLAGS) -o $@ -c $<
 
-$(JSON_PARSER_DIR)/test_json:
-	@$(MAKE) -C $(JSON_PARSER_DIR) all
-
-$(AFL_FUZZ_OUT_DIR):
-	@mkdir -p $@
-
-ifneq "$(realpath $(GRAMMAR_FILE))" "$(realpath ../grammars/json_grammar.json)"
-
-# Not using the default JSON grammar
-.PHONY: fuzz_json_parser
-fuzz_json_parser:
-	@echo "Skip JSON grammar mutator test"
-
-.PHONY: fuzz_json_parser_memcheck
-fuzz_json_parser_memcheck:
-	@echo "Skip JSON grammar mutator test"
-
-else
-ifneq "$(shell command -v $(AFL_FUZZ) 2>/dev/null)" ""
-
-.PHONY: fuzz_json_parser
-fuzz_json_parser: $(JSON_PARSER_DIR)/test_json | $(AFL_FUZZ_OUT_DIR)
-	@echo "Test: fuzz json_parser"
-	@echo "[==========] Running afl-fuzz."
-	@$(AFL_FUZZ_ENVS) $(AFL_FUZZ) -V 10 -s 0 -i ../examples/JSON/in -o $(AFL_FUZZ_OUT_DIR) -- $< @@ > /dev/null
-	@echo "[  PASSED  ] 1 test."
-
-.PHONY: fuzz_json_parser_memcheck
-fuzz_json_parser_memcheck: $(JSON_PARSER_DIR)/test_json | $(AFL_FUZZ_OUT_DIR)
-	@echo "Test: fuzz json_parser"
-	@echo "[==========] Running afl-fuzz."
-	@$(AFL_FUZZ_ENVS) $(VALGRIND_CMD) --log-file=$(VALGRIND_LOG_DIR)/fuzz_json_parser.log $(AFL_FUZZ) -V 10 -s 0 -i ../examples/JSON/in -o $(AFL_FUZZ_OUT_DIR) -- $< @@ > /dev/null
-	@echo "[  PASSED  ] 1 test."
-
-else
-
-# No afl-fuzz
-.PHONY: fuzz_json_parser
-fuzz_json_parser:
-	@echo "No $(AFL_FUZZ) command"
-
-.PHONY: fuzz_json_parser_memcheck
-fuzz_json_parser_memcheck:
-	@echo "No $(AFL_FUZZ) command"
-
-endif
-endif
-
 .PHONY: run_test
-run_test: check_test_programs $(addprefix run_,$(TARGETS)) fuzz_json_parser
+run_test: check_test_programs $(addprefix run_,$(TARGETS))
 
 $(VALGRIND_LOG_DIR):
 	@mkdir -p $@
 
 .PHONY: memcheck
-memcheck: check_test_programs $(VALGRIND_LOG_DIR) $(MEMCHECK_TARGETS) fuzz_json_parser_memcheck
+memcheck: check_test_programs $(VALGRIND_LOG_DIR) $(MEMCHECK_TARGETS)
 	cat $(VALGRIND_LOG_DIR)/*.log
 
 .PHONY: clean
 clean:
 	@$(MAKE) -C $(GTEST_DIR) clean
-	@$(MAKE) -C $(JSON_PARSER_DIR) clean
 	@rm -f $(TARGETS)
 	@rm -f $(OBJS)
 	@rm -rf $(VALGRIND_LOG_DIR)
+	@rm -rf afl_test_fuzz_out
