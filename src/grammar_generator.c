@@ -21,58 +21,39 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <time.h>
 
 #include "f1_c_fuzz.h"
+#include "utils.h"
 
 int main(int argc, const char *argv[]) {
   int         seed, max_num, max_len;
   const char *out_dir, *tree_out_dir;
-//  size_t      out_dir_len, tree_out_dir_len;
 
-  if (argc < 5) {
-    printf("%s <random seed> <max_num> <max_size> <output_dir> <tree_output_dir>\n",
-           argv[0]);
+  if (argc < 4) {
+    printf(
+        "%s <max_num> <max_size> <output_dir> <tree_output_dir> [<random "
+        "seed>]\n",
+        argv[0]);
     return 0;
   }
 
-  seed = atoi(argv[1]);
-  max_num = atoi(argv[2]);
-  max_len = atoi(argv[3]);
-  out_dir = argv[4];
-//  out_dir_len = strlen(out_dir);
-  tree_out_dir = argv[5];
-//  tree_out_dir_len = strlen(tree_out_dir);
+  max_num = atoi(argv[1]);
+  max_len = atoi(argv[2]);
+  out_dir = argv[3];
+  tree_out_dir = argv[4];
+  seed = time(NULL);
+  if (argc > 5) seed = atoi(argv[1]);
 
   srandom(seed);
 
-  struct stat info;
-  if (stat(out_dir, &info) != 0) {
-    // The output directory does not exist
-    if (mkdir(out_dir, 0700) != 0) {
-      // error
-      perror("Cannot create the output directory");
-      return EXIT_FAILURE;
-    }
-  } else if (info.st_mode & S_IFDIR) {
-    // Exist
-  } else {
-    // Not a directory
-    perror("Wrong output path (stat)");
+  if (!create_directory(out_dir)) {
+    fprintf(stderr, "Cannot create the output directory\n");
     return EXIT_FAILURE;
   }
 
-  if (stat(tree_out_dir, &info) != 0) {
-    // The output directory does not exist
-    if (mkdir(tree_out_dir, 0700) != 0) {
-      // error
-      perror("Cannot create the tree output directory");
-      return EXIT_FAILURE;
-    }
-  } else if (info.st_mode & S_IFDIR) {
-    // Exist
-  } else {
-    // Not a directory
-    perror("Wrong tree output path (stat)");
+  if (!create_directory(tree_out_dir)) {
+    fprintf(stderr, "Cannot create the tree output directory\n");
     return EXIT_FAILURE;
   }
 

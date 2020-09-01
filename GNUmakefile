@@ -161,5 +161,5 @@ help:
 	@echo "                   files, e.g. \"ruby\" => ./grammar_generator-ruby"
 	@echo "ANTLR_JAR_LOCATION - the path to ANTLR4 jar file"
 	@echo "=========================================="
-	@echo "e.g.: make ENABLE_TESTING=1 GRAMMAR_FILE=./grammars/json_grammar.json \\"
+	@echo "e.g.: make ENABLE_TESTING=1 GRAMMAR_FILE=./grammars/ruby.json \\"
 	@echo "           ANTLR_JAR_LOCATION=./antlr-4.8-complete.jar"

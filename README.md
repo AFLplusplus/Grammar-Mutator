@@ -94,9 +94,11 @@ Usually, the larger the tree size is, the more complex the corresponding input s
 
 ```bash
 # Usage
-# ./grammar_generator-$GRAMMAR <random seed> <max_num> <max_size> <seed_output_dir> <tree_output_dir>
-# eg:
-./grammar_generator-ruby 123 100 1000 ./seeds ./trees
+# ./grammar_generator-$GRAMMAR <max_num> <max_size> <seed_output_dir> <tree_output_dir> [<random seed>]
+#
+# <random seed> is optional
+# e.g.:
+./grammar_generator-ruby 100 1000 ./seeds ./trees
 ```
 
 Afterwards copy the `trees` folder with that exact name to the output directory that you will use with afl-fuzz (e.g. `-o out`):
@@ -117,7 +119,7 @@ done
 ### Fuzzing the Target with the Grammar Mutator!
 
 Let's start running the fuzzer.
-This example command is using ruby grammar (from `grammars/ruby.json`) where mruby has been cloned to the root `Grammar-Mutator` directory.
+The following example command is using Ruby grammar (from `grammars/ruby.json`) where `mruby` project has been cloned to the root `Grammar-Mutator` directory.
 
 The default memory limit for child process is `75M` in `afl-fuzz`.
 This may not be enough for some test cases, so it is recommended to increase it to `128M` by adding an option `-m 128`.
