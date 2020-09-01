@@ -20,54 +20,54 @@ export ENABLE_TESTING
 
 BUILD = yes
 ifeq "$(filter $(MAKECMDGOALS),test)" "test"
-override BUILD = no
+  override BUILD = no
 endif
 ifeq "$(filter $(MAKECMDGOALS),test_memcheck)" "test_memcheck"
-override BUILD = no
+  override BUILD = no
 endif
 ifeq "$(filter $(MAKECMDGOALS),clean)" "clean"
-override BUILD = no
+  override BUILD = no
 endif
 ifeq "$(filter $(MAKECMDGOALS),help)" "help"
-override BUILD = no
+  override BUILD = no
 endif
 
 ifeq ($(BUILD),yes)
 
-ifndef ANTLR_JAR_LOCATION
-$(error Missing antlr4.jar path. Please specify it's path using: make ANTLR_JAR_LOCATION=<path>)
-else
-TEMP := $(abspath $(ANTLR_JAR_LOCATION))
-override ANTLR_JAR_LOCATION := $(TEMP)
-endif
-# Check whether ANTLR jar exists
-ifeq (,$(wildcard $(ANTLR_JAR_LOCATION)))
-$(error Unable to find antlr4.jar in $(ANTLR_JAR_LOCATION))
-endif
-ANTLR_NAME := $(basename $(shell basename $(ANTLR_JAR_LOCATION)))
-$(info Found $(ANTLR_NAME): $(ANTLR_JAR_LOCATION))
+  ifndef ANTLR_JAR_LOCATION
+    $(error Missing antlr4.jar path. Please specify it's path using: make ANTLR_JAR_LOCATION=<path>)
+  else
+    TEMP := $(abspath $(ANTLR_JAR_LOCATION))
+    override ANTLR_JAR_LOCATION := $(TEMP)
+  endif
+  # Check whether ANTLR jar exists
+  ifeq (,$(wildcard $(ANTLR_JAR_LOCATION)))
+    $(error Unable to find antlr4.jar in $(ANTLR_JAR_LOCATION))
+  endif
+  ANTLR_NAME := $(basename $(shell basename $(ANTLR_JAR_LOCATION)))
+  $(info Found $(ANTLR_NAME): $(ANTLR_JAR_LOCATION))
 
-ifndef GRAMMAR_FILE
-$(error Missing the grammar file path. Please specify it's path using: make GRAMMAR_FILE=<path>)
-else
-TEMP := $(abspath $(GRAMMAR_FILE))
-override GRAMMAR_FILE := $(TEMP)
-endif
-# Check whether the grammar file exists
-ifeq (,$(wildcard $(GRAMMAR_FILE)))
-$(error The grammar file does not exist: $(GRAMMAR_FILE))
-endif
-ifneq "$(shell cat .grammar 2> /dev/null)" "$(abspath $(GRAMMAR_FILE))"
-# Create or update .grammar
-$(info Create or update .grammar)
-$(shell echo $(abspath $(GRAMMAR_FILE)) > .grammar)
-endif
-ifndef GRAMMAR_FILENAME
-  GRAMMAR_FILENAME := $(shell basename $(GRAMMAR_FILE) | sed 's/[_.-].*//' | tr A-Z a-z)
-  $(info Selected grammar name: $(GRAMMAR_FILENAME) (from $(GRAMMAR_FILE)))
-else
-  $(info Selected grammar name: $(GRAMMAR_FILENAME))
-endif
+  ifndef GRAMMAR_FILE
+    $(error Missing the grammar file path. Please specify it's path using: make GRAMMAR_FILE=<path>)
+  else
+    TEMP := $(abspath $(GRAMMAR_FILE))
+    override GRAMMAR_FILE := $(TEMP)
+  endif
+  # Check whether the grammar file exists
+  ifeq (,$(wildcard $(GRAMMAR_FILE)))
+    $(error The grammar file does not exist: $(GRAMMAR_FILE))
+  endif
+  ifneq "$(shell cat .grammar 2> /dev/null)" "$(abspath $(GRAMMAR_FILE))"
+    # Create or update .grammar
+    $(info Create or update .grammar)
+    $(shell echo $(abspath $(GRAMMAR_FILE)) > .grammar)
+  endif
+  ifndef GRAMMAR_FILENAME
+    GRAMMAR_FILENAME := $(shell basename $(GRAMMAR_FILE) | sed 's/[_.-].*//' | tr A-Z a-z)
+    $(info Selected grammar name: $(GRAMMAR_FILENAME) (from $(GRAMMAR_FILE)))
+  else
+    $(info Selected grammar name: $(GRAMMAR_FILENAME))
+  endif
 
 endif
 
