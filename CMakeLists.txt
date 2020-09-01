@@ -82,7 +82,6 @@ endif ()
 get_filename_component(ANTLR_NAME ${ANTLR_JAR_LOCATION} NAME_WE)
 message(STATUS "Found ${ANTLR_NAME}: ${ANTLR_JAR_LOCATION}")
 
-
 # Python
 find_program(PYTHON
   NAMES "python3"

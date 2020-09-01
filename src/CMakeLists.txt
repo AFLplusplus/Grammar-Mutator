@@ -37,6 +37,8 @@ target_include_directories(grammarmutator
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/barrust_set
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/Cyan4973_xxHash)
+set_target_properties(grammarmutator
+  PROPERTIES OUTPUT_NAME "grammarmutator-${GRAMMAR_FILENAME}")
 
 # Grammar generator
 add_executable(grammar_generator
@@ -46,5 +48,7 @@ target_link_libraries(grammar_generator
 target_include_directories(grammarmutator
   PUBLIC ${CMAKE_SOURCE_DIR}/include
   PUBLIC ${CMAKE_BINARY_DIR}/f1/include)
+set_target_properties(grammar_generator
+  PROPERTIES OUTPUT_NAME "grammar_generator-${GRAMMAR_FILENAME}")
 
 add_subdirectory(benchmark)

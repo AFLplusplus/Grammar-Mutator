@@ -2,11 +2,10 @@
 
 ![Grammar Mutator CI](https://github.com/AFLplusplus/Grammar-Mutator/workflows/Grammar%20Mutator%20CI/badge.svg)
 
-A grammar-based custom mutator for AFL++ during GSoC '20.
+A grammar-based custom mutator for AFL++ to handle highly-structured inputs.
 
 - Developer: [Shengtuo Hu (h1994st)](https://github.com/h1994st)
 - Mentors: [Marc Heuse](https://github.com/vanhauser-thc), [Andrea Fioraldi](https://github.com/andreafioraldi)
-- [GSoC task tracking](https://github.com/AFLplusplus/Grammar-Mutator/projects/1)
 
 ## Overview
 
@@ -48,17 +47,17 @@ sudo make install
 
 Next you need to build the grammar mutator.
 To specify the grammar file, eg. Ruby, you can use `GRAMMAR_FILE` environment variable.
-There are several grammar files in `grammars` directory, such as `json_grammar.json` and `ruby_grammar.json`.
+There are several grammar files in `grammars` directory, such as `JSON.json` and `Ruby.json`.
 Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about the input grammar file.
 Note that pull requests with new grammars are welcome! :-)
 
 ```bash
-make GRAMMAR_FILE=grammars/ruby_grammar.json \
+make GRAMMAR_FILE=grammars/Ruby.json \
      ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar
 ```
 
-Now, you should be able to see two symbolic files `libgrammarmutator.so` and `grammar_generator` under the root directory.
-These two files are actually locate in the `src` directory.
+Now, you should be able to see two symbolic files `libgrammarmutator-Ruby.so` and `grammar_generator` under the root directory.
+These two files actually locate in the `src` directory.
 
 If you would like to fork the project and fix bugs or contribute to the project, you can take a look at [building-grammar-mutator.md](doc/building-grammar-mutator.md) for full building instructions.
 
@@ -76,14 +75,12 @@ Before fuzzing the real program, you need to prepare the input fuzzing seeds. Yo
 #### Using Existing Seeds
 
 You can feed your own fuzzing seeds to the fuzzer, which does not need to match with your input grammar file.
-Assuming that the grammar mutator is built with `grammars/ruby_grammar.json`, which is a simplified Ruby grammar and does not cover all Ruby syntax.
+Assuming that the grammar mutator is built with `grammars/Ruby.json`, which is a simplified Ruby grammar and does not cover all Ruby syntax.
 In this case, the parsing error will definitely occur.
 For any parsing errors, the grammar mutator will not terminate but save the error portion as a terminal node in the tree, such that we will not lose too much information on the original test case.
 
 To e.g. use the test cases of the `mruby` project as input fuzzing seeds just pass the `-i mruby/test/t` to afl-fuzz
 when we run the fuzzer (if it has been checked out with `git clone https://github.com/mruby/mruby.git` in the current directory).
-
-
 
 #### Using Generated Seeds
 

@@ -15,7 +15,27 @@
 # A grammar-based custom mutator written for GSoC '20.
 #
 
-TARGETS = libgrammarmutator.so grammar_generator benchmark/benchmark
+BUILD = yes
+ifeq "$(filter $(MAKECMDGOALS),clean)" "clean"
+override BUILD = no
+endif
+
+ifeq ($(BUILD),yes)
+
+# Check GRAMMAR_FILENAME
+ifndef GRAMMAR_FILENAME
+$(error Please specify the grammar filename)
+endif
+ifeq (,$(GRAMMAR_FILENAME))
+$(error Please specify the grammar filename)
+endif
+
+endif
+
+GRAMMAR_MUTATOR_LIB = libgrammarmutator-$(GRAMMAR_FILENAME).so
+GRAMMAR_GENERATOR_PROM = grammar_generator-$(GRAMMAR_FILENAME)
+BENCH_PROM = benchmark/benchmark-$(GRAMMAR_FILENAME)
+TARGETS = $(GRAMMAR_MUTATOR_LIB) $(GRAMMAR_GENERATOR_PROM) $(BENCH_PROM)
 
 LIB_SRC_FILES = chunk_store.c f1_c_fuzz.c grammar_mutator.c list.c tree.c tree_mutation.c tree_trimming.c hash.c utils.c
 GEN_SRC_FILES = grammar_generator.c
@@ -49,8 +69,8 @@ endif
 .PHONY: all
 all: $(TARGETS)
 
-libgrammarmutator.so: $(LIB_OBJS)
-	$(CXX) -fPIC $(C_FLAGS) -shared -Wl,-soname,libgrammarmutator.so -o $@ $^ $(LDFLAGS)
+$(GRAMMAR_MUTATOR_LIB): $(LIB_OBJS)
+	$(CXX) -fPIC $(C_FLAGS) -shared -Wl,-soname,$(GRAMMAR_MUTATOR_LIB) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(C_DEFINES) $(C_INCLUDES) -fPIC $(C_FLAGS) -o $@ -c $<
@@ -58,16 +78,16 @@ libgrammarmutator.so: $(LIB_OBJS)
 grammar_generator.o: grammar_generator.c
 	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) -o $@ -c $<
 
-grammar_generator: $(GEN_OBJS) libgrammarmutator.so
-	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) libgrammarmutator.so
+$(GRAMMAR_GENERATOR_PROM): $(GEN_OBJS) $(GRAMMAR_MUTATOR_LIB)
+	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB)
 
 benchmark/benchmark.o: benchmark/benchmark.c
 	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) -o $@ -c $<
 
-benchmark/benchmark: $(BENCHMARK_OBJS) libgrammarmutator.so
-	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) libgrammarmutator.so -lm
+$(BENCH_PROM): $(BENCHMARK_OBJS) $(GRAMMAR_MUTATOR_LIB)
+	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB) -lm
 
 .PHONY: clean
 clean:
 	@rm -f $(OBJS)
-	@rm -f $(TARGETS)
+	@rm -f libgrammarmutator-*.so grammar_generator-* benchmark/benchmark-*

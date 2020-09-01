@@ -107,7 +107,6 @@ test_%.o: test_%.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
 
 ifeq "$(realpath $(GRAMMAR_FILE))" "$(realpath ../grammars/ruby_grammar.json)"
-$(info Enable testing on parsing 'testcases/array.rb')
 test_tree.o: test_tree.cpp $(GTEST_INCLUDE)
 	$(CXX) -DENABLE_PARSING_ARRAY_RB -DARRAY_RB_PATH=\"`realpath testcases/array.rb`\" \
 	       $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<

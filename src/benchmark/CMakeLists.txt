@@ -24,3 +24,5 @@ target_link_libraries(benchmark
 target_include_directories(benchmark
   PUBLIC ${CMAKE_SOURCE_DIR}/include
   PUBLIC ${CMAKE_BINARY_DIR}/f1/include)
+set_target_properties(benchmark
+  PROPERTIES OUTPUT_NAME "benchmark-${GRAMMAR_FILENAME}")

@@ -18,41 +18,53 @@
 export ENABLE_DEBUG
 export ENABLE_TESTING
 
+BUILD = yes
 ifeq "$(filter $(MAKECMDGOALS),test)" "test"
-override GRAMMAR_FILE = $(shell cat .grammar 2> /dev/null)
-override ANTLR_JAR_LOCATION = ""
+override BUILD = no
 endif
 ifeq "$(filter $(MAKECMDGOALS),test_memcheck)" "test_memcheck"
-override GRAMMAR_FILE = $(shell cat .grammar 2> /dev/null)
-override ANTLR_JAR_LOCATION = ""
+override BUILD = no
 endif
 ifeq "$(filter $(MAKECMDGOALS),clean)" "clean"
-override GRAMMAR_FILE = ""
-override ANTLR_JAR_LOCATION = ""
+override BUILD = no
 endif
 ifeq "$(filter $(MAKECMDGOALS),help)" "help"
-override GRAMMAR_FILE = ""
-override ANTLR_JAR_LOCATION = ""
+override BUILD = no
 endif
 
-ifndef GRAMMAR_FILE
-$(error Missing the grammar file path. Please specify it's path using: make GRAMMAR_FILE=<path>)
-else
-TEMP := $(realpath $(GRAMMAR_FILE))
-override GRAMMAR_FILE := $(TEMP)
-endif
-
-ifneq "$(shell cat .grammar 2> /dev/null)" "$(realpath $(GRAMMAR_FILE))"
-# Create or update .grammar
-$(info Create or update .grammar)
-$(shell echo $(realpath $(GRAMMAR_FILE)) > .grammar)
-endif
+ifeq ($(BUILD),yes)
 
 ifndef ANTLR_JAR_LOCATION
 $(error Missing antlr4.jar path. Please specify it's path using: make ANTLR_JAR_LOCATION=<path>)
 else
-TEMP := $(realpath $(ANTLR_JAR_LOCATION))
+TEMP := $(abspath $(ANTLR_JAR_LOCATION))
 override ANTLR_JAR_LOCATION := $(TEMP)
+endif
+# Check whether ANTLR jar exists
+ifeq (,$(wildcard $(ANTLR_JAR_LOCATION)))
+$(error Unable to find antlr4.jar in $(ANTLR_JAR_LOCATION))
+endif
+ANTLR_NAME := $(basename $(shell basename $(ANTLR_JAR_LOCATION)))
+$(info Found $(ANTLR_NAME): $(ANTLR_JAR_LOCATION))
+
+ifndef GRAMMAR_FILE
+$(error Missing the grammar file path. Please specify it's path using: make GRAMMAR_FILE=<path>)
+else
+TEMP := $(abspath $(GRAMMAR_FILE))
+override GRAMMAR_FILE := $(TEMP)
+endif
+# Check whether the grammar file exists
+ifeq (,$(wildcard $(GRAMMAR_FILE)))
+$(error The grammar file does not exist: $(GRAMMAR_FILE))
+endif
+ifneq "$(shell cat .grammar 2> /dev/null)" "$(abspath $(GRAMMAR_FILE))"
+# Create or update .grammar
+$(info Create or update .grammar)
+$(shell echo $(abspath $(GRAMMAR_FILE)) > .grammar)
+endif
+GRAMMAR_FILENAME := $(basename $(shell basename $(GRAMMAR_FILE)))
+$(info Found $(GRAMMAR_FILENAME): $(GRAMMAR_FILE))
+
 endif
 
 PYTHON = python3
@@ -61,26 +73,35 @@ CXX_FLAGS_OPT = -Wall -Wextra -Werror
 export C_FLAGS_OPT
 export CXX_FLAGS_OPT
 
-GEN_FILES = .grammar src/f1_c_fuzz.c include/f1_c_fuzz.h grammars/Grammar.g4
+GEN_FILES = \
+	.grammar \
+	grammars/Grammar.g4 \
+	src/f1_c_fuzz.c include/f1_c_fuzz.h \
+	lib/antlr4_shim/generated
 
 .PHONY: all
 all: build
 
+# Generation
 src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar
-	@echo "Grammar: $(shell cat .grammar)"
-	$(PYTHON) $< $(shell cat .grammar) $(CURDIR)
+	$(PYTHON) grammars/f1_c_gen.py $(shell cat .grammar) $(CURDIR)
+
+lib/antlr4_shim/generated: grammars/f1_g4_translate.py .grammar
+	$(PYTHON) grammars/f1_g4_translate.py $(shell cat .grammar) ./grammars
+	@rm -rf lib/antlr4_shim/generated
+	java -jar $(ANTLR_JAR_LOCATION) \
+	     -Dlanguage=Cpp -DcontextSuperClass=antlr4::RuleContextWithAltNum \
+	     -o lib/antlr4_shim/generated \
+	     $(abspath grammars/Grammar.g4)
 
 .PHONY: build
 build: src/f1_c_fuzz.c include/f1_c_fuzz.h third_party build_lib
-	@$(MAKE) -C src all
-	@ln -sf src/grammar_generator grammar_generator
-	@ln -sf src/libgrammarmutator.so libgrammarmutator.so
-
-grammars/Grammar.g4: grammars/f1_g4_translate.py .grammar
-	$(PYTHON) $< $(shell cat .grammar) ./grammars
+	@$(MAKE) -C src all GRAMMAR_FILE=$(GRAMMAR_FILE) GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
+	@ln -sf src/grammar_generator-$(GRAMMAR_FILENAME) grammar_generator-$(GRAMMAR_FILENAME)
+	@ln -sf src/libgrammarmutator-$(GRAMMAR_FILENAME).so libgrammarmutator-$(GRAMMAR_FILENAME).so
 
 .PHONY: build_lib
-build_lib: grammars/Grammar.g4 src/f1_c_fuzz.c include/f1_c_fuzz.h third_party
+build_lib: lib/antlr4_shim/generated src/f1_c_fuzz.c include/f1_c_fuzz.h third_party
 	@$(MAKE) -C lib all ANTLR_JAR_LOCATION=$(ANTLR_JAR_LOCATION)
 
 ifdef ENABLE_TESTING
@@ -88,7 +109,7 @@ all: build_test
 
 .PHONY: build_test
 build_test: third_party
-	@$(MAKE) -C tests build GRAMMAR_FILE=$(GRAMMAR_FILE)
+	@$(MAKE) -C tests build GRAMMAR_FILE=$(GRAMMAR_FILE) GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
 endif
 
 .PHONY: third_party
@@ -109,9 +130,9 @@ clean:
 	@$(MAKE) -C src $@
 	@$(MAKE) -C tests $@
 	@$(MAKE) -C third_party $@
-	@rm -f $(GEN_FILES)
+	@rm -rf $(GEN_FILES)
 	@rm -rf grammars/__pycache__
-	@rm -f grammar_generator libgrammarmutator.so
+	@rm -f grammar_generator-* libgrammarmutator-*.so
 
 .PHONY: help
 help:

@@ -1,4 +1,4 @@
 # Generated targets
-grammar_generator
-libgrammarmutator.so
-benchmark/benchmark
+grammar_generator-*
+libgrammarmutator-*.so
+benchmark/benchmark-*

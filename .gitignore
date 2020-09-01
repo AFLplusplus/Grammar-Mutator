@@ -49,5 +49,5 @@ __pycache__/
 out/
 
 # Generated targets
-grammar_generator
-libgrammarmutator.so
+grammar_generator-*
+libgrammarmutator-*.so
