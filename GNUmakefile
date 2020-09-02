@@ -111,6 +111,16 @@ build_lib: lib/antlr4_shim/generated src/f1_c_fuzz.c include/f1_c_fuzz.h third_p
 ifdef ENABLE_TESTING
 all: build_test
 
+.PHONY: code-format
+code-format:
+	./.custom-format.py -i src/*.c
+	./.custom-format.py -i json-parser/*.c
+	./.custom-format.py -i tests/*.cpp
+	./.custom-format.py -i src/*.h
+	./.custom-format.py -i json-parser/*.h
+	./.custom-format.py -i tests/*.h
+	./.custom-format.py -i include/*.h
+
 .PHONY: build_test
 build_test: build third_party
 	@$(MAKE) -C tests build GRAMMAR_FILE=$(GRAMMAR_FILE) GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
@@ -149,6 +159,7 @@ help:
 	@echo "test_memcheck: runs Valgrind with all test cases to pinpoint memory leaks"
 	@echo "               (if ENABLE_TESTING=1 and have Valgrind)"
 	@echo "clean: cleans everything compiled"
+	@echo "code-format: format the code with a clang-format config (llvm 10)"
 	@echo "help: shows help information"
 	@echo "=========================================="
 	@echo

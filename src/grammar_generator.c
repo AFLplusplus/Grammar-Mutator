@@ -42,10 +42,11 @@ int main(int argc, const char *argv[]) {
   max_len = atoi(argv[2]);
   out_dir = argv[3];
   tree_out_dir = argv[4];
-  seed = time(NULL);
   if (argc > 5) seed = atoi(argv[1]);
+  else seed = (int)time(NULL);
 
-  srandom(seed);
+  printf("Using seed %d\n", seed);
+  srandom((unsigned int) seed);
 
   if (!create_directory(out_dir)) {
     fprintf(stderr, "Cannot create the output directory\n");
