@@ -20,6 +20,7 @@
 #include "tree_trimming.h"
 
 tree_t *subtree_trimming(tree_t *tree, node_t *node) {
+
   tree_t *trimmed_tree = NULL;
 
   // generate the minimal subtree
@@ -29,10 +30,12 @@ tree_t *subtree_trimming(tree_t *tree, node_t *node) {
 
   node_t *parent = node->parent;
   if (!parent) {
+
     // no parent, meaning that the input node is the root node in the tree
     trimmed_tree = tree_create();
     trimmed_tree->root = min_node;
     return trimmed_tree;
+
   }
 
   // detach `node` from `parent`
@@ -52,25 +55,31 @@ tree_t *subtree_trimming(tree_t *tree, node_t *node) {
   node_free(min_node);
 
   return trimmed_tree;
+
 }
 
 tree_t *recursive_trimming(tree_t *tree, edge_t edge) {
+
   tree_t *trimmed_tree = NULL;
 
   node_t *parent = edge.parent;
   node_t *tail = edge.subnode;
   if (!parent || !tail) {
+
     // if `edge` is empty, return the original tree
     trimmed_tree = tree_clone(tree);
     return trimmed_tree;
+
   }
 
   node_t *pre_parent = parent->parent;
   if (!pre_parent) {
+
     // if `parent` is the root node of the tree, return the tail part
     trimmed_tree = tree_create();
     trimmed_tree->root = node_clone(tail);
     return trimmed_tree;
+
   }
 
   // detach `tail` from `parent`
@@ -95,4 +104,6 @@ tree_t *recursive_trimming(tree_t *tree, edge_t edge) {
   tail->parent = parent;
 
   return trimmed_tree;
+
 }
+

@@ -27,40 +27,50 @@
 #include "utils.h"
 
 int main(int argc, const char *argv[]) {
+
   int         seed, max_num, max_len;
   const char *out_dir, *tree_out_dir;
 
   if (argc < 4) {
+
     printf(
         "%s <max_num> <max_size> <output_dir> <tree_output_dir> [<random "
         "seed>]\n",
         argv[0]);
     return 0;
+
   }
 
   max_num = atoi(argv[1]);
   max_len = atoi(argv[2]);
   out_dir = argv[3];
   tree_out_dir = argv[4];
-  if (argc > 5) seed = atoi(argv[1]);
-  else seed = (int)time(NULL);
+  if (argc > 5)
+    seed = atoi(argv[1]);
+  else
+    seed = (int)time(NULL);
 
   printf("Using seed %d\n", seed);
-  srandom((unsigned int) seed);
+  srandom((unsigned int)seed);
 
   if (!create_directory(out_dir)) {
+
     fprintf(stderr, "Cannot create the output directory\n");
     return EXIT_FAILURE;
+
   }
 
   if (!create_directory(tree_out_dir)) {
+
     fprintf(stderr, "Cannot create the tree output directory\n");
     return EXIT_FAILURE;
+
   }
 
   char    fn[PATH_MAX];
   tree_t *tree = NULL;
   for (int i = 0; i < max_num; ++i) {
+
     tree = gen_init__(max_len);
 
     snprintf(fn, PATH_MAX, "%s/%d", out_dir, i);
@@ -69,7 +79,10 @@ int main(int argc, const char *argv[]) {
     write_tree_to_file(tree, fn);
 
     tree_free(tree);
+
   }
 
   return 0;
+
 }
+

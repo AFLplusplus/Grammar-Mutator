@@ -23,6 +23,7 @@
 #include "gtest_ext.h"
 
 TEST(TreeMutationTest, RandomMutation) {
+
   srandom(0);  // Fix the random seed
 
   auto tree = tree_create();
@@ -36,9 +37,11 @@ TEST(TreeMutationTest, RandomMutation) {
 
   tree_free(tree);
   tree_free(mutated_tree);
+
 }
 
 TEST(TreeMutationTest, RandomRecursiveMutation) {
+
   srandom(0);  // Fix the random seed
 
   auto tree = tree_create();
@@ -66,4 +69,6 @@ TEST(TreeMutationTest, RandomRecursiveMutation) {
 
   tree_free(tree);
   tree_free(mutated_tree);
+
 }
+

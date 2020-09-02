@@ -25,6 +25,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 typedef map_t(list_t *) list_map_t;
@@ -37,7 +38,10 @@ void   hash_node(node_t *node, char dest[9]);
 void   chunk_store_add_node(node_t *node);
 
 #ifdef __cplusplus
+
 }
+
 #endif
 
 #endif
+

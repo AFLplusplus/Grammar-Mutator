@@ -5,6 +5,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 /**
@@ -32,7 +33,10 @@ node_t *chunk_store_get_alternative_node(node_t *node);
 void chunk_store_clear();
 
 #ifdef __cplusplus
+
 }
+
 #endif
 
 #endif
+

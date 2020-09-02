@@ -13,10 +13,12 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 typedef struct tree_node node_t;
 struct tree_node {
+
   uint32_t id;       // node type
   uint32_t rule_id;  // rule id
 
@@ -34,13 +36,16 @@ struct tree_node {
   size_t recursion_edge_size;  // the total number of recursion edges in the
   // subtree
   size_t non_term_size;  // the number of non-terminal nodes in the subtree
+
 };
 
 typedef struct edge edge_t;
 struct edge {
+
   node_t *parent;
   node_t *subnode;
   size_t  subnode_offset;
+
 };
 
 /**
@@ -159,6 +164,7 @@ edge_t node_pick_recursion_edge(node_t *node);
 edge_t node_get_parent_edge(node_t *node);
 
 typedef struct tree {
+
   node_t *root;
 
   // uint8_t *data_buf;
@@ -173,6 +179,7 @@ typedef struct tree {
 
   list_t *non_terminal_node_list;
   list_t *recursion_edge_list;
+
 } tree_t;
 
 /**
@@ -280,7 +287,10 @@ void write_tree_to_file(tree_t *tree, const char *filename);
 void dump_tree_to_test_case(tree_t *tree, const char *filename);
 
 #ifdef __cplusplus
+
 }
+
 #endif
 
 #endif
+

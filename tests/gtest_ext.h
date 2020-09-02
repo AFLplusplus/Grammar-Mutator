@@ -32,3 +32,4 @@
   EXPECT_NE(memcmp((void *)(mem1), (void *)(mem2), (int)(len)), 0)
 
 #endif  // GRAMMAR_MUTATOR_GTEST_EXT_H
+

@@ -25,19 +25,26 @@
 using namespace std;
 
 class ChunkStoreTest : public ::testing::Test {
+
  protected:
   ChunkStoreTest() = default;
 
   void SetUp() override {
+
     chunk_store_init();
+
   }
 
   void TearDown() override {
+
     chunk_store_clear();
+
   }
+
 };
 
 TEST_F(ChunkStoreTest, SeenChunk) {
+
   auto node1 = node_create_with_val(1, "test", 4);
   auto node2 = node_clone(node1);
 
@@ -53,9 +60,11 @@ TEST_F(ChunkStoreTest, SeenChunk) {
 
   node_free(node1);
   node_free(node2);
+
 }
 
 TEST_F(ChunkStoreTest, AddNode) {
+
   auto node1 = node_create(1);
   auto node2 = node_create_with_val(0, "\r", 1);
   node_init_subnodes(node1, 1);
@@ -70,9 +79,11 @@ TEST_F(ChunkStoreTest, AddNode) {
   EXPECT_EQ(set_length(&seen_chunks), node_list->size);
 
   node_free(node1);
+
 }
 
 TEST_F(ChunkStoreTest, AddTree) {
+
   auto tree = tree_create();  // "{" + "123" + "}"
   auto node1 = node_create(1);
   auto node2 = node_create_with_val(0, "{", 1);
@@ -95,9 +106,11 @@ TEST_F(ChunkStoreTest, AddTree) {
   EXPECT_EQ(node_list->size, 2);
 
   tree_free(tree);
+
 }
 
 TEST_F(ChunkStoreTest, GetAlternativeNode) {
+
   // input: nullptr, output: nullptr
   EXPECT_EQ(chunk_store_get_alternative_node(nullptr), nullptr);
 
@@ -112,9 +125,13 @@ TEST_F(ChunkStoreTest, GetAlternativeNode) {
 
   node_free(node);
   node_free(_node);
+
 }
 
 int main(int argc, char **argv) {
+
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
+
 }
+

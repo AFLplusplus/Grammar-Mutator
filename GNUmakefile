@@ -31,6 +31,9 @@ endif
 ifeq "$(filter $(MAKECMDGOALS),help)" "help"
   override BUILD = no
 endif
+ifeq "$(filter $(MAKECMDGOALS),code-format)" "code-format"
+  override BUILD = no
+endif
 
 ifeq ($(BUILD),yes)
 
@@ -111,16 +114,6 @@ build_lib: lib/antlr4_shim/generated src/f1_c_fuzz.c include/f1_c_fuzz.h third_p
 ifdef ENABLE_TESTING
 all: build_test
 
-.PHONY: code-format
-code-format:
-	./.custom-format.py -i src/*.c
-	./.custom-format.py -i json-parser/*.c
-	./.custom-format.py -i tests/*.cpp
-	./.custom-format.py -i src/*.h
-	./.custom-format.py -i json-parser/*.h
-	./.custom-format.py -i tests/*.h
-	./.custom-format.py -i include/*.h
-
 .PHONY: build_test
 build_test: build third_party
 	@$(MAKE) -C tests build GRAMMAR_FILE=$(GRAMMAR_FILE) GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
@@ -137,6 +130,16 @@ test:
 .PHONY: test_memcheck
 test_memcheck:
 	@$(MAKE) -C tests memcheck
+
+.PHONY: code-format
+code-format:
+	./.custom-format.py -i src/*.c
+	./.custom-format.py -i json-parser/*.c
+	./.custom-format.py -i tests/*.cpp
+	./.custom-format.py -i src/*.h
+	./.custom-format.py -i json-parser/*.h
+	./.custom-format.py -i tests/*.h
+	./.custom-format.py -i include/*.h
 
 .PHONY: clean
 clean:

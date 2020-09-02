@@ -5,6 +5,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 // File/directory operations
@@ -27,7 +28,10 @@ bool create_directory(const char *path);
 bool remove_directory(const char *path);
 
 #ifdef __cplusplus
+
 }
+
 #endif
 
 #endif
+
