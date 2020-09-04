@@ -71,4 +71,3 @@ TEST(TreeMutationTest, RandomRecursiveMutation) {
   tree_free(mutated_tree);
 
 }
-

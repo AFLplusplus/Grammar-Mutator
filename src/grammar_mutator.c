@@ -572,4 +572,3 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
   data->mutated_tree = NULL;
 
 }
-

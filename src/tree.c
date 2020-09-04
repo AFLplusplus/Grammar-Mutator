@@ -932,4 +932,3 @@ void dump_tree_to_test_case(tree_t *tree, const char *filename) {
   close(fd);
 
 }
-

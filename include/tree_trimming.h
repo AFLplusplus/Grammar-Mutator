@@ -5,7 +5,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-
 #endif
 
 /**
@@ -33,10 +32,7 @@ tree_t *subtree_trimming(tree_t *tree, node_t *node);
 tree_t *recursive_trimming(tree_t *tree, edge_t edge);
 
 #ifdef __cplusplus
-
 }
-
 #endif
 
 #endif
-

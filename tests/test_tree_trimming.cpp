@@ -79,4 +79,3 @@ TEST(TreeTrimmingTest, RecursiveTrimming) {
   tree_free(trimmed_tree);
 
 }
-

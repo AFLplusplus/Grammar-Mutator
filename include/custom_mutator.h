@@ -21,7 +21,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-
 #endif
 
 typedef struct afl {
@@ -94,10 +93,7 @@ void     afl_custom_queue_new_entry(my_mutator_t * data,
                                     const uint8_t *filename_orig_queue);
 
 #ifdef __cplusplus
-
 }
-
 #endif
 
 #endif
-

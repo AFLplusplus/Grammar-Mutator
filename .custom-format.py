@@ -53,7 +53,7 @@ if CLANG_FORMAT_BIN is None:
     #        exit(1)
     else:
         CLANG_FORMAT_BIN = 'clang-format-10'
-            
+
 COLUMN_LIMIT = 80
 for line in fmt.split("\n"):
     line = line.split(":")
@@ -69,12 +69,12 @@ def custom_format(filename):
     in_define = False
     last_line = None
     out = ""
-    
+
     for line in src.split("\n"):
         if line.lstrip().startswith("#"):
             if line[line.find("#")+1:].lstrip().startswith("define"):
                 in_define = True
-        
+
         if "/*" in line and not line.strip().startswith("/*") and line.endswith("*/") and len(line) < (COLUMN_LIMIT-2):
             cmt_start = line.rfind("/*")
             line = line[:cmt_start] + " " * (COLUMN_LIMIT-2 - len(line)) + line[cmt_start:]
@@ -120,4 +120,3 @@ for filename in args:
             f.write(code)
     else:
         print(code)
-

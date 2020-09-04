@@ -91,4 +91,3 @@ bool remove_directory(const char *path) {
   return true;
 
 }
-

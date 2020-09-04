@@ -6,7 +6,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-
 #endif
 
 // a doubly linked list
@@ -95,10 +94,7 @@ void *list_get(list_t *list, size_t i);
 bool list_empty(list_t *list);
 
 #ifdef __cplusplus
-
 }
-
 #endif
 
 #endif
-

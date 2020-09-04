@@ -13,7 +13,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-
 #endif
 
 typedef struct tree_node node_t;
@@ -287,10 +286,7 @@ void write_tree_to_file(tree_t *tree, const char *filename);
 void dump_tree_to_test_case(tree_t *tree, const char *filename);
 
 #ifdef __cplusplus
-
 }
-
 #endif
 
 #endif
-

@@ -220,4 +220,3 @@ inline bool list_empty(list_t *list) {
   return false;
 
 }
-

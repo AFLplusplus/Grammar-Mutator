@@ -106,4 +106,3 @@ tree_t *recursive_trimming(tree_t *tree, edge_t edge) {
   return trimmed_tree;
 
 }
-

@@ -150,4 +150,3 @@ void chunk_store_clear() {
   tree_free(temp_tree);
 
 }
-

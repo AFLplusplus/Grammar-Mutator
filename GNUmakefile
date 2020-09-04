@@ -134,10 +134,8 @@ test_memcheck:
 .PHONY: code-format
 code-format:
 	./.custom-format.py -i src/*.c
-	./.custom-format.py -i json-parser/*.c
 	./.custom-format.py -i tests/*.cpp
 	./.custom-format.py -i src/*.h
-	./.custom-format.py -i json-parser/*.h
 	./.custom-format.py -i tests/*.h
 	./.custom-format.py -i include/*.h
 

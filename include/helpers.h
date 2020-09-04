@@ -3,7 +3,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-
 #endif
 
 /* Use in a struct: creates a name_buf and a name_size variable. */
@@ -86,10 +85,7 @@ static inline void *maybe_grow(void **buf, size_t *size, size_t size_needed) {
 #undef INITIAL_GROWTH_SIZE
 
 #ifdef __cplusplus
-
 }
-
 #endif
 
 #endif
-
