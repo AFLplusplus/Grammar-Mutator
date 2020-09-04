@@ -103,9 +103,19 @@ TEST(TreeMutationTest, SplicingMutation) {
   tree2->root = node6;
 
   chunk_store_init();
+
+  // mutate NULL
+  auto tree3 = splicing_mutation(nullptr);
+  EXPECT_EQ(tree3, nullptr);
+
+  // empty chunk store - return an identical tree
+  tree3 = splicing_mutation(tree2);
+  EXPECT_TRUE(tree_equal(tree3, tree2));
+
+  // add tree1 and all its subtrees to the chunk store
   chunk_store_add_tree(tree1);
 
-  auto tree3 = splicing_mutation(tree2);
+  tree3 = splicing_mutation(tree2);
   tree_to_buf(tree3);
   EXPECT_MEMEQ(tree3->data_buf, "123", 3);
 

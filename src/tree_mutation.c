@@ -150,6 +150,8 @@ size_t rules_mutation_count(tree_t *tree) {
 
 tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
 
+  if (unlikely(!tree)) return NULL;
+
   tree_t *mutated_tree = tree_clone(tree);
 
   edge_t picked_edge = node_pick_recursion_edge(mutated_tree->root);
@@ -191,6 +193,8 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
 }
 
 tree_t *splicing_mutation(tree_t *tree) {
+
+  if (unlikely(!tree)) return NULL;
 
   tree_t *mutated_tree = tree_clone(tree);
 
