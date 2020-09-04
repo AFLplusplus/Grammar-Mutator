@@ -16,6 +16,7 @@
 
  */
 
+#include "chunk_store.h"
 #include "tree.h"
 #include "tree_mutation.h"
 
@@ -69,5 +70,48 @@ TEST(TreeMutationTest, RandomRecursiveMutation) {
 
   tree_free(tree);
   tree_free(mutated_tree);
+
+}
+
+TEST(TreeMutationTest, SplicingMutation) {
+
+  srandom(0);  // Fix the random seed
+
+  auto tree1 = tree_create();  // "{" + "123" + "}"
+  auto node1 = node_create(1);  // <1> -> "{" + <2> + "}"
+  auto node2 = node_create_with_val(0, "{", 1);
+  auto node3 = node_create(2);  // <2> -> "123"
+  auto node4 = node_create_with_val(0, "}", 1);
+  auto node5 = node_create_with_val(0, "123", 3);
+
+  auto tree2 = tree_create();  // "{" + "321" + "}"
+  auto node6 = node_create(2);  // <2> -> "321"
+  auto node7 = node_create_with_val(0, "321", 3);
+
+  node_init_subnodes(node1, 3);
+  node_set_subnode(node1, 0, node2);
+  node_set_subnode(node1, 1, node3);
+  node_set_subnode(node1, 2, node4);
+
+  node_init_subnodes(node3, 1);
+  node_set_subnode(node3, 0, node5);
+
+  node_init_subnodes(node6, 1);
+  node_set_subnode(node6, 0, node7);
+
+  tree1->root = node1;
+  tree2->root = node6;
+
+  chunk_store_init();
+  chunk_store_add_tree(tree1);
+
+  auto tree3 = splicing_mutation(tree2);
+  tree_to_buf(tree3);
+  EXPECT_MEMEQ(tree3->data_buf, "123", 3);
+
+  chunk_store_clear();
+  tree_free(tree1);
+  tree_free(tree2);
+  tree_free(tree3);
 
 }
