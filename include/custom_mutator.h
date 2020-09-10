@@ -24,9 +24,11 @@ extern "C" {
 #endif
 
 typedef struct afl {
+
 } afl_t;
 
 typedef struct my_mutator {
+
   afl_t *afl;
 
   bool tree_out_dir_exist;
@@ -59,7 +61,7 @@ typedef struct my_mutator {
   size_t total_splicing_mutation_steps;
 
   // Rules mutation
-  node_t *cur_rules_mutation_node;
+  node_t * cur_rules_mutation_node;
   uint32_t cur_rules_mutation_rule_id;
 
   // Reused buffers:

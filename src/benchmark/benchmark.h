@@ -19,6 +19,10 @@
 #ifndef __MUTATOR_BENCHMARK_H__
 #define __MUTATOR_BENCHMARK_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void bench_all();
 void bench_parsing_test_case(const char *fn);
 
@@ -33,5 +37,9 @@ void bench_subtree_trimming();
 void bench_recursive_trimming();
 
 void bench_stats_print(const char *label);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -11,16 +11,20 @@ extern "C" {
 // a doubly linked list
 typedef struct list_node list_node_t;
 struct list_node {
+
   list_node_t *next, *prev;
   void *       data;
+
 };
 
 typedef void (*data_free_t)(void *data);
 
 typedef struct list list_t;
 struct list {
+
   list_node_t *head, *tail;
   size_t       size;
+
 };
 
 /**

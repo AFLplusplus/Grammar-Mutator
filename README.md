@@ -31,8 +31,11 @@ Before getting started, the following tools/packages should be installed:
 ```bash
 sudo apt install valgrind uuid-dev default-jre python3
 wget https://www.antlr.org/download/antlr-4.8-complete.jar
-sudo mv antlr-4.8-complete.jar /usr/local/lib
+sudo cp -f antlr-4.8-complete.jar /usr/local/lib
 ```
+If you do not leave the JAR file in the Grammar-Mutator directory or do not copy
+it to /usr/local/lib then you must specify the location via ANTLR_JAR_LOCATION=...
+in the make command.
 
 Note that the grammar mutator is based on the latest custom mutator APIs in AFL++, so please use the latest `dev` or `stable` branch of [AFL++](https://github.com/AFLplusplus/AFLplusplus/tree/dev).
 
@@ -47,16 +50,19 @@ sudo make install
 
 Next you need to build the grammar mutator.
 To specify the grammar file, eg. Ruby, you can use `GRAMMAR_FILE` environment variable.
-There are several grammar files in `grammars` directory, such as `JSON.json` and `Ruby.json`.
+There are several grammar files in `grammars` directory, such as `json.json` and `ruby.json`.
 Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about the input grammar file.
 Note that pull requests with new grammars are welcome! :-)
 
 ```bash
-make GRAMMAR_FILE=grammars/Ruby.json \
-     ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar
+make GRAMMAR_FILE=grammars/ruby.json
 ```
 
-Now, you should be able to see two symbolic files `libgrammarmutator-Ruby.so` and `grammar_generator` under the root directory.
+Note that the shared library and grammar generator are named after the grammar file that is specified so you can have multiple grammars generated.
+The grammar name part is based on the filename with everything cut off after a underline, dash or dot, hency `ruby.json` will result in `ruby` and hence `grammar_generator-ruby` and `libgrammarmutator-ruby.so` will be created.
+You can specify your own naming by setting `GRAMMAR_FILENAME=yourname` as make option.
+
+Now, you should be able to see two symbolic files `libgrammarmutator-ruby.so` and `grammar_generator-ruby` under the root directory.
 These two files actually locate in the `src` directory.
 
 If you would like to fork the project and fix bugs or contribute to the project, you can take a look at [building-grammar-mutator.md](doc/building-grammar-mutator.md) for full building instructions.
@@ -75,7 +81,7 @@ Before fuzzing the real program, you need to prepare the input fuzzing seeds. Yo
 #### Using Existing Seeds
 
 You can feed your own fuzzing seeds to the fuzzer, which does not need to match with your input grammar file.
-Assuming that the grammar mutator is built with `grammars/Ruby.json`, which is a simplified Ruby grammar and does not cover all Ruby syntax.
+Assuming that the grammar mutator is built with `grammars/ruby.json`, which is a simplified Ruby grammar and does not cover all Ruby syntax.
 In this case, the parsing error will definitely occur.
 For any parsing errors, the grammar mutator will not terminate but save the error portion as a terminal node in the tree, such that we will not lose too much information on the original test case.
 
@@ -90,9 +96,11 @@ Usually, the larger the tree size is, the more complex the corresponding input s
 
 ```bash
 # Usage
-# ./grammar_generator <random seed> <max_num> <max_size> <seed_output_dir> <tree_output_dir>
-# eg:
-./grammar_generator 123 100 1000 ./seeds ./trees
+# ./grammar_generator-$GRAMMAR <max_num> <max_size> <seed_output_dir> <tree_output_dir> [<random seed>]
+#
+# <random seed> is optional
+# e.g.:
+./grammar_generator-ruby 100 1000 ./seeds ./trees
 ```
 
 Afterwards copy the `trees` folder with that exact name to the output directory that you will use with afl-fuzz (e.g. `-o out`):
@@ -101,24 +109,34 @@ mkdir out
 cp -r trees out
 ```
 
+Note that if you use multiple fuzzers (-M/-S sync mode) then you have to do this for all fuzzer instances, e.g. when the fuzzer instances are named fuzzer1 to fuzzer8:
+```bash
+mkdir out
+for i in 1 2 3 4 5 6 7 8; do
+  mkdir out/fuzzer$i
+  cp -r trees out/fuzzer$i/
+done
+```
+
 ### Fuzzing the Target with the Grammar Mutator!
 
 Let's start running the fuzzer.
-
-You may notice that the fuzzer will be stuck for a while at the beginning of fuzzing.
-One reason for the stuck is the large `max_size` (i.e., 1000) we choose, which results in a large size of test cases that increases the loading time.
-Another reason is the costly parsing operations in the grammar mutator.
-Since the input seeds are in string format, the grammar mutator needs to parse them into tree representations at first, which is costly.
-The large `max_size` passed into `grammar_generator` does help us generate deeply nested trees, but it further increases the parsing overhead.
+The following example command is using Ruby grammar (from `grammars/ruby.json`) where `mruby` project has been cloned to the root `Grammar-Mutator` directory.
 
 The default memory limit for child process is `75M` in `afl-fuzz`.
 This may not be enough for some test cases, so it is recommended to increase it to `128M` by adding an option `-m 128`.
 
 ```bash
-export AFL_CUSTOM_MUTATOR_LIBRARY=/path/to/libgrammarmutator.so
+export AFL_CUSTOM_MUTATOR_LIBRARY=./libgrammarmutator-ruby.so
 export AFL_CUSTOM_MUTATOR_ONLY=1
 afl-fuzz -m 128 -i seeds -o out -- /path/to/target @@
 ```
+
+You may notice that the fuzzer will be stuck for a while at the beginning of fuzzing.
+One reason for the stuck is the large `max_size` (i.e., 1000) we choose, which results in a large size of test cases that increases the loading time.
+Another reason is the costly parsing operations in the grammar mutator.
+Since the input seeds are in string format, the grammar mutator needs to parse them into tree representations at first, which is costly.
+The large `max_size` passed into `grammar_generator-$GRAMMAR` does help us generate deeply nested trees, but it further increases the parsing overhead.
 
 ## Contact & Contributions
 

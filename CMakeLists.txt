@@ -103,8 +103,15 @@ endif ()
 if (NOT EXISTS ${GRAMMAR_FILE})
   message(FATAL_ERROR "The grammar file does not exist: ${GRAMMAR_FILE}")
 endif ()
-get_filename_component(GRAMMAR_FILENAME ${GRAMMAR_FILE} NAME_WE)
-message(STATUS "Found ${GRAMMAR_FILENAME}: ${GRAMMAR_FILE}")
+if (NOT GRAMMAR_FILENAME)
+  get_filename_component(GRAMMAR_FILENAME ${GRAMMAR_FILE} NAME_WE)
+  string(TOLOWER ${GRAMMAR_FILENAME} GRAMMAR_FILENAME)
+  STRING(REGEX REPLACE "[_.-].*" "" GRAMMAR_FILENAME ${GRAMMAR_FILENAME})
+  message(STATUS "Selected grammar name: ${GRAMMAR_FILENAME} (from ${GRAMMAR_FILE})")
+else ()
+  message(STATUS "Selected grammar name: ${GRAMMAR_FILENAME}")
+endif ()
+
 
 # Generate files at configure time
 execute_process(

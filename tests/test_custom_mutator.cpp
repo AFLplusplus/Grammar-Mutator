@@ -33,16 +33,22 @@
 using namespace std;
 
 struct custom_mutator {
+
   my_mutator_t *data;
+
 };
 
 #ifdef DEBUG_BUILD
 static void dump_test_case(uint8_t *buf, size_t buf_size) {
+
   fprintf(stderr, "%.*s\n", (int)buf_size, buf);
+
 }
+
 #endif
 
 class CustomMutatorTest : public ::testing::Test {
+
  protected:
   afl_t *                afl = nullptr;
   struct custom_mutator *mutator = nullptr;
@@ -51,49 +57,65 @@ class CustomMutatorTest : public ::testing::Test {
   string                 queue_dir = out_dir + "/queue";
 
   CustomMutatorTest() {
+
     // Check whether the directory exists
     if (!create_directory(out_dir.c_str())) {
+
       perror("Cannot create the output directory (CustomMutatorTest)");
       exit(EXIT_FAILURE);
+
     }
 
     if (!create_directory(tree_out_dir.c_str())) {
+
       perror("Cannot create the tree output directory (CustomMutatorTest)");
       exit(EXIT_FAILURE);
+
     }
 
     if (!create_directory(queue_dir.c_str())) {
+
       perror("Cannot create the queue output directory (CustomMutatorTest)");
       exit(EXIT_FAILURE);
+
     }
 
     // Set max tree length
     tree_set_max_len(100);
+
   }
 
   ~CustomMutatorTest() override {
+
     remove_directory(out_dir.c_str());
+
   }
 
   void SetUp() override {
+
     mutator = (struct custom_mutator *)calloc(1, sizeof(struct custom_mutator));
     ASSERT_NE(mutator, nullptr);
 
     // Initialize the custom mutator
     mutator->data = afl_custom_init(afl, 0);  // fixed random seed
     ASSERT_NE(mutator->data, nullptr);
+
   }
 
   void TearDown() override {
+
     // Deinitialize the custom mutator
     afl_custom_deinit(mutator->data);
     mutator->data = nullptr;
     free(mutator);
     mutator = nullptr;
+
   }
+
 };
 
 TEST_F(CustomMutatorTest, Fuzzing) {
+
   uint8_t *                      buf = nullptr;
   __attribute__((unused)) size_t buf_size;
 
@@ -114,6 +136,7 @@ TEST_F(CustomMutatorTest, Fuzzing) {
   if (tree->recursion_edge_list->size > 0) expected_num += 20;
   EXPECT_EQ(num, expected_num);
   for (int i = 0; i < num; ++i) {
+
     buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
@@ -126,12 +149,15 @@ TEST_F(CustomMutatorTest, Fuzzing) {
     fprintf(stderr, "=====%d=====\n", i + 1);
     dump_test_case(buf, buf_size);
 #endif
+
   }
 
   tree_free(tree);
+
 }
 
 TEST_F(CustomMutatorTest, FuzzingParsingError) {
+
   uint8_t *                      buf = nullptr;
   __attribute__((unused)) size_t buf_size;
 
@@ -160,6 +186,7 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
   if (tree->recursion_edge_list->size > 0) expected_num += 20;
   EXPECT_NE(num, expected_num);
   for (int i = 0; i < num; ++i) {
+
     buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
@@ -173,12 +200,15 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
     fprintf(stderr, "=====%d=====\n", i + 1);
     dump_test_case(buf, buf_size);
 #endif
+
   }
 
   tree_free(tree);
+
 }
 
 TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
+
   uint8_t *                      buf = nullptr;
   __attribute__((unused)) size_t buf_size;
 
@@ -206,6 +236,7 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
   if (tree->recursion_edge_list->size > 0) expected_num += 20;
   EXPECT_EQ(num, expected_num);
   for (int i = 0; i < num; ++i) {
+
     buf_size = afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len,
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
@@ -219,12 +250,15 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
     fprintf(stderr, "=====%d=====\n", i + 1);
     dump_test_case(buf, buf_size);
 #endif
+
   }
 
   tree_free(tree);
+
 }
 
 TEST_F(CustomMutatorTest, Trimming) {
+
   srandom(1234);
 
   uint8_t *                      buf = nullptr;
@@ -249,12 +283,14 @@ TEST_F(CustomMutatorTest, Trimming) {
   //  EXPECT_EQ(stage_max, tree->root->non_term_size +
   //  tree->root->recursion_edge_size);
   while (stage_cur < stage_max) {
+
     buf_size = afl_custom_trim(mutator->data, &buf);
 #ifdef DEBUG_BUILD
     dump_test_case(buf, buf_size);
 #endif
 
     stage_cur = afl_custom_post_trim(mutator->data, 0);
+
   }
 
   // always success in trimming
@@ -264,18 +300,23 @@ TEST_F(CustomMutatorTest, Trimming) {
   //  EXPECT_EQ(stage_max, tree->root->non_term_size +
   //  tree->root->recursion_edge_size);
   while (stage_cur < stage_max) {
+
     buf_size = afl_custom_trim(mutator->data, &buf);
 #ifdef DEBUG_BUILD
     dump_test_case(buf, buf_size);
 #endif
 
     stage_cur = afl_custom_post_trim(mutator->data, 1);
+
   }
 
   tree_free(tree);
+
 }
 
 int main(int argc, char **argv) {
+
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
+
 }
