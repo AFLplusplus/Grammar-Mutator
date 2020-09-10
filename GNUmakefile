@@ -37,7 +37,15 @@ endif
 
 ifeq ($(BUILD),yes)
 
-  ifndef ANTLR_JAR_LOCATION
+  ifeq "$(ANTLR_JAR_LOCATION)" ""
+    ANTLR_JAR_LOCATION = $(shell ls antlr-4.8-complete.jar 2>/dev/null)
+  endif
+
+  ifeq "$(ANTLR_JAR_LOCATION)" ""
+    ANTLR_JAR_LOCATION = $(shell ls /usr/local/lib/antlr-4.8-complete.jar 2>/dev/null)
+  endif
+
+  ifeq "$(ANTLR_JAR_LOCATION)" ""
     $(error Missing antlr4.jar path. Please specify it's path using: make ANTLR_JAR_LOCATION=<path>)
   else
     TEMP := $(abspath $(ANTLR_JAR_LOCATION))

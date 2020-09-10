@@ -31,8 +31,11 @@ Before getting started, the following tools/packages should be installed:
 ```bash
 sudo apt install valgrind uuid-dev default-jre python3
 wget https://www.antlr.org/download/antlr-4.8-complete.jar
-sudo mv antlr-4.8-complete.jar /usr/local/lib
+sudo cp -f antlr-4.8-complete.jar /usr/local/lib
 ```
+If you do not leave the JAR file in the Grammar-Mutator directory or do not copy
+it to /usr/local/lib then you must specify the location via ANTLR_JAR_LOCATION=...
+in the make command.
 
 Note that the grammar mutator is based on the latest custom mutator APIs in AFL++, so please use the latest `dev` or `stable` branch of [AFL++](https://github.com/AFLplusplus/AFLplusplus/tree/dev).
 
@@ -52,8 +55,7 @@ Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more 
 Note that pull requests with new grammars are welcome! :-)
 
 ```bash
-make GRAMMAR_FILE=grammars/ruby.json \
-     ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar
+make GRAMMAR_FILE=grammars/ruby.json
 ```
 
 Note that the shared library and grammar generator are named after the grammar file that is specified so you can have multiple grammars generated.
