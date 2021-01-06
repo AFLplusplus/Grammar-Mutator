@@ -50,6 +50,9 @@ $(TARGET): $(ANTLR4_SHIM_OBJS)
 %.o: %.cpp
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
 
+generated/GrammarParser.o: generated/GrammarParser.cpp
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -Wno-unused-parameter -o $@ -c $<
+
 .PHONY: clean
 clean:
 	@rm -rf generated
