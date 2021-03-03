@@ -22,6 +22,9 @@ In summary, this repository includes:
 
 For more details about tree-based mutation, trimming, and grammar-based fuzzing, please refer to [Nautilus paper](https://www.syssec.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2018/12/17/NDSS19-Nautilus.pdf).
 
+A fuzzing writeup on Apache which uses the AFL++ Grammmar Mutator can be found here:
+[https://securitylab.github.com/research/fuzzing-apache-1](https://securitylab.github.com/research/fuzzing-apache-1)
+
 ## Getting Started
 
 ### Prerequisites
@@ -50,7 +53,7 @@ sudo make install
 
 Next you need to build the grammar mutator.
 To specify the grammar file, eg. Ruby, you can use `GRAMMAR_FILE` environment variable.
-There are several grammar files in `grammars` directory, such as `json.json` and `ruby.json`.
+There are several grammar files in `grammars` directory, such as `json.json`, `ruby.json` and `http.json`.
 Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about the input grammar file.
 Note that pull requests with new grammars are welcome! :-)
 

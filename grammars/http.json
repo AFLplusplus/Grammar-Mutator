@@ -1,0 +1,43 @@
+{
+	"<A>": [["<START_LINE>", "\r\n", "<HEADERS>", "<BODY>", "\r\n\r\n"]],
+	
+	"<START_LINE>": [["<METHOD>", " ", "<URI>", " ", "<VERSION>"]],
+	
+	"<METHOD>": [["GET"], ["HEAD"], ["POST"], ["PUT"], ["DELETE"], ["CONNECT"], ["OPTIONS"], ["TRACE"], ["PATCH"], ["ACL"], ["BASELINE-CONTROL"], ["BIND"], ["CHECKIN"], ["CHECKOUT"], ["COPY"], ["LABEL"], ["LINK"], ["LOCK"], ["MERGE"], ["MKACTIVITY"], ["MKCALENDAR"], ["MKCOL"], ["MKREDIRECTREF"], ["MKWORKSPACE"], ["MOVE"], ["ORDERPATCH"], ["PRI"], ["PROPFIND"], ["PROPPATCH"], ["REBIND"], ["REPORT"], ["SEARCH"], ["UNBIND"], ["UNCHECKOUT"], ["UNLINK"], ["UNLOCK"], ["UPDATE"], ["UPDATEREDIRECTREF"], ["VERSION-CONTROL"]],
+	
+	"<URI>": [["<SCHEME>" , ":", "<HIER>", "<QUERY>", "<FRAGMENT>"]],
+	
+	"<SCHEME>": [["http"], ["https"], ["shttp"], ["dav"], ["about"], ["attachment"], ["cid"], ["data"], ["file"], ["ftp"], ["ssh"], ["sip"]],
+	
+	"<HIER>": [["//", "<AUTHORITY>", "<PATH>"]],
+	
+	"<AUTHORITY>": [["<USERINFO>", "<HOST>"]],
+
+	"<PATH>": [["/", "<DIR>"]],
+
+	"<DIR>": [[], ["<CHAR>", "/", "<DIR>"]],
+	
+	"<USERINFO>": [[], ["<CHAR>", ":", "<CHAR>", "@"]],
+	
+	"<HOST>": [["127.0.0.1:8080"]],
+	
+	"<QUERY>": [[], ["?", "<CHAR>" , "=", "<CHAR>"]],
+	
+	"<FRAGMENT>": [[], ["#", "<CHAR>"]],
+
+	"<VERSION>": [["HTTP/0.9"], ["HTTP/1.0"], ["HTTP/1.1"], ["HTTP/2.0"], ["HTTP/3.0"]],
+	
+	"<HEADERS>": [[], ["<HEADER>", "\r\n", "<HEADERS>"]],
+	
+	"<HEADER>": [["<HEADER_FIELD>", ": ", "<ANY>"]],
+	
+	"<HEADER_FIELD>": [["A-IM"], ["Accept"], ["Accept-Charset"], ["Accept-Datetime"], ["Accept-Encoding"], ["Accept-Language"], ["Access-Control-Request-Method"], ["Access-Control-Request-Headers"], ["Authorization"], ["Cache-Control"], ["Connection"], ["Content-Encoding"], ["Content-Length"], ["Content-MD5"], ["Content-Type"], ["Cookie"], ["Date"], ["Expect"], ["Forwarded"], ["From"], ["Host"], ["HTTP2-Settings"], ["If-Match"], ["If-Modified-Since"], ["If-None-Match"], ["If-Range"], ["If-Unmodified-Since"], ["Max-Forwards"], ["Origin"], ["Pragma"], ["Proxy-Authorization"], ["Range"], ["Referer"], ["TE"], ["Trailer"], ["Transfer-Encoding"], ["User-Agent"], ["Upgrade"], ["Via"], ["Warning"]],
+	
+	"<BODY>": [[], ["<CHAR>"]],
+	
+	"<ANY>": [[], ["<DATE>"], ["<CHAR>"], ["<HOST>"], ["<URI>"]],
+	
+	"<DATE>": [["Sat, 29 Oct 1994 19:43:31 GMT"]],
+	
+	"<CHAR>": [["0"], ["1"], ["2"], ["3"], ["4"], ["5"], ["6"], ["7"], ["8"], ["9"], ["a"], ["b"], ["c"], ["d"], ["e"], ["f"], ["g"], ["h"], ["i"], ["j"], ["k"], ["l"], ["m"], ["n"], ["o"], ["p"], ["q"], ["r"], ["s"], ["t"], ["u"], ["v"], ["w"], ["x"], ["y"], ["z"], ["A"], ["B"], ["C"], ["D"], ["E"], ["F"], ["G"], ["H"], ["I"], ["J"], ["K"], ["L"], ["M"], ["N"], ["O"], ["P"], ["Q"], ["R"], ["S"], ["T"], ["U"], ["V"], ["W"], ["X"], ["Y"], ["Z"]]
+}
