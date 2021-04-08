@@ -92,6 +92,13 @@ tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
     parser.removeErrorListener(&ConsoleErrorListener::INSTANCE);
 
     antlr4::tree::ParseTree *parse_tree = parser.entry();
+    if (!parse_tree->children.size()) {
+#ifdef DEBUG_BUILD
+      fprintf(stderr, "ANTLR4 parsing error: No child nodes\n");
+#endif
+      return nullptr;
+    }
+
     root = node_from_parse_tree(parse_tree->children[0]);
   } catch (std::exception &e) {
 #ifdef DEBUG_BUILD
