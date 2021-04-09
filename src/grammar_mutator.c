@@ -120,7 +120,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     }
 
     // Replace "queue" with "trees"
-    memcpy(found + 1, "trees", 5);
+    memcpy(found, "/trees", 6);
 
     // Check whether the directory exists
     if (!create_directory(tree_out_dir)) {
@@ -136,7 +136,6 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   }
 
   snprintf(data->tree_fn_cur, PATH_MAX - 1, "%s", fn);
-  data->tree_fn_cur[PATH_MAX - 1] = '\0';
   char *found = strstr(data->tree_fn_cur, "/queue/");
   if (unlikely(!found)) {
 
@@ -147,7 +146,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   }
 
   // Replace "queue" with "trees"
-  memcpy(found + 1, "trees", 5);
+  memcpy(found, "/trees", 6);
 
   // Read the corresponding serialized tree from file
   data->tree_cur = read_tree_from_file(data->tree_fn_cur);
@@ -542,22 +541,21 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
                                 const uint8_t *filename_orig_queue) {
 
   // Skip if we read from initial test cases (i.e., from input directory)
-  if (!filename_orig_queue) return;
+  if (unlikely(!filename_orig_queue || !data->mutated_tree)) { return; }
 
   const char *fn = (const char *)filename_new_queue;
   snprintf(data->new_tree_fn, PATH_MAX - 1, "%s", fn);
-  data->new_tree_fn[PATH_MAX - 1] = '\0';
   char *found = strstr(data->new_tree_fn, "/queue/");
   if (unlikely(!found)) {
 
     // Should not reach here
-    perror("Invalid filename_new_queue (afl_custom_queue_new_entry)");
+    fprintf(stderr, "Invalid filename_new_queue (afl_custom_queue_new_entry)\n");
     return;
 
   }
 
   // Replace "queue" with "trees"
-  memcpy(found + 1, "trees", 5);
+  memcpy(found, "/trees", 6);
 
   // Write the mutated tree to the file
   write_tree_to_file(data->mutated_tree, data->new_tree_fn);
