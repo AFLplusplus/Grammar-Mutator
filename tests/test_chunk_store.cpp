@@ -49,10 +49,10 @@ TEST_F(ChunkStoreTest, SeenChunk) {
   auto node2 = node_clone(node1);
 
   // check the comparator
-  char node1_hash[9];
+  char node1_hash[16+1];
   hash_node(node1, node1_hash);
   EXPECT_EQ(set_add(&seen_chunks, node1_hash), SET_TRUE);
-  char node2_hash[9];
+  char node2_hash[16+1];
   hash_node(node1, node2_hash);
   EXPECT_EQ(set_add(&seen_chunks, node2_hash), SET_ALREADY_PRESENT);
 

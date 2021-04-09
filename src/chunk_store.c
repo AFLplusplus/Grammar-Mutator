@@ -49,15 +49,35 @@ size_t buf_from_node(node_t *node, uint8_t **out_buf) {
 
 }
 
-void hash_node(node_t *node, char dest[9]) {
+// Tiny implementation of fixed-length hash to text conversion
+static void uint64_to_hex(uint64_t num, char dest[16+1]) {
+
+  // Starting at the end and working backward:
+  int i;
+  char * c = &dest[16];
+
+  *c = '\0';
+  for (i = 0; i < 16; ++i) {
+
+    --c;
+    *c = "0123456789ABCDEF"[num & 0xF];
+    num >>= 4;
+
+  }
+
+}
+
+void hash_node(node_t *node, char dest[16+1]) {
 
   uint8_t *node_buf = NULL;
   size_t   node_buf_len = buf_from_node(node, &node_buf);
   uint64_t node_hash = hash64(node_buf, node_buf_len, HASH_SEED);
   free(node_buf);
 
-  memcpy(dest, &node_hash, 8);
-  dest[8] = '\0';
+  // Need to convert the hash to text so that 0-values in the hash don't cause an inordinant amount of collisions.
+  // If we just put the 8-byte integer in as a "string" then the first byte being a zero would cause
+  // a collision approximately 1/256 of the time!
+  uint64_to_hex(node_hash, dest);
 
 }
 
@@ -69,7 +89,7 @@ void chunk_store_add_node(node_t *node) {
   const char *node_type = node_type_str(node->id);
 
   // add current subtree
-  char node_hash[9];
+  char node_hash[16+1];
   hash_node(node, node_hash);
   if (set_contains(&seen_chunks, node_hash) == SET_FALSE) {
 
