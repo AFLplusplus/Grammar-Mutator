@@ -85,6 +85,15 @@ void node_init_subnodes(node_t *node, size_t n);
 void node_free(node_t *node);
 
 /**
+ * Destroy the node and free its memory but do not recurse
+ * and destroy the subnodes.
+ * This is dangerous and should only be used if you plan to
+ * manually free all the subnodes as well!
+ * @param node The node
+ */
+void node_free_only_self(node_t *node);
+
+/**
  * Set the concrete value for the node
  * @param node    The node
  * @param val_buf The buffer of the attached value

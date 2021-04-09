@@ -86,8 +86,8 @@ TEST_F(ChunkStoreTest, AddNode) {
   node_init_subnodes(node1, 1);
   node_set_subnode(node1, 0, node2);
 
-  chunk_store_add_node(node1);
-  chunk_store_add_node(node1);
+  chunk_store_take_node(node_clone(node1));
+  chunk_store_take_node(node_clone(node1));
 
   list_t **p_node_list = map_get(&chunk_store, node_type_str(node1->id));
   EXPECT_NE(p_node_list, nullptr);
@@ -134,7 +134,7 @@ TEST_F(ChunkStoreTest, GetAlternativeNode) {
   auto node = node_create(1);
   EXPECT_EQ(chunk_store_get_alternative_node(node), nullptr);
 
-  chunk_store_add_node(node);
+  chunk_store_take_node(node_clone(node));
   // input: a node that has been saved in the chunk store, output: the same node
   auto _node = chunk_store_get_alternative_node(node);
   EXPECT_TRUE(node_equal(_node, node));

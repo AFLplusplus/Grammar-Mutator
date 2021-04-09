@@ -39,7 +39,7 @@ extern node_map_t seen_chunks;
 
 // private functions
 void   hash_node(node_t *node, char dest[16+1]);
-void   chunk_store_add_node(node_t *node);
+void   chunk_store_take_node(node_t *node);
 
 #ifdef __cplusplus
 }

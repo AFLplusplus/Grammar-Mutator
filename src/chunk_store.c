@@ -85,7 +85,11 @@ void hash_node(node_t *node, char dest[16+1]) {
 
 }
 
-void chunk_store_add_node(node_t *node) {
+/**
+ * Take ownership of a node for the chunk store, storing it if unique or freeing it if not.
+ * @param  node The node, which must not be owned/kept by anybody else. It also should not have a parent except when called recursively.
+ */
+void chunk_store_take_node(node_t *node) {
 
   if (!node) return;
   if (node->id == 0) return;
@@ -96,10 +100,24 @@ void chunk_store_add_node(node_t *node) {
   char node_hash[16+1];
   hash_node(node, node_hash);
   node_t **seen_node = map_get(&seen_chunks, node_hash);
-  if (!seen_node) {
+  if (seen_node) {
 
-    node_t *_node = node_clone(node);
-    map_set(&seen_chunks, node_hash, _node);
+    // This node already exists in the tree. So patch up our parent to point at it
+    // and then free the duplicate.
+    if (node->parent) {
+
+      // Replace myself with the already existing node
+      node_replace_subnode(node->parent, node, *seen_node);
+
+    }
+
+    // We're a duplicate and not needed anymore, and neither are our subnodes!
+    node_free(node);
+
+  } else {
+
+    // This is a brand new node, so keep it!
+    map_set(&seen_chunks, node_hash, node);
 
     list_t **p_node_list = map_get(&chunk_store, node_type);
     if (unlikely(!p_node_list)) {
@@ -110,16 +128,20 @@ void chunk_store_add_node(node_t *node) {
     }
 
     list_t *node_list = *p_node_list;
-    list_append(node_list, _node);
+    list_append(node_list, node);
 
-  }
+    // process subnodes
+    node_t *subnode = NULL;
+    for (uint32_t i = 0; i < node->subnode_count; ++i) {
 
-  // process subnodes
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+      subnode = node->subnodes[i];
 
-    subnode = node->subnodes[i];
-    chunk_store_add_node(subnode);
+      // NOTE: We *don't* clone this subnode before handing off ownership.
+      //       If the subnode is a duplicate, then it will patch up *this* node
+      //       to point at the already-seen copy and then free the duplicate.
+      chunk_store_take_node(subnode);
+
+    }
 
   }
 
@@ -134,8 +156,10 @@ void chunk_store_init() {
 
 void chunk_store_add_tree(tree_t *tree) {
 
-  if (!tree) return;
-  chunk_store_add_node(tree->root);
+  if (!tree || !tree->root) return;
+
+  // Clone the tree and then hand it off to the chunk_store
+  chunk_store_take_node(node_clone(tree->root));
 
 }
 
@@ -163,8 +187,10 @@ void chunk_store_clear() {
   map_iter_t  iter = map_iter(&list_map);
   while ((key = map_next(&chunk_store, &iter))) {
 
+    // NOTE: This needs to only free the CURRENT node and not its children, because we know that the
+    //       chunk store map already contains all the children and they will get freed as well!
     list_free_with_data_free_func(*map_get(&chunk_store, key),
-                                  (data_free_t)node_free);
+                                  (data_free_t)node_free_only_self);
 
   }
 
