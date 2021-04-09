@@ -16,7 +16,7 @@
 
  */
 
-#include "hash.h"
+#include "xxh3.h"
 #include "list.h"
 #include "f1_c_fuzz.h"
 #include "chunk_store.h"
@@ -25,29 +25,6 @@
 // the list, in `chunk_store`, contains a collection of `node_t`
 list_map_t chunk_store;
 simple_set seen_chunks;
-
-// temporary tree
-static tree_t *temp_tree = NULL;
-
-size_t buf_from_node(node_t *node, uint8_t **out_buf) {
-
-  size_t out_buf_len = 0;
-
-  temp_tree->root = node;
-  tree_to_buf(temp_tree);
-
-  *out_buf =
-      (uint8_t *)maybe_grow(BUF_PARAMS(temp_tree, data), temp_tree->data_len);
-  out_buf_len = temp_tree->data_len;
-
-  temp_tree->data_buf = NULL;
-  temp_tree->data_len = 0;
-  temp_tree->data_size = 0;
-  temp_tree->root = NULL;
-
-  return out_buf_len;
-
-}
 
 // Tiny implementation of fixed-length hash to text conversion
 static void uint64_to_hex(uint64_t num, char dest[16+1]) {
@@ -67,17 +44,44 @@ static void uint64_to_hex(uint64_t num, char dest[16+1]) {
 
 }
 
+// Append the node and its subnodes a hash of the node and its subnodes
+static void node_update_hash(node_t *node, XXH3_state_t* hash) {
+
+  // Use the same fields that `node_equal()` uses, so
+  // that we can be reasonably certain that if the hashes
+  // are equal than `node_equal()` will return true.
+  XXH3_64bits_update(hash, &node->id, sizeof(node->id));
+  XXH3_64bits_update(hash, &node->rule_id, sizeof(node->rule_id));
+  XXH3_64bits_update(hash, &node->val_len, sizeof(node->val_len));
+  XXH3_64bits_update(hash, &node->val_buf, node->val_len);
+
+  // Do not consider the parent node while comparing two nodes
+
+  // subnodes
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+
+    node_update_hash(node->subnodes[i], hash);
+
+  }
+
+}
+
+// Create a hash of the node and its subnodes
+// Use the same fields that `node_equal()` uses, so
+// that we can be reasonably certain that if the hashes
+// are equal than `node_equal()` will return true.
 void hash_node(node_t *node, char dest[16+1]) {
 
-  uint8_t *node_buf = NULL;
-  size_t   node_buf_len = buf_from_node(node, &node_buf);
-  uint64_t node_hash = hash64(node_buf, node_buf_len, HASH_SEED);
-  free(node_buf);
+  // Set up a hash state so we can pass it to sub-nodes recursively:
+  XXH3_state_t hash;
+  XXH3_64bits_reset(&hash);
+
+  node_update_hash(node, &hash);
 
   // Need to convert the hash to text so that 0-values in the hash don't cause an inordinant amount of collisions.
   // If we just put the 8-byte integer in as a "string" then the first byte being a zero would cause
   // a collision approximately 1/256 of the time!
-  uint64_to_hex(node_hash, dest);
+  uint64_to_hex(XXH3_64bits_digest(&hash), dest);
 
 }
 
@@ -125,8 +129,6 @@ void chunk_store_init() {
   map_init(&chunk_store);
   set_init(&seen_chunks);
 
-  temp_tree = tree_create();
-
 }
 
 void chunk_store_add_tree(tree_t *tree) {
@@ -166,7 +168,5 @@ void chunk_store_clear() {
   }
 
   map_deinit(&chunk_store);
-
-  tree_free(temp_tree);
 
 }
