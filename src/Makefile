@@ -48,15 +48,14 @@ OBJS = $(LIB_OBJS) $(GEN_OBJS) $(BENCHMARK_OBJS)
 
 C_FLAGS = $(C_FLAGS_OPT)
 C_DEFINES =
-C_INCLUDES = -I../include -I../third_party/rxi_map -I../third_party/barrust_set -I../third_party/Cyan4973_xxHash
+C_INCLUDES = -I../include -I../third_party/rxi_map -I../third_party/Cyan4973_xxHash
 
 RXI_MAP_LIB = $(realpath ../third_party/rxi_map/librxi_map.a)
-BARRUST_SET_LIB = $(realpath ../third_party/barrust_set/libbarrust_set.a)
 ANTLR4_CXX_RUNTIME_LIB = $(realpath ../third_party/antlr4-cpp-runtime/libantlr4-runtime.a)
 ANTLR4_SHIM_LIB = $(realpath ../lib/antlr4_shim/libantlr4_shim.a)
 XXHASH_LIB = $(realpath ../third_party/Cyan4973_xxHash/libxxhash.a)
 
-LIBS = $(RXI_MAP_LIB) $(BARRUST_SET_LIB) $(ANTLR4_SHIM_LIB) $(ANTLR4_CXX_RUNTIME_LIB) $(XXHASH_LIB)
+LIBS = $(RXI_MAP_LIB) $(ANTLR4_SHIM_LIB) $(ANTLR4_CXX_RUNTIME_LIB) $(XXHASH_LIB)
 LDFLAGS = $(LIBS)
 
 ifdef ENABLE_DEBUG

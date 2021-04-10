@@ -15,7 +15,7 @@
 # A grammar-based custom mutator written for GSoC '20.
 #
 
-DIRS = rxi_map barrust_set antlr4-cpp-runtime Cyan4973_xxHash
+DIRS = rxi_map antlr4-cpp-runtime Cyan4973_xxHash
 CLEANDIRS = $(DIRS:%=clean-%)
 
 .PHONY: all

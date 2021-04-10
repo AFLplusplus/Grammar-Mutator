@@ -100,11 +100,9 @@ add_executable(test_chunk_store test_chunk_store.cpp)
 target_link_libraries(test_chunk_store
   PRIVATE gtest_main
   PRIVATE grammarmutator
-  PRIVATE rxi_map
-  PRIVATE barrust_set)
+  PRIVATE rxi_map)
 target_include_directories(test_chunk_store
-  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map
-  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/barrust_set)
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)
 add_test(
   NAME test_chunk_store
   COMMAND test_chunk_store)
@@ -131,16 +129,3 @@ target_include_directories(test_rxi_map
 add_test(
   NAME test_rxi_map
   COMMAND test_rxi_map)
-
-# Test suite 8:
-# test the third-party C set library
-add_executable(test_barrust_set test_barrust_set.cpp)
-target_link_libraries(test_barrust_set
-  PRIVATE gtest_main
-  PRIVATE grammarmutator
-  PRIVATE barrust_set)
-target_include_directories(test_barrust_set
-  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/barrust_set)
-add_test(
-  NAME test_barrust_set
-  COMMAND test_barrust_set)
