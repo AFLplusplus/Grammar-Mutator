@@ -24,7 +24,7 @@
 
 // the list, in `chunk_store`, contains a collection of `node_t`
 list_map_t chunk_store;
-simple_set seen_chunks;
+node_map_t seen_chunks;
 
 // Tiny implementation of fixed-length hash to text conversion
 static void uint64_to_hex(uint64_t num, char dest[16+1]) {
@@ -95,10 +95,11 @@ void chunk_store_add_node(node_t *node) {
   // add current subtree
   char node_hash[16+1];
   hash_node(node, node_hash);
-  if (set_contains(&seen_chunks, node_hash) == SET_FALSE) {
+  node_t **seen_node = map_get(&seen_chunks, node_hash);
+  if (!seen_node) {
 
     node_t *_node = node_clone(node);
-    set_add(&seen_chunks, node_hash);
+    map_set(&seen_chunks, node_hash, _node);
 
     list_t **p_node_list = map_get(&chunk_store, node_type);
     if (unlikely(!p_node_list)) {
@@ -127,7 +128,7 @@ void chunk_store_add_node(node_t *node) {
 void chunk_store_init() {
 
   map_init(&chunk_store);
-  set_init(&seen_chunks);
+  map_init(&seen_chunks);
 
 }
 
@@ -156,7 +157,7 @@ node_t *chunk_store_get_alternative_node(node_t *node) {
 
 void chunk_store_clear() {
 
-  set_destroy(&seen_chunks);
+  map_deinit(&seen_chunks);
 
   const char *key;
   map_iter_t  iter = map_iter(&list_map);

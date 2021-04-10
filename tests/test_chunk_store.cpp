@@ -43,6 +43,21 @@ class ChunkStoreTest : public ::testing::Test {
 
 };
 
+static size_t num_seen_chunks() {
+
+  int num_seen = 0;
+  const char * key;
+  map_iter_t iter = map_iter(&seen_chunks);
+  while ((key = map_next(&seen_chunks, &iter))) {
+
+    ++num_seen;
+
+  }
+
+  return num_seen;
+
+}
+
 TEST_F(ChunkStoreTest, SeenChunk) {
 
   auto node1 = node_create_with_val(1, "test", 4);
@@ -51,12 +66,13 @@ TEST_F(ChunkStoreTest, SeenChunk) {
   // check the comparator
   char node1_hash[16+1];
   hash_node(node1, node1_hash);
-  EXPECT_EQ(set_add(&seen_chunks, node1_hash), SET_TRUE);
+  EXPECT_EQ(map_set(&seen_chunks, node1_hash, node1), 0);
   char node2_hash[16+1];
   hash_node(node1, node2_hash);
-  EXPECT_EQ(set_add(&seen_chunks, node2_hash), SET_ALREADY_PRESENT);
+  EXPECT_NE(map_get(&seen_chunks, node2_hash), nullptr);
+  EXPECT_EQ(*map_get(&seen_chunks, node2_hash), node1);
 
-  EXPECT_EQ(set_length(&seen_chunks), 1);
+  EXPECT_EQ(num_seen_chunks(), 1);
 
   node_free(node1);
   node_free(node2);
@@ -76,7 +92,7 @@ TEST_F(ChunkStoreTest, AddNode) {
   list_t **p_node_list = map_get(&chunk_store, node_type_str(node1->id));
   EXPECT_NE(p_node_list, nullptr);
   list_t *node_list = *p_node_list;
-  EXPECT_EQ(set_length(&seen_chunks), node_list->size);
+  EXPECT_EQ(num_seen_chunks(), node_list->size);
 
   node_free(node1);
 
@@ -99,7 +115,7 @@ TEST_F(ChunkStoreTest, AddTree) {
   tree_get_size(tree);
 
   chunk_store_add_tree(tree);
-  EXPECT_EQ(set_length(&seen_chunks), 2);
+  EXPECT_EQ(num_seen_chunks(), 2);
   list_t **p_node_list = map_get(&chunk_store, node_type_str(node1->id));
   EXPECT_NE(p_node_list, nullptr);
   list_t *node_list = *p_node_list;
