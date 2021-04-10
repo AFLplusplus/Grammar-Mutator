@@ -37,7 +37,7 @@ GRAMMAR_GENERATOR_PROM = grammar_generator-$(GRAMMAR_FILENAME)
 BENCH_PROM = benchmark/benchmark-$(GRAMMAR_FILENAME)
 TARGETS = $(GRAMMAR_MUTATOR_LIB) $(GRAMMAR_GENERATOR_PROM) $(BENCH_PROM)
 
-LIB_SRC_FILES = chunk_store.c f1_c_fuzz.c grammar_mutator.c list.c tree.c tree_mutation.c tree_trimming.c hash.c utils.c
+LIB_SRC_FILES = chunk_store.c f1_c_fuzz.c grammar_mutator.c list.c tree.c tree_mutation.c tree_trimming.c utils.c
 GEN_SRC_FILES = grammar_generator.c
 BENCHMARK_SRC_FILES = benchmark/benchmark.c
 

@@ -18,7 +18,6 @@
 # Grammar mutator
 add_library(grammarmutator SHARED
   chunk_store.c
-  hash.c
   list.c
   tree.c
   tree_mutation.c
