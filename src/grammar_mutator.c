@@ -551,8 +551,17 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
                                 const uint8_t *filename_new_queue,
                                 const uint8_t *filename_orig_queue) {
 
-  // Skip if we read from initial test cases (i.e., from input directory)
-  if (unlikely(!filename_orig_queue || !data->mutated_tree)) { return; }
+  // If this is an initial case or sync, then we will get called with a null "filename_orig_queue".
+  if (unlikely(!filename_orig_queue || !data->mutated_tree)) {
+
+    // In that situation, we can skip it here and let afl_custom_queue_get() import the data later,
+    // or we can prefetch it here to ensure that it gets into our splicing data set (chunk_store) asap.
+    // Choosing the second option for now, but if this is inefficient we can just return instead of
+    // calling afl_custom_queue_get().
+    afl_custom_queue_get(data, filename_new_queue);
+    return;
+
+  }
 
   const char *fn = (const char *)filename_new_queue;
   snprintf(data->new_tree_fn, PATH_MAX - 1, "%s", fn);
