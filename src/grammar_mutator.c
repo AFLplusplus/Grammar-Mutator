@@ -150,19 +150,30 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   // Read the corresponding serialized tree from file
   data->tree_cur = read_tree_from_file(data->tree_fn_cur);
-  if (data->tree_cur) goto queue_get_done;
+  if (data->tree_cur) {
+
+    // We already had this tree in the trees folder, so compute its size and then we're done!
+    tree_get_size(data->tree_cur);
+    return 1;
+
+  }
 
   // try to parse the test case
   data->tree_cur = load_tree_from_test_case(fn);
-  if (data->tree_cur) goto queue_get_done;
+  if (data->tree_cur) {
+
+    // Now that we've parsed it, cache the info from this test case in
+    // our trees folder and in the chunk store
+    tree_get_size(data->tree_cur);
+    write_tree_to_file(data->tree_cur, data->tree_fn_cur);
+    chunk_store_add_tree(data->tree_cur);
+    return 1;
+
+  }
 
   // parsing error, skip the current test case
+
   return 0;
-
-queue_get_done:
-  tree_get_size(data->tree_cur);
-
-  return 1;
 
 }
 
