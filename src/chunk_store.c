@@ -16,7 +16,7 @@
 
  */
 
-#include "hash.h"
+#include "xxh3.h"
 #include "list.h"
 #include "f1_c_fuzz.h"
 #include "chunk_store.h"
@@ -24,44 +24,72 @@
 
 // the list, in `chunk_store`, contains a collection of `node_t`
 list_map_t chunk_store;
-simple_set seen_chunks;
+node_map_t seen_chunks;
 
-// temporary tree
-static tree_t *temp_tree = NULL;
+// Tiny implementation of fixed-length hash to text conversion
+static void uint64_to_hex(uint64_t num, char dest[16+1]) {
 
-size_t buf_from_node(node_t *node, uint8_t **out_buf) {
+  // Starting at the end and working backward:
+  int i;
+  char * c = &dest[16];
 
-  size_t out_buf_len = 0;
+  *c = '\0';
+  for (i = 0; i < 16; ++i) {
 
-  temp_tree->root = node;
-  tree_to_buf(temp_tree);
+    --c;
+    *c = "0123456789ABCDEF"[num & 0xF];
+    num >>= 4;
 
-  *out_buf =
-      (uint8_t *)maybe_grow(BUF_PARAMS(temp_tree, data), temp_tree->data_len);
-  out_buf_len = temp_tree->data_len;
-
-  temp_tree->data_buf = NULL;
-  temp_tree->data_len = 0;
-  temp_tree->data_size = 0;
-  temp_tree->root = NULL;
-
-  return out_buf_len;
+  }
 
 }
 
-void hash_node(node_t *node, char dest[9]) {
+// Append the node and its subnodes a hash of the node and its subnodes
+static void node_update_hash(node_t *node, XXH3_state_t* hash) {
 
-  uint8_t *node_buf = NULL;
-  size_t   node_buf_len = buf_from_node(node, &node_buf);
-  uint64_t node_hash = hash64(node_buf, node_buf_len, HASH_SEED);
-  free(node_buf);
+  // Use the same fields that `node_equal()` uses, so
+  // that we can be reasonably certain that if the hashes
+  // are equal than `node_equal()` will return true.
+  XXH3_64bits_update(hash, &node->id, sizeof(node->id));
+  XXH3_64bits_update(hash, &node->rule_id, sizeof(node->rule_id));
+  XXH3_64bits_update(hash, &node->val_len, sizeof(node->val_len));
+  XXH3_64bits_update(hash, &node->val_buf, node->val_len);
 
-  memcpy(dest, &node_hash, 8);
-  dest[8] = '\0';
+  // Do not consider the parent node while comparing two nodes
+
+  // subnodes
+  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+
+    node_update_hash(node->subnodes[i], hash);
+
+  }
 
 }
 
-void chunk_store_add_node(node_t *node) {
+// Create a hash of the node and its subnodes
+// Use the same fields that `node_equal()` uses, so
+// that we can be reasonably certain that if the hashes
+// are equal than `node_equal()` will return true.
+void hash_node(node_t *node, char dest[16+1]) {
+
+  // Set up a hash state so we can pass it to sub-nodes recursively:
+  XXH3_state_t hash;
+  XXH3_64bits_reset(&hash);
+
+  node_update_hash(node, &hash);
+
+  // Need to convert the hash to text so that 0-values in the hash don't cause an inordinant amount of collisions.
+  // If we just put the 8-byte integer in as a "string" then the first byte being a zero would cause
+  // a collision approximately 1/256 of the time!
+  uint64_to_hex(XXH3_64bits_digest(&hash), dest);
+
+}
+
+/**
+ * Take ownership of a node for the chunk store, storing it if unique or freeing it if not.
+ * @param  node The node, which must not be owned/kept by anybody else. It also should not have a parent except when called recursively.
+ */
+void chunk_store_take_node(node_t *node) {
 
   if (!node) return;
   if (node->id == 0) return;
@@ -69,12 +97,27 @@ void chunk_store_add_node(node_t *node) {
   const char *node_type = node_type_str(node->id);
 
   // add current subtree
-  char node_hash[9];
+  char node_hash[16+1];
   hash_node(node, node_hash);
-  if (set_contains(&seen_chunks, node_hash) == SET_FALSE) {
+  node_t **seen_node = map_get(&seen_chunks, node_hash);
+  if (seen_node) {
 
-    node_t *_node = node_clone(node);
-    set_add(&seen_chunks, node_hash);
+    // This node already exists in the tree. So patch up our parent to point at it
+    // and then free the duplicate.
+    if (node->parent) {
+
+      // Replace myself with the already existing node
+      node_replace_subnode(node->parent, node, *seen_node);
+
+    }
+
+    // We're a duplicate and not needed anymore, and neither are our subnodes!
+    node_free(node);
+
+  } else {
+
+    // This is a brand new node, so keep it!
+    map_set(&seen_chunks, node_hash, node);
 
     list_t **p_node_list = map_get(&chunk_store, node_type);
     if (unlikely(!p_node_list)) {
@@ -85,16 +128,20 @@ void chunk_store_add_node(node_t *node) {
     }
 
     list_t *node_list = *p_node_list;
-    list_append(node_list, _node);
+    list_append(node_list, node);
 
-  }
+    // process subnodes
+    node_t *subnode = NULL;
+    for (uint32_t i = 0; i < node->subnode_count; ++i) {
 
-  // process subnodes
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+      subnode = node->subnodes[i];
 
-    subnode = node->subnodes[i];
-    chunk_store_add_node(subnode);
+      // NOTE: We *don't* clone this subnode before handing off ownership.
+      //       If the subnode is a duplicate, then it will patch up *this* node
+      //       to point at the already-seen copy and then free the duplicate.
+      chunk_store_take_node(subnode);
+
+    }
 
   }
 
@@ -103,16 +150,16 @@ void chunk_store_add_node(node_t *node) {
 void chunk_store_init() {
 
   map_init(&chunk_store);
-  set_init(&seen_chunks);
-
-  temp_tree = tree_create();
+  map_init(&seen_chunks);
 
 }
 
 void chunk_store_add_tree(tree_t *tree) {
 
-  if (!tree) return;
-  chunk_store_add_node(tree->root);
+  if (!tree || !tree->root) return;
+
+  // Clone the tree and then hand it off to the chunk_store
+  chunk_store_take_node(node_clone(tree->root));
 
 }
 
@@ -134,19 +181,19 @@ node_t *chunk_store_get_alternative_node(node_t *node) {
 
 void chunk_store_clear() {
 
-  set_destroy(&seen_chunks);
+  map_deinit(&seen_chunks);
 
   const char *key;
   map_iter_t  iter = map_iter(&list_map);
   while ((key = map_next(&chunk_store, &iter))) {
 
+    // NOTE: This needs to only free the CURRENT node and not its children, because we know that the
+    //       chunk store map already contains all the children and they will get freed as well!
     list_free_with_data_free_func(*map_get(&chunk_store, key),
-                                  (data_free_t)node_free);
+                                  (data_free_t)node_free_only_self);
 
   }
 
   map_deinit(&chunk_store);
-
-  tree_free(temp_tree);
 
 }

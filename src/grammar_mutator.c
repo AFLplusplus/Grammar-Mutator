@@ -150,19 +150,30 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   // Read the corresponding serialized tree from file
   data->tree_cur = read_tree_from_file(data->tree_fn_cur);
-  if (data->tree_cur) goto queue_get_done;
+  if (data->tree_cur) {
+
+    // We already had this tree in the trees folder, so compute its size and then we're done!
+    tree_get_size(data->tree_cur);
+    return 1;
+
+  }
 
   // try to parse the test case
   data->tree_cur = load_tree_from_test_case(fn);
-  if (data->tree_cur) goto queue_get_done;
+  if (data->tree_cur) {
+
+    // Now that we've parsed it, cache the info from this test case in
+    // our trees folder and in the chunk store
+    tree_get_size(data->tree_cur);
+    write_tree_to_file(data->tree_cur, data->tree_fn_cur);
+    chunk_store_add_tree(data->tree_cur);
+    return 1;
+
+  }
 
   // parsing error, skip the current test case
+
   return 0;
-
-queue_get_done:
-  tree_get_size(data->tree_cur);
-
-  return 1;
 
 }
 
@@ -540,8 +551,17 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
                                 const uint8_t *filename_new_queue,
                                 const uint8_t *filename_orig_queue) {
 
-  // Skip if we read from initial test cases (i.e., from input directory)
-  if (unlikely(!filename_orig_queue || !data->mutated_tree)) { return; }
+  // If this is an initial case or sync, then we will get called with a null "filename_orig_queue".
+  if (unlikely(!filename_orig_queue || !data->mutated_tree)) {
+
+    // In that situation, we can skip it here and let afl_custom_queue_get() import the data later,
+    // or we can prefetch it here to ensure that it gets into our splicing data set (chunk_store) asap.
+    // Choosing the second option for now, but if this is inefficient we can just return instead of
+    // calling afl_custom_queue_get().
+    afl_custom_queue_get(data, filename_new_queue);
+    return;
+
+  }
 
   const char *fn = (const char *)filename_new_queue;
   snprintf(data->new_tree_fn, PATH_MAX - 1, "%s", fn);
