@@ -24,7 +24,6 @@ OBJS = $(SRC_FILES:.cpp=.o)
 
 GRAMMAR_MUTATOR_LIB = $(realpath ../src/libgrammarmutator-$(GRAMMAR_FILENAME).so)
 RXI_MAP_LIB = $(realpath ../third_party/rxi_map/librxi_map.a)
-BARRUST_SET_LIB = $(realpath ../third_party/barrust_set/libbarrust_set.a)
 
 GTEST_DIR = googletest-download
 GTEST_VERSION = 1.10.0
@@ -95,10 +94,6 @@ test_chunk_store: test_chunk_store.o $(LIBS) $(RXI_MAP_LIB)
 test_rxi_map: test_rxi_map.o $(LIBS) $(RXI_MAP_LIB)
 	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(RXI_MAP_LIB)
 
-.PRECIOUS: test_barrust_set
-test_barrust_set: test_barrust_set.o $(LIBS) $(BARRUST_SET_LIB)
-	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(BARRUST_SET_LIB)
-
 .PRECIOUS: test_%.o
 test_%.o: test_%.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
@@ -111,15 +106,11 @@ endif
 
 .PRECIOUS: test_chunk_store.o
 test_chunk_store.o: test_chunk_store.cpp $(GTEST_INCLUDE)
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map -I../third_party/barrust_set $(CXX_FLAGS) -o $@ -c $<
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_rxi_map.o
 test_rxi_map.o: test_rxi_map.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
-
-.PRECIOUS: test_barrust_set.o
-test_barrust_set.o: test_barrust_set.cpp $(GTEST_INCLUDE)
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/barrust_set $(CXX_FLAGS) -o $@ -c $<
 
 .PHONY: run_test
 run_test: check_test_programs $(addprefix run_,$(TARGETS))

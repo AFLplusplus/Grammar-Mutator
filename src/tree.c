@@ -156,6 +156,15 @@ void node_free(node_t *node) {
 
 }
 
+void node_free_only_self(node_t *node) {
+
+  // Pretend we don't have any subnodes so that node_free() won't
+  // call itself recursively
+  node->subnode_count = 0;
+  node_free(node);
+
+}
+
 void node_set_val(node_t *node, const void *val_buf, size_t val_len) {
 
   if (node == NULL) return;
