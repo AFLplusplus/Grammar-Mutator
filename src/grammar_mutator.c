@@ -186,6 +186,7 @@ int32_t afl_custom_init_trim(my_mutator_t *                   data,
 
   tree_get_non_terminal_nodes(data->tree_cur);
   tree_get_recursion_edges(data->tree_cur);
+  tree_to_buf(data->tree_cur);
 
   data->cur_trimming_stage = 0;
 
@@ -248,9 +249,21 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
     return 0;            /* afl-fuzz will very likely error out after this. */
 
   }
-
-  memcpy(trimmed_out, trimmed_tree->data_buf, trimmed_size);
   *out_buf = trimmed_out;
+
+  if (trimmed_size > data->tree_cur->data_len) {
+    //fprintf(stderr, "Trim made it bigger!!!\n");
+
+    // Don't allow things to get bigger! Just copy the original out again.
+    memcpy(trimmed_out, data->tree_cur->data_buf, data->tree_cur->data_len);
+    trimmed_size = data->tree_cur->data_len;
+
+  }
+  else {
+
+    memcpy(trimmed_out, trimmed_tree->data_buf, trimmed_size);
+
+  }
 
   return trimmed_size;
 
