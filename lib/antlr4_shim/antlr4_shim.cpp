@@ -63,6 +63,7 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
     auto &child = t->children[i];
     subnode = node_from_parse_tree(child);
     node->subnodes[i] = subnode;
+    subnode->parent = node;
   }
 
   return node;

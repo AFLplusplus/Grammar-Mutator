@@ -368,6 +368,7 @@ class CFuzzer(PyRecCompiledFuzzer):
                     'subnode = node_create_with_val(NODE_TERM__, "%s", %d);' % (
                         esc_token, len(esc_token_chars)))
             res.append('node->subnodes[%d] = subnode;' % i)
+            res.append('subnode->parent = node;')
         return '\n    '.join(res)
 
     def gen_num_candidate_rules(self, k):
