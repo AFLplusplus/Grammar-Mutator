@@ -96,38 +96,56 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   data->tree_cur = NULL;
 
-  // Check the tree output directory
-  if (unlikely(data->tree_out_dir_exist == 0)) {
+  // Figure out where the "trees" folder is stashed!
+  // Strip off the file portion of the filename:
+  const char *slash_basename = strrchr(fn, '/');
+  if (unlikely(!slash_basename)) {
 
-    const char *last_slash = strrchr(fn, '/');
-    if (unlikely(!last_slash)) {
+    // Should not reach here
+    perror("No folder in filename (afl_custom_queue_get)");
+    return 0;
 
-      // Should not reach here
-      perror("Invalid filename (afl_custom_queue_get)");
-      return 0;
+  }
+  char *tree_out_dir = strdup(fn);
+  tree_out_dir[slash_basename - fn] = '\0';
 
-    }
+  // Get the name of the parent folder
+  char *last_dir = strrchr(tree_out_dir, '/');
+  if (unlikely(!last_dir)) {
 
-    // Set the tree output directory
-    char *tree_out_dir = strndup(fn, last_slash - fn);
-    char *found = strstr(tree_out_dir, "/queue");
-    if (unlikely(!found)) {
+    // Should not reach here
+    perror("No parent folder in filename (afl_custom_queue_get)");
+    return 0;
 
-      // Should not reach here
-      perror("Invalid filename (afl_custom_queue_get)");
-      return 0;
+  }
 
-    }
+  // Only read or write trees if we get /queue or /_resume as the last folder!
+  if (strcmp(last_dir, "/queue") != 0 && strcmp(last_dir, "/_resume") != 0) {
 
-    // Replace "queue" with "trees"
-    memcpy(found, "/trees", 6);
+    free(tree_out_dir);
+    tree_out_dir = NULL;
+    data->tree_fn_cur[0] = '\0';
 
-    // Check whether the directory exists
-    if (!create_directory(tree_out_dir)) {
+  } else {
 
-      // error
-      perror("Cannot create the output directory (afl_custom_queue_get)");
-      return 0;
+    // Copy "/trees" (including the null) to replace the old folder name
+    memcpy(last_dir, "/trees", 7);
+
+    // Set up the (expected) tree filename
+    snprintf(data->tree_fn_cur, PATH_MAX - 1, "%s%s", tree_out_dir, slash_basename);
+
+    // Check if we need to create the tree output directory
+    if (unlikely(data->tree_out_dir_exist == 0)) {
+
+      // Check whether the directory exists
+      if (!create_directory(tree_out_dir)) {
+
+        // error
+        perror("Cannot create the output directory (afl_custom_queue_get)");
+        free(tree_out_dir);
+        return 0;
+
+      }
 
     }
 
@@ -135,26 +153,17 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   }
 
-  snprintf(data->tree_fn_cur, PATH_MAX - 1, "%s", fn);
-  char *found = strstr(data->tree_fn_cur, "/queue/");
-  if (unlikely(!found)) {
+  if (strlen(data->tree_fn_cur)) {
 
-    // Should not reach here
-    perror("Invalid filename (afl_custom_queue_get)");
-    return 0;
+    // Read the corresponding serialized tree from file
+    data->tree_cur = read_tree_from_file(data->tree_fn_cur);
+    if (data->tree_cur) {
 
-  }
+      // We already had this tree in the trees folder, so compute its size and then we're done!
+      tree_get_size(data->tree_cur);
+      return 1;
 
-  // Replace "queue" with "trees"
-  memcpy(found, "/trees", 6);
-
-  // Read the corresponding serialized tree from file
-  data->tree_cur = read_tree_from_file(data->tree_fn_cur);
-  if (data->tree_cur) {
-
-    // We already had this tree in the trees folder, so compute its size and then we're done!
-    tree_get_size(data->tree_cur);
-    return 1;
+    }
 
   }
 
@@ -165,7 +174,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     // Now that we've parsed it, cache the info from this test case in
     // our trees folder and in the chunk store
     tree_get_size(data->tree_cur);
-    write_tree_to_file(data->tree_cur, data->tree_fn_cur);
+    if (strlen(data->tree_fn_cur)) write_tree_to_file(data->tree_cur, data->tree_fn_cur);
     chunk_store_add_tree(data->tree_cur);
     return 1;
 
@@ -563,9 +572,11 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
 
   }
 
+  // NOTE: Unlike afl_custom_queue_get(), this function should ALWAYS have /queue/ as the last
+  //       directory in its filename, so the following simplified parsing is acceptable.
   const char *fn = (const char *)filename_new_queue;
   snprintf(data->new_tree_fn, PATH_MAX - 1, "%s", fn);
-  char *found = strstr(data->new_tree_fn, "/queue/");
+  char *found = strrstr(data->new_tree_fn, "/queue/");
   if (unlikely(!found)) {
 
     // Should not reach here
