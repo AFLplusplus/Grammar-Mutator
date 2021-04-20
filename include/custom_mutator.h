@@ -42,10 +42,14 @@ typedef struct my_mutator {
   uint8_t cur_trimming_stage;  // 0: subtree trimming
                                // 1: recursive trimming
 
+  bool trim_was_effective; // Did we change the file *at all* during trim?
+
   size_t cur_subtree_trimming_step;
+  size_t finished_subtree_trimming_nodes;
   size_t total_subtree_trimming_steps;
 
   size_t cur_recursive_trimming_step;
+  size_t finished_recursive_trimming_edges;
   size_t total_recursive_trimming_steps;
 
   // Fuzzing

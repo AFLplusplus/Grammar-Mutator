@@ -70,9 +70,12 @@ void afl_custom_deinit(my_mutator_t *data) {
   data->cur_rules_mutation_rule_id = 0;
 
   data->cur_trimming_stage = 0;
+  data->trim_was_effective = false;
   data->cur_subtree_trimming_step = 0;
+  data->finished_subtree_trimming_nodes = 0;
   data->total_subtree_trimming_steps = 0;
   data->cur_recursive_trimming_step = 0;
+  data->finished_recursive_trimming_edges = 0;
   data->total_recursive_trimming_steps = 0;
 
   free(data->fuzz_buf);
@@ -188,11 +191,14 @@ int32_t afl_custom_init_trim(my_mutator_t *                   data,
   tree_get_recursion_edges(data->tree_cur);
 
   data->cur_trimming_stage = 0;
+  data->trim_was_effective = false;
 
   data->cur_subtree_trimming_step = 0;
+  data->finished_subtree_trimming_nodes = 0;
   data->total_subtree_trimming_steps = data->tree_cur->root->non_term_size;
 
   data->cur_recursive_trimming_step = 0;
+  data->finished_recursive_trimming_edges = 0;
   data->total_recursive_trimming_steps =
       data->tree_cur->root->recursion_edge_size;
 
@@ -213,16 +219,12 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
     node_t *node = (node_t *)list_pop_front(tree_cur->non_terminal_node_list);
     trimmed_tree = subtree_trimming(tree_cur, node);
 
-    ++data->cur_subtree_trimming_step;
-
   } else if (data->cur_trimming_stage == 1) {
 
     // recursive trimming
     edge_t *edge = (edge_t *)list_pop_front(tree_cur->recursion_edge_list);
     trimmed_tree = recursive_trimming(tree_cur, *edge);
     free(edge);
-
-    ++data->cur_recursive_trimming_step;
 
   } else {
 
@@ -259,35 +261,72 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
 int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
 
   if (success) {
+    // Keep track that we will need to rewrite the tree file later
+    data->trim_was_effective = true;
 
-    // Update the trimming step
-    size_t remaining_node_size = data->tree_cur->non_terminal_node_list->size;
-    size_t remaining_edge_size = data->tree_cur->recursion_edge_list->size;
-
-    // Update the corresponding tree file
-    write_tree_to_file(data->trimmed_tree, data->tree_fn_cur);
-
+    // Swap in the trimmed tree as our current tree:
     tree_free(data->tree_cur);
     data->tree_cur = data->trimmed_tree;
 
     // Update the non-terminal node list
     tree_get_non_terminal_nodes(data->tree_cur);
-    for (uint32_t i = 0; i < data->cur_subtree_trimming_step; ++i)
+
+    // The idea here is that the results that we've already tried are always at
+    // the start of the non_terminal_node_list, because whenever we get a "yes" result
+    // the nodes get trimmed out and they are always the last thing we've popped off the list.
+    //
+    // So to avoid repeating the previous attempts, just pop them out of the list right away:
+    for (uint32_t i = 0; i < data->finished_subtree_trimming_nodes; ++i)
       list_pop_front(data->tree_cur->non_terminal_node_list);
+
+    // We are now pointing *at* the node we just replaced.
+    // So we want to skip it and its children!
+    node_t * node = list_pop_front(data->tree_cur->non_terminal_node_list);
+    if (node) {
+
+      // Remember to skip these next time as well:
+      data->finished_subtree_trimming_nodes += 1 + node->non_term_size;
+
+      for (uint32_t i = 0; i < node->non_term_size; ++i)
+        list_pop_front(data->tree_cur->non_terminal_node_list);
+
+    }
+
     size_t new_node_size = data->tree_cur->non_terminal_node_list->size;
 
-    data->cur_subtree_trimming_step += (remaining_node_size - new_node_size);
+    // Set our progress equal to the remaining un-tested nodes in the list:
+    data->cur_subtree_trimming_step += data->total_subtree_trimming_steps - new_node_size;
+
 
     // update the recursion edge list
     tree_get_recursion_edges(data->tree_cur);
+    // Avoid repeating work by skipping edges that we have already tried.
+    for (uint32_t i = 0; i < data->finished_recursive_trimming_edges; ++i)
+      list_pop_front(data->tree_cur->recursion_edge_list);
     size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
 
-    data->cur_recursive_trimming_step += (remaining_edge_size - new_edge_size);
+    // Set our progress equal to the remaining un-tested edges in the list:
+    data->cur_recursive_trimming_step = data->total_recursive_trimming_steps - new_edge_size;
 
   } else {
 
     // the trimmed tree will not be saved, so destroy it
     tree_free(data->trimmed_tree);
+
+    // Even if the trim didn't work, still count the progress!
+    if (data->cur_trimming_stage == 0) {
+
+      ++data->cur_subtree_trimming_step;
+      ++data->finished_subtree_trimming_nodes;
+
+    }
+
+    if (data->cur_trimming_stage == 1) {
+
+      ++data->cur_recursive_trimming_step;
+      ++data->finished_recursive_trimming_edges;
+
+    }
 
   }
 
@@ -306,6 +345,16 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     if (data->cur_recursive_trimming_step >=
         data->total_recursive_trimming_steps)
       ++data->cur_trimming_stage;
+
+  }
+
+  // If we're done and we reduced the tree, then save the tree back to the
+  // file and write it to the chunk store for use in future splice mutations:
+  if (data->trim_was_effective && data->cur_trimming_stage > 1) {
+
+    // Update the corresponding tree file
+    write_tree_to_file(data->tree_cur, data->tree_fn_cur);
+    chunk_store_add_tree(data->tree_cur);
 
   }
 
