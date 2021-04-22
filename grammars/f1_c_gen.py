@@ -152,22 +152,23 @@ class LimitFuzzer(Fuzzer):
 
     def symbol_cost(self, grammar, symbol):
         if symbol not in grammar:
-            return 0  # terminal node
+            return len(symbol)  # terminal node
         if symbol in self.key_cost:
             return self.key_cost[symbol]
         return float("inf")
 
     def expansion_cost(self, grammar, rule):
-        ret = 1
+        ret = 0
         for token in rule:
-            if token not in grammar:
-                continue
             ret += self.symbol_cost(grammar, token)
             if ret == float("inf"):
                 return ret
         return ret
 
     def compute_cost(self, grammar):
+        '''
+        Compute the minimum cost (number of characters) for each key in the grammar.
+        '''
         cost = {}
         changed = True
         while changed:
@@ -212,7 +213,7 @@ class PooledFuzzer(LimitFuzzer):
 
     def cheap_grammar(self):
         new_grammar = {}
-        for k in self.cost:
+        for k in self.grammar_keys:
             crules = self.cost[k]
             min_cost = crules[0][0]
             new_grammar[k] = [r for c, r in crules if c == min_cost]
@@ -367,6 +368,7 @@ class CFuzzer(PyRecCompiledFuzzer):
                 res.append(
                     'subnode = node_create_with_val(NODE_TERM__, "%s", %d);' % (
                         esc_token, len(esc_token_chars)))
+                res.append('*consumed += %d;' % (len(token)))
             res.append('node->subnodes[%d] = subnode;' % i)
             res.append('subnode->parent = node;')
         return '\n    '.join(res)
@@ -436,7 +438,7 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
 
   node = node_create_with_rule_id(NODE_%(node_type)s, val);
 
-  *consumed = 1;
+  *consumed = 0;
   int __attribute__((unused)) remaining_len = 0;
   int __attribute__((unused)) subnode_max_len = 0;
   int __attribute__((unused)) subnode_consumed = 0;
