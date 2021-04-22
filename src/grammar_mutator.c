@@ -161,6 +161,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
       // We already had this tree in the trees folder, so compute its size and then we're done!
       tree_get_size(data->tree_cur);
+      chunk_store_add_tree(data->tree_cur);
       return 1;
 
     }
