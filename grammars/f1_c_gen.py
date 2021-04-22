@@ -421,14 +421,14 @@ class CFuzzer(PyRecCompiledFuzzer):
                 res.append('if (max_len < %d) {' % min_rule_size)
             else:
                 res.append('} else if (max_len < %d) {' % min_rule_size)
-            res.append('  num_rules = %d;' % num_candidate_rules)
+            res.append('  rules_that_fit = %d;' % num_candidate_rules)
 
         num_candidate_rules += num_min_rules[-1]
         if len(num_min_rules) == 1:
-            res.append('num_rules = %d;' % num_candidate_rules)
+            res.append('rules_that_fit = %d;' % num_candidate_rules)
         else:
             res.append('} else {')
-            res.append('  num_rules = %d;' % num_candidate_rules)
+            res.append('  rules_that_fit = %d;' % num_candidate_rules)
             res.append('}')
         return '\n    '.join(res)
 
@@ -453,15 +453,10 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
   }
 
   if (rule_index < 0 || rule_index >= %(nrules)d) {
-    int num_rules = 0;
+    int rules_that_fit = 0;
     %(gen_num_candidate_rules)s
 
-    val = 0;
-    if (num_rules == %(num_min_rules)d) {
-      val = map_rand(%(num_min_rules)d);
-    } else {
-      val = map_rand(num_rules - %(num_min_rules)d) + %(num_min_rules)d;
-    }
+    val = map_rand(rules_that_fit);
   } else {
     val = rule_index;
   }
@@ -480,7 +475,6 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
             'nrules': len(rules),
             'num_cheap_trees': len(cheap_trees),
             'min_cost': min_cost,
-            'num_min_rules': num_min_rules,
             'gen_num_candidate_rules': self.gen_num_candidate_rules(k)
         })
 
