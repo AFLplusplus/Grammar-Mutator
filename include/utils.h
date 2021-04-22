@@ -26,6 +26,23 @@ bool create_directory(const char *path);
  */
 bool remove_directory(const char *path);
 
+
+// String operations
+/**
+ * This function is the same as `strstr` except it finds the LAST occurance
+ * of the \p needle in the \p haystack instead of the FIRST.
+ *
+ * @param haystack The string in which to find the \p needle
+ * @param needle   The substring to be found inside of \p haystack
+ * @return         A pointer to the LAST substring location in the \p haystack,
+ *                 or NULL if no match was found.
+ *
+ * @note This function breaks normal const rules and returns "non-const char *" just
+ *       because that's what strstr() does!
+ */
+char * strrstr(const char * haystack, const char * needle);
+
+
 #ifdef __cplusplus
 }
 #endif
