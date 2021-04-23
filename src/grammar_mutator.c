@@ -295,7 +295,7 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     size_t new_node_size = data->tree_cur->non_terminal_node_list->size;
 
     // Set our progress equal to the remaining un-tested nodes in the list:
-    data->cur_subtree_trimming_step += data->total_subtree_trimming_steps - new_node_size;
+    data->cur_subtree_trimming_step = data->total_subtree_trimming_steps - new_node_size;
 
 
     // update the recursion edge list
