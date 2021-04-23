@@ -86,13 +86,19 @@ TEST_F(ChunkStoreTest, AddNode) {
   node_init_subnodes(node1, 1);
   node_set_subnode(node1, 0, node2);
 
+  // chunk store should de-duplicate the clones:
   chunk_store_take_node(node_clone(node1));
   chunk_store_take_node(node_clone(node1));
+  chunk_store_take_node(node_clone(node1));
+  chunk_store_take_node(node_clone(node2));
+  EXPECT_EQ(num_seen_chunks(), 2);
 
   list_t **p_node_list = map_get(&chunk_store, node_type_str(node1->id));
   EXPECT_NE(p_node_list, nullptr);
   list_t *node_list = *p_node_list;
-  EXPECT_EQ(num_seen_chunks(), node_list->size);
+
+  // We expect only 1 node added to the node1->id matching list:
+  EXPECT_EQ(node_list->size, 1);
 
   node_free(node1);
 
@@ -115,7 +121,7 @@ TEST_F(ChunkStoreTest, AddTree) {
   tree_get_size(tree);
 
   chunk_store_add_tree(tree);
-  EXPECT_EQ(num_seen_chunks(), 2);
+  EXPECT_EQ(num_seen_chunks(), 4);
   list_t **p_node_list = map_get(&chunk_store, node_type_str(node1->id));
   EXPECT_NE(p_node_list, nullptr);
   list_t *node_list = *p_node_list;
