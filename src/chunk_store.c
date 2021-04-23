@@ -53,7 +53,7 @@ static void node_update_hash(node_t *node, XXH3_state_t* hash) {
   XXH3_64bits_update(hash, &node->id, sizeof(node->id));
   XXH3_64bits_update(hash, &node->rule_id, sizeof(node->rule_id));
   XXH3_64bits_update(hash, &node->val_len, sizeof(node->val_len));
-  XXH3_64bits_update(hash, &node->val_buf, node->val_len);
+  XXH3_64bits_update(hash, node->val_buf, node->val_len);
 
   // Do not consider the parent node while comparing two nodes
 
@@ -92,7 +92,6 @@ void hash_node(node_t *node, char dest[16+1]) {
 void chunk_store_take_node(node_t *node) {
 
   if (!node) return;
-  if (node->id == 0) return;
 
   const char *node_type = node_type_str(node->id);
 
@@ -118,6 +117,11 @@ void chunk_store_take_node(node_t *node) {
 
     // This is a brand new node, so keep it!
     map_set(&seen_chunks, node_hash, node);
+
+    // NOTE: If this is a terminal node (node->id == 0), we *could*
+    // skip creating a list for them here, because they aren't usable
+    // for the splicing mutation (because they are not all interchangable).
+    // But for simplicity we can just leave it as-is for now.
 
     list_t **p_node_list = map_get(&chunk_store, node_type);
     if (unlikely(!p_node_list)) {
