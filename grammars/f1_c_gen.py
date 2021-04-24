@@ -32,6 +32,8 @@ import os
 import string
 import json
 
+from f1_common import LimitFuzzer
+
 
 class TreeNode:
     node_type: int = 0
@@ -136,64 +138,6 @@ class TreeNode:
 
 def bytes_to_c_str(data: bytes):
     return ''.join(["\\x%02X" % x for x in data])
-
-
-class Fuzzer:
-    def __init__(self, grammar):
-        self.grammar = grammar
-        self.grammar_keys = list(self.grammar.keys())
-
-
-class LimitFuzzer(Fuzzer):
-    def __init__(self, grammar):
-        super().__init__(grammar)
-        self.key_cost = {}
-        self.cost = self.compute_cost(grammar)
-
-    def symbol_cost(self, grammar, symbol):
-        if symbol not in grammar:
-            return len(symbol)  # terminal node
-        if symbol in self.key_cost:
-            return self.key_cost[symbol]
-        return float("inf")
-
-    def expansion_cost(self, grammar, rule):
-        ret = 0
-        for token in rule:
-            ret += self.symbol_cost(grammar, token)
-            if ret == float("inf"):
-                return ret
-        return ret
-
-    def compute_cost(self, grammar):
-        '''
-        Compute the minimum cost (number of characters) for each key in the grammar.
-        '''
-        cost = {}
-        changed = True
-        while changed:
-            changed = False
-            _cost = {}
-            for k in self.grammar_keys:
-                _cost[k] = []
-                for rule in grammar[k]:
-                    rule_cost = self.expansion_cost(grammar, rule)
-                    if rule_cost == float("inf"):
-                        continue
-                    if k not in self.key_cost:
-                        self.key_cost[k] = rule_cost
-                    if self.key_cost[k] > rule_cost:
-                        self.key_cost[k] = rule_cost
-
-                    _cost[k].append((rule_cost, rule))
-            if _cost != cost:
-                cost = _cost
-                changed = True
-
-        # sort
-        for k in self.grammar_keys:
-            cost[k] = sorted(cost[k])
-        return cost
 
 
 class PooledFuzzer(LimitFuzzer):

@@ -23,66 +23,20 @@ import sys
 import json
 import random
 
+from f1_common import LimitFuzzer
 
 #
 # The original Sanitize and AntlrG class are borrowed from F1 fuzzer:
 # https://github.com/vrthra/F1
 #
-class Sanitize:
-    def __init__(self, g):
-        self.g = g
-        self.grammar_keys = list(self.g.keys())
-        self.key_cost = {}
-        self.cost = self.compute_cost(g)
+class Sanitize(LimitFuzzer):
+    def __init__(self, grammar):
+        super().__init__(grammar)
 
         # reorder our grammar rules by cost.
         for k in self.grammar_keys:
-            self.g[k] = [r for (i, r) in self.cost[k]]
+            self.grammar[k] = [r for (i, r) in self.cost[k]]
         self.entry_keys = self.get_entry_key()
-
-    def symbol_cost(self, grammar, symbol):
-        if symbol not in grammar:
-            return 0  # terminal node
-        if symbol in self.key_cost:
-            return self.key_cost[symbol]
-        return float("inf")
-
-    def expansion_cost(self, grammar, rule):
-        ret = 1
-        for token in rule:
-            if token not in grammar:
-                continue
-            ret += self.symbol_cost(grammar, token)
-            if ret == float("inf"):
-                return ret
-        return ret
-
-    def compute_cost(self, grammar):
-        cost = {}
-        changed = True
-        while changed:
-            changed = False
-            _cost = {}
-            for k in self.grammar_keys:
-                _cost[k] = []
-                for rule in grammar[k]:
-                    rule_cost = self.expansion_cost(grammar, rule)
-                    if rule_cost == float("inf"):
-                        continue
-                    if k not in self.key_cost:
-                        self.key_cost[k] = rule_cost
-                    if self.key_cost[k] > rule_cost:
-                        self.key_cost[k] = rule_cost
-
-                    _cost[k].append((rule_cost, rule))
-            if _cost != cost:
-                cost = _cost
-                changed = True
-
-        # sort
-        for k in self.grammar_keys:
-            cost[k] = sorted(cost[k])
-        return cost
 
     def to_key(self, k):
         s = k.replace('-', '_')
@@ -98,7 +52,7 @@ class Sanitize:
         for k in self.grammar_keys:
             if k not in key_seen:
                 key_seen[k] = False
-            for rule in self.g[k]:
+            for rule in self.grammar[k]:
                 for token in rule:
                     if token not in self.grammar_keys:
                         continue
@@ -133,8 +87,8 @@ entry
     : %s
     ;''' % entries)
         for k in self.grammar_keys:
-            rules = self.g[k]
-            v = '\n    | '.join([self.rule_to_s(rule, self.g)
+            rules = self.grammar[k]
+            v = '\n    | '.join([self.rule_to_s(rule, self.grammar)
                                 for rule in rules])
             lines.append('''\
 %s
