@@ -120,7 +120,7 @@ $(VALGRIND_LOG_DIR):
 
 .PHONY: memcheck
 memcheck: check_test_programs $(VALGRIND_LOG_DIR) $(MEMCHECK_TARGETS)
-	cat $(VALGRIND_LOG_DIR)/*.log
+	@find $(VALGRIND_LOG_DIR) -name "*.log" -not -empty -exec cat {} + | grep . || exit 0 && exit 2
 
 .PHONY: clean
 clean:
