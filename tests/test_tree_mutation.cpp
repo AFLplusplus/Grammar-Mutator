@@ -84,7 +84,7 @@ TEST(TreeMutationTest, SplicingMutation) {
   auto node4 = node_create_with_val(0, "}", 1);
   auto node5 = node_create_with_val(0, "123", 3);
 
-  auto tree2 = tree_create();  // "{" + "321" + "}"
+  auto tree2 = tree_create();  // "321"
   auto node6 = node_create(2);  // <2> -> "321"
   auto node7 = node_create_with_val(0, "321", 3);
 
@@ -115,13 +115,14 @@ TEST(TreeMutationTest, SplicingMutation) {
   // add tree1 and all its subtrees to the chunk store
   chunk_store_add_tree(tree1);
 
-  tree3 = splicing_mutation(tree2);
-  tree_to_buf(tree3);
-  EXPECT_MEMEQ(tree3->data_buf, "123", 3);
+  auto tree4 = splicing_mutation(tree2);
+  tree_to_buf(tree4);
+  EXPECT_MEMEQ(tree4->data_buf, "123", 3);
 
   chunk_store_clear();
   tree_free(tree1);
   tree_free(tree2);
   tree_free(tree3);
+  tree_free(tree4);
 
 }
