@@ -32,6 +32,8 @@ import os
 import string
 import json
 
+from f1_common import LimitFuzzer
+
 
 class TreeNode:
     node_type: int = 0
@@ -138,63 +140,6 @@ def bytes_to_c_str(data: bytes):
     return ''.join(["\\x%02X" % x for x in data])
 
 
-class Fuzzer:
-    def __init__(self, grammar):
-        self.grammar = grammar
-        self.grammar_keys = list(self.grammar.keys())
-
-
-class LimitFuzzer(Fuzzer):
-    def __init__(self, grammar):
-        super().__init__(grammar)
-        self.key_cost = {}
-        self.cost = self.compute_cost(grammar)
-
-    def symbol_cost(self, grammar, symbol):
-        if symbol not in grammar:
-            return 0  # terminal node
-        if symbol in self.key_cost:
-            return self.key_cost[symbol]
-        return float("inf")
-
-    def expansion_cost(self, grammar, rule):
-        ret = 1
-        for token in rule:
-            if token not in grammar:
-                continue
-            ret += self.symbol_cost(grammar, token)
-            if ret == float("inf"):
-                return ret
-        return ret
-
-    def compute_cost(self, grammar):
-        cost = {}
-        changed = True
-        while changed:
-            changed = False
-            _cost = {}
-            for k in self.grammar_keys:
-                _cost[k] = []
-                for rule in grammar[k]:
-                    rule_cost = self.expansion_cost(grammar, rule)
-                    if rule_cost == float("inf"):
-                        continue
-                    if k not in self.key_cost:
-                        self.key_cost[k] = rule_cost
-                    if self.key_cost[k] > rule_cost:
-                        self.key_cost[k] = rule_cost
-
-                    _cost[k].append((rule_cost, rule))
-            if _cost != cost:
-                cost = _cost
-                changed = True
-
-        # sort
-        for k in self.grammar_keys:
-            cost[k] = sorted(cost[k])
-        return cost
-
-
 class PooledFuzzer(LimitFuzzer):
     def __init__(self, grammar):
         super().__init__(grammar)
@@ -212,7 +157,7 @@ class PooledFuzzer(LimitFuzzer):
 
     def cheap_grammar(self):
         new_grammar = {}
-        for k in self.cost:
+        for k in self.grammar_keys:
             crules = self.cost[k]
             min_cost = crules[0][0]
             new_grammar[k] = [r for c, r in crules if c == min_cost]
@@ -223,20 +168,50 @@ class PooledFuzzer(LimitFuzzer):
         return self.grammar_keys.index(k) + 1
 
     def get_trees_for_key(self, grammar, key='<start>'):
+        '''
+        For one key, generate a list of possible trees (one for each rule,
+        downsampled to self.MAX_SAMPLE).
+        '''
+        # If this is a terminal node, just put in the one node:
         if key not in grammar:
             return [TreeNode(node_type=0, val=key)]
-        v = sum([self.get_trees_for_rule(grammar, key, rule_id, rule)
-                 for rule_id, rule in enumerate(grammar[key])], [])
-        return random.sample(v, min(self.MAX_SAMPLE, len(v)))
+
+        # Enumerate the rules so we know how many there are and so we
+        # can match rule IDs correctly:
+        all_rules = list(enumerate(grammar[key]))
+
+        # Generate trees for up to MAX_SAMPLE of them.
+        # Each selected rule generates a list of trees (the subnodes of the rule), so this returns a list of lists.
+        downsampled_rules = random.sample(all_rules, min(self.MAX_SAMPLE, len(all_rules)))
+        return sum([self.get_trees_for_rule(grammar, key, rule_id, rule) for rule_id, rule in downsampled_rules],
+                   [])
 
     def get_trees_for_rule(self, grammar, key, rule_id, rule):
+        '''
+        For each subnode of a rule, generate a list of all possible trees.
+        '''
         assert grammar[key][rule_id] == rule
-        my_trees_list = [
-            self.get_trees_for_key(grammar, key) for key in rule]
-        v = [TreeNode(node_type=self.k_to_id(key), rule_id=rule_id,
-                      subnodes=subnodes)
-             for subnodes in itertools.product(*my_trees_list)]
-        return random.sample(v, min(self.MAX_SAMPLE, len(v)))
+        # Make a list of possible child trees for each subnode of this rule (each will be maximum of MAX_SAMPLE long)
+        # This is a list of lists, one list for each subnode.
+        subnode_possibilities = [self.get_trees_for_key(grammar, key) for key in rule]
+
+        # We want to randomly choose one option for each subnode to create a valid tree,
+        # and we want a maximum of MAX_SAMPLE total trees:
+        max_possible_trees = 1
+        for subnode in subnode_possibilities:
+            max_possible_trees *= len(subnode)
+
+        # Clamp the possibilities to something sane:
+        chosen_trees = min(max_possible_trees, self.MAX_SAMPLE)
+
+        def random_product(*args, repeat=1):
+            '''Pick ONE option from the equivalent of itertools.product()'''
+            pools = [tuple(pool) for pool in args] * repeat
+            return tuple(map(random.choice, pools))
+
+        # Select chosen_trees number of random valid sets of subnodes, and return a tree for each
+        return [TreeNode(node_type=self.k_to_id(key), rule_id=rule_id, subnodes=subnodes)
+                for subnodes in (random_product(*subnode_possibilities) for _ in range(chosen_trees))]
 
     def completion_trees(self):
         return {k: self.get_trees_for_key(self.c_grammar, k)
@@ -367,7 +342,9 @@ class CFuzzer(PyRecCompiledFuzzer):
                 res.append(
                     'subnode = node_create_with_val(NODE_TERM__, "%s", %d);' % (
                         esc_token, len(esc_token_chars)))
+                res.append('*consumed += %d;' % (len(token)))
             res.append('node->subnodes[%d] = subnode;' % i)
+            res.append('subnode->parent = node;')
         return '\n    '.join(res)
 
     def gen_num_candidate_rules(self, k):
@@ -388,14 +365,14 @@ class CFuzzer(PyRecCompiledFuzzer):
                 res.append('if (max_len < %d) {' % min_rule_size)
             else:
                 res.append('} else if (max_len < %d) {' % min_rule_size)
-            res.append('  num_rules = %d;' % num_candidate_rules)
+            res.append('  rules_that_fit = %d;' % num_candidate_rules)
 
         num_candidate_rules += num_min_rules[-1]
         if len(num_min_rules) == 1:
-            res.append('num_rules = %d;' % num_candidate_rules)
+            res.append('rules_that_fit = %d;' % num_candidate_rules)
         else:
             res.append('} else {')
-            res.append('  num_rules = %d;' % num_candidate_rules)
+            res.append('  rules_that_fit = %d;' % num_candidate_rules)
             res.append('}')
         return '\n    '.join(res)
 
@@ -420,22 +397,17 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
   }
 
   if (rule_index < 0 || rule_index >= %(nrules)d) {
-    int num_rules = 0;
+    int rules_that_fit = 0;
     %(gen_num_candidate_rules)s
 
-    val = 0;
-    if (num_rules == %(num_min_rules)d) {
-      val = map_rand(%(num_min_rules)d);
-    } else {
-      val = map_rand(num_rules - %(num_min_rules)d) + %(num_min_rules)d;
-    }
+    val = map_rand(rules_that_fit);
   } else {
     val = rule_index;
   }
 
   node = node_create_with_rule_id(NODE_%(node_type)s, val);
 
-  *consumed = 1;
+  *consumed = 0;
   int __attribute__((unused)) remaining_len = 0;
   int __attribute__((unused)) subnode_max_len = 0;
   int __attribute__((unused)) subnode_consumed = 0;
@@ -447,7 +419,6 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
             'nrules': len(rules),
             'num_cheap_trees': len(cheap_trees),
             'min_cost': min_cost,
-            'num_min_rules': num_min_rules,
             'gen_num_candidate_rules': self.gen_num_candidate_rules(k)
         })
 

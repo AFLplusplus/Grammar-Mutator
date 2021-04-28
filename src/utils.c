@@ -91,3 +91,29 @@ bool remove_directory(const char *path) {
   return true;
 
 }
+
+
+char * strrstr(const char * haystack, const char * needle) {
+
+  size_t haystack_len;
+  size_t needle_len;
+  const char * s;
+
+  // Don't allow empty needle or haystack
+  if (!haystack || !needle) return NULL;
+
+  haystack_len = strlen(haystack);
+  needle_len = strlen(needle);
+
+  // Don't allow empty needle or haystack or haystack smaller than needle
+  if (!needle_len || !haystack_len || haystack_len < needle_len) return NULL;
+
+  for (s = haystack + (haystack_len - needle_len); s != haystack; --s) {
+
+    if (!strncmp(s, needle, needle_len)) return (char *) s;
+
+  }
+
+  return NULL;
+
+}

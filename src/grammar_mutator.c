@@ -70,9 +70,12 @@ void afl_custom_deinit(my_mutator_t *data) {
   data->cur_rules_mutation_rule_id = 0;
 
   data->cur_trimming_stage = 0;
+  data->trim_was_effective = false;
   data->cur_subtree_trimming_step = 0;
+  data->finished_subtree_trimming_nodes = 0;
   data->total_subtree_trimming_steps = 0;
   data->cur_recursive_trimming_step = 0;
+  data->finished_recursive_trimming_edges = 0;
   data->total_recursive_trimming_steps = 0;
 
   free(data->fuzz_buf);
@@ -96,38 +99,56 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   data->tree_cur = NULL;
 
-  // Check the tree output directory
-  if (unlikely(data->tree_out_dir_exist == 0)) {
+  // Figure out where the "trees" folder is stashed!
+  // Strip off the file portion of the filename:
+  const char *slash_basename = strrchr(fn, '/');
+  if (unlikely(!slash_basename)) {
 
-    const char *last_slash = strrchr(fn, '/');
-    if (unlikely(!last_slash)) {
+    // Should not reach here
+    perror("No folder in filename (afl_custom_queue_get)");
+    return 0;
 
-      // Should not reach here
-      perror("Invalid filename (afl_custom_queue_get)");
-      return 0;
+  }
+  char *tree_out_dir = strdup(fn);
+  tree_out_dir[slash_basename - fn] = '\0';
 
-    }
+  // Get the name of the parent folder
+  char *last_dir = strrchr(tree_out_dir, '/');
+  if (unlikely(!last_dir)) {
 
-    // Set the tree output directory
-    char *tree_out_dir = strndup(fn, last_slash - fn);
-    char *found = strstr(tree_out_dir, "/queue");
-    if (unlikely(!found)) {
+    // Should not reach here
+    perror("No parent folder in filename (afl_custom_queue_get)");
+    return 0;
 
-      // Should not reach here
-      perror("Invalid filename (afl_custom_queue_get)");
-      return 0;
+  }
 
-    }
+  // Only read or write trees if we get /queue or /_resume as the last folder!
+  if (strcmp(last_dir, "/queue") != 0 && strcmp(last_dir, "/_resume") != 0) {
 
-    // Replace "queue" with "trees"
-    memcpy(found, "/trees", 6);
+    free(tree_out_dir);
+    tree_out_dir = NULL;
+    data->tree_fn_cur[0] = '\0';
 
-    // Check whether the directory exists
-    if (!create_directory(tree_out_dir)) {
+  } else {
 
-      // error
-      perror("Cannot create the output directory (afl_custom_queue_get)");
-      return 0;
+    // Copy "/trees" (including the null) to replace the old folder name
+    memcpy(last_dir, "/trees", 7);
+
+    // Set up the (expected) tree filename
+    snprintf(data->tree_fn_cur, PATH_MAX - 1, "%s%s", tree_out_dir, slash_basename);
+
+    // Check if we need to create the tree output directory
+    if (unlikely(data->tree_out_dir_exist == 0)) {
+
+      // Check whether the directory exists
+      if (!create_directory(tree_out_dir)) {
+
+        // error
+        perror("Cannot create the output directory (afl_custom_queue_get)");
+        free(tree_out_dir);
+        return 0;
+
+      }
 
     }
 
@@ -135,26 +156,18 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   }
 
-  snprintf(data->tree_fn_cur, PATH_MAX - 1, "%s", fn);
-  char *found = strstr(data->tree_fn_cur, "/queue/");
-  if (unlikely(!found)) {
+  if (strlen(data->tree_fn_cur)) {
 
-    // Should not reach here
-    perror("Invalid filename (afl_custom_queue_get)");
-    return 0;
+    // Read the corresponding serialized tree from file
+    data->tree_cur = read_tree_from_file(data->tree_fn_cur);
+    if (data->tree_cur) {
 
-  }
+      // We already had this tree in the trees folder, so compute its size and then we're done!
+      tree_get_size(data->tree_cur);
+      chunk_store_add_tree(data->tree_cur);
+      return 1;
 
-  // Replace "queue" with "trees"
-  memcpy(found, "/trees", 6);
-
-  // Read the corresponding serialized tree from file
-  data->tree_cur = read_tree_from_file(data->tree_fn_cur);
-  if (data->tree_cur) {
-
-    // We already had this tree in the trees folder, so compute its size and then we're done!
-    tree_get_size(data->tree_cur);
-    return 1;
+    }
 
   }
 
@@ -165,7 +178,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     // Now that we've parsed it, cache the info from this test case in
     // our trees folder and in the chunk store
     tree_get_size(data->tree_cur);
-    write_tree_to_file(data->tree_cur, data->tree_fn_cur);
+    if (strlen(data->tree_fn_cur)) write_tree_to_file(data->tree_cur, data->tree_fn_cur);
     chunk_store_add_tree(data->tree_cur);
     return 1;
 
@@ -188,11 +201,14 @@ int32_t afl_custom_init_trim(my_mutator_t *                   data,
   tree_get_recursion_edges(data->tree_cur);
 
   data->cur_trimming_stage = 0;
+  data->trim_was_effective = false;
 
   data->cur_subtree_trimming_step = 0;
+  data->finished_subtree_trimming_nodes = 0;
   data->total_subtree_trimming_steps = data->tree_cur->root->non_term_size;
 
   data->cur_recursive_trimming_step = 0;
+  data->finished_recursive_trimming_edges = 0;
   data->total_recursive_trimming_steps =
       data->tree_cur->root->recursion_edge_size;
 
@@ -213,16 +229,12 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
     node_t *node = (node_t *)list_pop_front(tree_cur->non_terminal_node_list);
     trimmed_tree = subtree_trimming(tree_cur, node);
 
-    ++data->cur_subtree_trimming_step;
-
   } else if (data->cur_trimming_stage == 1) {
 
     // recursive trimming
     edge_t *edge = (edge_t *)list_pop_front(tree_cur->recursion_edge_list);
     trimmed_tree = recursive_trimming(tree_cur, *edge);
     free(edge);
-
-    ++data->cur_recursive_trimming_step;
 
   } else {
 
@@ -259,35 +271,72 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
 int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
 
   if (success) {
+    // Keep track that we will need to rewrite the tree file later
+    data->trim_was_effective = true;
 
-    // Update the trimming step
-    size_t remaining_node_size = data->tree_cur->non_terminal_node_list->size;
-    size_t remaining_edge_size = data->tree_cur->recursion_edge_list->size;
-
-    // Update the corresponding tree file
-    write_tree_to_file(data->trimmed_tree, data->tree_fn_cur);
-
+    // Swap in the trimmed tree as our current tree:
     tree_free(data->tree_cur);
     data->tree_cur = data->trimmed_tree;
 
     // Update the non-terminal node list
     tree_get_non_terminal_nodes(data->tree_cur);
-    for (uint32_t i = 0; i < data->cur_subtree_trimming_step; ++i)
+
+    // The idea here is that the results that we've already tried are always at
+    // the start of the non_terminal_node_list, because whenever we get a "yes" result
+    // the nodes get trimmed out and they are always the last thing we've popped off the list.
+    //
+    // So to avoid repeating the previous attempts, just pop them out of the list right away:
+    for (uint32_t i = 0; i < data->finished_subtree_trimming_nodes; ++i)
       list_pop_front(data->tree_cur->non_terminal_node_list);
+
+    // We are now pointing *at* the node we just replaced.
+    // So we want to skip it and its children!
+    node_t * node = list_pop_front(data->tree_cur->non_terminal_node_list);
+    if (node) {
+
+      // Remember to skip these next time as well:
+      data->finished_subtree_trimming_nodes += 1 + node->non_term_size;
+
+      for (uint32_t i = 0; i < node->non_term_size; ++i)
+        list_pop_front(data->tree_cur->non_terminal_node_list);
+
+    }
+
     size_t new_node_size = data->tree_cur->non_terminal_node_list->size;
 
-    data->cur_subtree_trimming_step += (remaining_node_size - new_node_size);
+    // Set our progress equal to the remaining un-tested nodes in the list:
+    data->cur_subtree_trimming_step = data->total_subtree_trimming_steps - new_node_size;
+
 
     // update the recursion edge list
     tree_get_recursion_edges(data->tree_cur);
+    // Avoid repeating work by skipping edges that we have already tried.
+    for (uint32_t i = 0; i < data->finished_recursive_trimming_edges; ++i)
+      list_pop_front(data->tree_cur->recursion_edge_list);
     size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
 
-    data->cur_recursive_trimming_step += (remaining_edge_size - new_edge_size);
+    // Set our progress equal to the remaining un-tested edges in the list:
+    data->cur_recursive_trimming_step = data->total_recursive_trimming_steps - new_edge_size;
 
   } else {
 
     // the trimmed tree will not be saved, so destroy it
     tree_free(data->trimmed_tree);
+
+    // Even if the trim didn't work, still count the progress!
+    if (data->cur_trimming_stage == 0) {
+
+      ++data->cur_subtree_trimming_step;
+      ++data->finished_subtree_trimming_nodes;
+
+    }
+
+    if (data->cur_trimming_stage == 1) {
+
+      ++data->cur_recursive_trimming_step;
+      ++data->finished_recursive_trimming_edges;
+
+    }
 
   }
 
@@ -306,6 +355,16 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     if (data->cur_recursive_trimming_step >=
         data->total_recursive_trimming_steps)
       ++data->cur_trimming_stage;
+
+  }
+
+  // If we're done and we reduced the tree, then save the tree back to the
+  // file and write it to the chunk store for use in future splice mutations:
+  if (data->trim_was_effective && data->cur_trimming_stage > 1) {
+
+    // Update the corresponding tree file
+    write_tree_to_file(data->tree_cur, data->tree_fn_cur);
+    chunk_store_add_tree(data->tree_cur);
 
   }
 
@@ -328,7 +387,7 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
   data->total_random_mutation_steps = 100;
   if (data->tree_cur->recursion_edge_list->size > 0) {
 
-    data->total_random_recursive_mutation_steps = 20;
+    data->total_random_recursive_mutation_steps = 100;
 
   } else {
 
@@ -427,9 +486,26 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
       tree = random_mutation(tree);
       break;
     case 2:
-      // random recursive mutation
-      tree = random_recursive_mutation(tree, random() % 10);
-      break;
+      {
+        // random recursive mutation
+        const unsigned RRM_GROWTH = 10; // Allow 2**RRM_GROWTH of bytes of expansion
+        tree_t *rrm_tree = NULL;
+        tree_to_buf(tree);
+        do {
+
+          if (rrm_tree) tree_free(rrm_tree);
+          rrm_tree = random_recursive_mutation(tree, random() % (RRM_GROWTH + 1));
+          tree_to_buf(rrm_tree);
+
+          // Make sure that the mutation doesn't grow more than RRM_GROWTH bytes per attempt!
+          // This is protecting against random_recursive_mutation's ability to
+          // create MASSIVE growth in a short period of time by duplicating big nodes.
+        } while (rrm_tree->data_len > (1 << RRM_GROWTH) + tree->data_len);
+
+        tree = rrm_tree;
+        break;
+
+      }
     case 3:
       // splicing mutation
       tree = splicing_mutation(tree);
@@ -563,9 +639,11 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
 
   }
 
+  // NOTE: Unlike afl_custom_queue_get(), this function should ALWAYS have /queue/ as the last
+  //       directory in its filename, so the following simplified parsing is acceptable.
   const char *fn = (const char *)filename_new_queue;
   snprintf(data->new_tree_fn, PATH_MAX - 1, "%s", fn);
-  char *found = strstr(data->new_tree_fn, "/queue/");
+  char *found = strrstr(data->new_tree_fn, "/queue/");
   if (unlikely(!found)) {
 
     // Should not reach here
