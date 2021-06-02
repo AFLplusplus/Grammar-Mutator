@@ -245,6 +245,7 @@ class PyCompiledFuzzer(PooledFuzzer):
         t = t.replace('\v', '\\v')
         t = t.replace("'", "\\'")
         t = t.replace('"', '\\"')
+        t = t.replace('\x00', '\\x00')  # null character
         return t
 
     def k_to_s(self, k):
