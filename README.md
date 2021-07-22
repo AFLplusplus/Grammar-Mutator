@@ -106,17 +106,16 @@ Usually, the larger the tree size is, the more complex the corresponding input s
 ./grammar_generator-ruby 100 1000 ./seeds ./trees
 ```
 
-Afterwards copy the `trees` folder with that exact name to the output directory that you will use with afl-fuzz (e.g. `-o out`):
+Afterwards copy the `trees` folder with that exact name to the output directory that you will use with afl-fuzz (e.g. `-o out -S default`):
 ```bash
-mkdir out
-cp -r trees out
+mkdir -p out/default
+cp -r trees out/default
 ```
 
 Note that if you use multiple fuzzers (-M/-S sync mode) then you have to do this for all fuzzer instances, e.g. when the fuzzer instances are named fuzzer1 to fuzzer8:
 ```bash
-mkdir out
 for i in 1 2 3 4 5 6 7 8; do
-  mkdir out/fuzzer$i
+  mkdir -p out/fuzzer$i
   cp -r trees out/fuzzer$i/
 done
 ```
