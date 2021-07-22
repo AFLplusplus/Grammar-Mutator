@@ -142,11 +142,13 @@ The large `max_size` passed into `grammar_generator-$GRAMMAR` does help us gener
 
 ### Changing the Default Configurations
 
-Users can change the default number of mutations, by setting the following environment variables:
+Except for the deterministic rules mutation, users can change the default number of the following three types of mutations, by setting related environment variables:
 
 - `RANDOM_MUTATION_STEPS`: the number of random mutations
 - `RANDOM_RECURSIVE_MUTATION_STEPS`: the number of random recursive mutations
 - `SPLICING_MUTATION_STEPS`: the number of splicing mutations
+
+By default, the number of each of these three mutations is 1000. Increase them on your own as follows, if needed. :)
 
 ```bash
 export RANDOM_MUTATION_STEPS=10000
