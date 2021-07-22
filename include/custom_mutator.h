@@ -23,6 +23,11 @@
 extern "C" {
 #endif
 
+// default number of mutations of three mutation strategies
+extern size_t default_random_mutation_steps;
+extern size_t default_random_recursive_mutation_steps;
+extern size_t default_splicing_mutation_steps;
+
 typedef struct afl {
 
 } afl_t;

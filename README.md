@@ -140,6 +140,23 @@ Another reason is the costly parsing operations in the grammar mutator.
 Since the input seeds are in string format, the grammar mutator needs to parse them into tree representations at first, which is costly.
 The large `max_size` passed into `grammar_generator-$GRAMMAR` does help us generate deeply nested trees, but it further increases the parsing overhead.
 
+### Changing the Default Configurations
+
+Users can change the default number of mutations, by setting the following environment variables:
+
+- `RANDOM_MUTATION_STEPS`: the number of random mutations
+- `RANDOM_RECURSIVE_MUTATION_STEPS`: the number of random recursive mutations
+- `SPLICING_MUTATION_STEPS`: the number of splicing mutations
+
+```bash
+export RANDOM_MUTATION_STEPS=10000
+export RANDOM_RECURSIVE_MUTATION_STEPS=10000
+export SPLICING_MUTATION_STEPS=10000
+export AFL_CUSTOM_MUTATOR_LIBRARY=./libgrammarmutator-ruby.so
+export AFL_CUSTOM_MUTATOR_ONLY=1
+afl-fuzz -m 128 -i seeds -o out -- /path/to/target @@
+```
+
 ## Contact & Contributions
 
 We welcome any questions and contributions! Feel free to open an issue or submit a pull request!

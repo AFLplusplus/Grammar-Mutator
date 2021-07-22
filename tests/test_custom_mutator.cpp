@@ -132,8 +132,11 @@ TEST_F(CustomMutatorTest, Fuzzing) {
   tree_to_buf(tree);
   tree_get_recursion_edges(tree);
   int num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
-  int expected_num = rules_mutation_count(tree) + 100 + 100;
-  if (tree->recursion_edge_list->size > 0) expected_num += 20;
+  int expected_num = rules_mutation_count(tree) +
+                     default_random_mutation_steps +
+                     default_splicing_mutation_steps;
+  if (tree->recursion_edge_list->size > 0)
+    expected_num += default_random_recursive_mutation_steps;
   EXPECT_EQ(num, expected_num);
   for (int i = 0; i < num; ++i) {
 
@@ -182,8 +185,11 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
   tree_to_buf(tree);
   tree_get_recursion_edges(tree);
   int num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
-  int expected_num = rules_mutation_count(tree) + 100 + 100;
-  if (tree->recursion_edge_list->size > 0) expected_num += 20;
+  int expected_num = rules_mutation_count(tree) +
+                     default_random_mutation_steps +
+                     default_splicing_mutation_steps;
+  if (tree->recursion_edge_list->size > 0)
+    expected_num += default_random_recursive_mutation_steps;
   EXPECT_NE(num, expected_num);
   for (int i = 0; i < num; ++i) {
 
@@ -232,8 +238,11 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
   tree_to_buf(tree);
   tree_get_recursion_edges(tree);
   int num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
-  int expected_num = rules_mutation_count(tree) + 100 + 100;
-  if (tree->recursion_edge_list->size > 0) expected_num += 20;
+  int expected_num = rules_mutation_count(tree) +
+                     default_random_mutation_steps +
+                     default_splicing_mutation_steps;
+  if (tree->recursion_edge_list->size > 0)
+    expected_num += default_random_recursive_mutation_steps;
   EXPECT_EQ(num, expected_num);
   for (int i = 0; i < num; ++i) {
 

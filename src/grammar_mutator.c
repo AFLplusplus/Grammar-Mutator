@@ -33,9 +33,50 @@
 #include "chunk_store.h"
 #include "utils.h"
 
+// default number of mutations of three mutation strategies
+// env: RANDOM_MUTATION_STEPS
+size_t default_random_mutation_steps = 1000;
+// env: RANDOM_RECURSIVE_MUTATION_STEPS
+size_t default_random_recursive_mutation_steps = 1000;
+// env: SPLICING_MUTATION_STEPS
+size_t default_splicing_mutation_steps = 1000;
+
+static void load_env_configs() {
+
+  char *ptr;
+  char *env_vars[4] = {
+      "RANDOM_MUTATION_STEPS",
+      "RANDOM_RECURSIVE_MUTATION_STEPS",
+      "SPLICING_MUTATION_STEPS",
+      NULL
+  };
+  size_t *configs[4] = {
+      &default_random_mutation_steps,
+      &default_random_recursive_mutation_steps,
+      &default_splicing_mutation_steps,
+      NULL
+  };
+  int i = 0;
+
+  while (env_vars[i] != NULL && configs[i] != NULL) {
+
+    ptr = getenv(env_vars[i]);
+    if (ptr && *ptr) {
+
+      *(configs[i]) = strtol(ptr, NULL, 10);
+
+    }
+    ++i;
+
+  }
+
+}
+
 my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
 
   srandom(seed);
+
+  load_env_configs();
 
   chunk_store_init();
 
@@ -383,11 +424,12 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
 
   data->cur_fuzzing_stage = 0;
   data->cur_fuzzing_step = 0;
+  // rules mutation is deterministic for a given tree
   data->total_rules_mutation_steps = rules_mutation_count(data->tree_cur);
-  data->total_random_mutation_steps = 100;
+  data->total_random_mutation_steps = default_random_mutation_steps;
   if (data->tree_cur->recursion_edge_list->size > 0) {
 
-    data->total_random_recursive_mutation_steps = 100;
+    data->total_random_recursive_mutation_steps = default_random_recursive_mutation_steps;
 
   } else {
 
@@ -395,7 +437,7 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
 
   }
 
-  data->total_splicing_mutation_steps = 100;
+  data->total_splicing_mutation_steps = default_splicing_mutation_steps;
 
   if (data->total_rules_mutation_steps > 0) {
 
@@ -487,6 +529,7 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
       break;
     case 2:
       {
+
         // random recursive mutation
         const unsigned RRM_GROWTH = 10; // Allow 2**RRM_GROWTH of bytes of expansion
         tree_t *rrm_tree = NULL;
