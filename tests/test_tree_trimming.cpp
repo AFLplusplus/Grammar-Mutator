@@ -18,13 +18,14 @@
 
 #include "tree.h"
 #include "tree_trimming.h"
+#include "utils.h"
 
 #include "gtest/gtest.h"
 #include "gtest_ext.h"
 
 TEST(TreeTrimmingTest, SubtreeTrimming) {
 
-  srandom(0);  // Fix the random seed
+  random_set_seed(0);  // Fix the random seed
 
   auto tree = tree_create();
   auto node1 = node_create(1);
@@ -43,7 +44,7 @@ TEST(TreeTrimmingTest, SubtreeTrimming) {
 
 TEST(TreeTrimmingTest, RecursiveTrimming) {
 
-  srandom(0);  // Fix the random seed
+  random_set_seed(0);  // Fix the random seed
 
   auto tree = tree_create();
   auto node1 = node_create(1);

@@ -51,7 +51,7 @@ int main(int argc, const char *argv[]) {
     seed = (int)time(NULL);
 
   printf("Using seed %d\n", seed);
-  srandom((unsigned int)seed);
+  random_set_seed((uint64_t)seed);
 
   if (!create_directory(out_dir)) {
 

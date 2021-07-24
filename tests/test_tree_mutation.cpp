@@ -19,13 +19,14 @@
 #include "chunk_store.h"
 #include "tree.h"
 #include "tree_mutation.h"
+#include "utils.h"
 
 #include "gtest/gtest.h"
 #include "gtest_ext.h"
 
 TEST(TreeMutationTest, RandomMutation) {
 
-  srandom(0);  // Fix the random seed
+  random_set_seed(0);  // Fix the random seed
 
   auto tree = tree_create();
   auto node1 = node_create(1);
@@ -43,7 +44,7 @@ TEST(TreeMutationTest, RandomMutation) {
 
 TEST(TreeMutationTest, RandomRecursiveMutation) {
 
-  srandom(0);  // Fix the random seed
+  random_set_seed(0);  // Fix the random seed
 
   auto tree = tree_create();
   auto node1 = node_create(1);
@@ -75,7 +76,7 @@ TEST(TreeMutationTest, RandomRecursiveMutation) {
 
 TEST(TreeMutationTest, SplicingMutation) {
 
-  srandom(0);  // Fix the random seed
+  random_set_seed(0);  // Fix the random seed
 
   auto tree1 = tree_create();  // "{" + "123" + "}"
   auto node1 = node_create(1);  // <1> -> "{" + <2> + "}"

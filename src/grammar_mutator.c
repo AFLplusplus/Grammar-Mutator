@@ -74,7 +74,7 @@ static void load_env_configs() {
 
 my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
 
-  srandom(seed);
+  random_set_seed(seed);
 
   load_env_configs();
 
@@ -537,7 +537,8 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
         do {
 
           if (rrm_tree) tree_free(rrm_tree);
-          rrm_tree = random_recursive_mutation(tree, random() % (RRM_GROWTH + 1));
+          rrm_tree =
+              random_recursive_mutation(tree, random_below(RRM_GROWTH + 1));
           tree_to_buf(rrm_tree);
 
           // Make sure that the mutation doesn't grow more than RRM_GROWTH bytes per attempt!

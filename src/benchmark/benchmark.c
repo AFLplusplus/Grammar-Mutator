@@ -30,6 +30,7 @@
 #include "tree.h"
 #include "tree_mutation.h"
 #include "tree_trimming.h"
+#include "utils.h"
 
 #define BENCH_NUM (1000)
 #define MAX_TREE_LEN (1000 + 1)
@@ -167,7 +168,7 @@ void bench_random_recursive_mutation() {
     for (int i = 0; i < BENCH_NUM; ++i) {
       tree = gen_init__(max_len);
       tree_get_size(tree);
-      n = random() % 10;
+      n = random_below(10);
 
       start = current_time();
       mutated_tree = random_recursive_mutation(tree, n);
@@ -200,10 +201,10 @@ void bench_subtree_trimming() {
 
   printf("========== Subtree Trimming, Single Node [START] ==========\n");
   for (int i = 0; i < BENCH_NUM; ++i) {
-    max_len = random() % MAX_TREE_LEN;
+    max_len = random_below(MAX_TREE_LEN);
     tree = gen_init__(max_len);
     tree_get_non_terminal_nodes(tree);
-    int j = random() % tree->non_terminal_node_list->size;
+    int j = random_below(tree->non_terminal_node_list->size);
     node = list_get(tree->non_terminal_node_list, j);
 
     start = current_time();
@@ -232,7 +233,7 @@ void bench_recursive_trimming() {
     tree_get_recursion_edges(tree);
   }
   for (int i = 0, j = 0; i < BENCH_NUM; ++i) {
-    j = random() % tree->recursion_edge_list->size;
+    j = random_below(tree->recursion_edge_list->size);
     edge = list_get(tree->recursion_edge_list, j);
 
     start = current_time();
@@ -290,7 +291,7 @@ int main(int argc, const char *argv[]) {
     return 1;
   }
 
-  srandom(time(NULL));
+  random_set_seed(time(NULL));
 
   // Parse single test case file
   if (strncmp(argv[1], "single", 6) == 0) {

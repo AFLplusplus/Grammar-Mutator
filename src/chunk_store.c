@@ -16,11 +16,13 @@
 
  */
 
-#include "xxh3.h"
+#define XXH_INLINE_ALL
+#include "xxhash.h"
 #include "list.h"
 #include "f1_c_fuzz.h"
 #include "chunk_store.h"
 #include "chunk_store_internal.h"
+#include "utils.h"
 
 // the list, in `chunk_store`, contains a collection of `node_t`
 list_map_t chunk_store;
@@ -177,7 +179,7 @@ node_t *chunk_store_get_alternative_node(node_t *node) {
 
   list_t *node_list = *p_node_list;
   size_t  n = node_list->size;
-  int     prob = random() % n;
+  int     prob = random_below(n);
   // must clone the node
   return node_clone((node_t *)list_get(node_list, prob));
 

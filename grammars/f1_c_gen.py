@@ -575,12 +575,13 @@ extern size_t node_num_rules[%(num_nodes)d];
 
 #include "tree.h"
 #include "f1_c_fuzz.h"
+#include "utils.h"
 
 extern node_t *_node_deserialize(const uint8_t *data_buf,
                                  size_t data_size, size_t *consumed_size);
 
 static inline int map_rand(int v) {
-  return random() %% v;
+  return random_below(v);
 }
 
 static int get_random_len(int num_subnodes, int total_remaining_len) {

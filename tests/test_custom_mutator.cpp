@@ -268,7 +268,7 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
 
 TEST_F(CustomMutatorTest, Trimming) {
 
-  srandom(1234);
+  random_set_seed(1234);
 
   uint8_t *                      buf = nullptr;
   __attribute__((unused)) size_t buf_size;

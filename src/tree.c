@@ -21,6 +21,7 @@
 #include <sys/mman.h>
 
 #include "tree.h"
+#include "utils.h"
 
 #define TREE_BUF_PREALLOC_SIZE (64)
 
@@ -334,7 +335,7 @@ node_t *node_pick_non_term_subnode(node_t *node) {
   if (node->non_term_size == 0) return NULL;
 
   size_t non_term_size = node->non_term_size;
-  size_t prob = random() % non_term_size;
+  size_t prob = random_below(non_term_size);
 
   if (prob < 1) return node;
   prob -= 1;
@@ -367,7 +368,7 @@ edge_t node_pick_recursion_edge(node_t *node) {
   if (node->recursion_edge_size == 0) return ret;
 
   size_t recursion_edge_size = node->recursion_edge_size;
-  size_t prob = random() % recursion_edge_size;
+  size_t prob = random_below(recursion_edge_size);
 
   node_t *subnode = NULL;
   for (uint32_t i = 0; i < node->subnode_count; ++i) {
