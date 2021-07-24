@@ -5,7 +5,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "helpers.h"
 #include "utils.h"
+
+#define XXH_INLINE_ALL
+#include "xxhash.h"
+#undef XXH_INLINE_ALL
 
 bool create_directory(const char *path) {
 
@@ -115,5 +120,70 @@ char * strrstr(const char * haystack, const char * needle) {
   }
 
   return NULL;
+
+}
+
+// Random number generators
+static RANDOM_RETURN random_seed[3];
+#define ROTL(d, lrot) ((d << (lrot)) | (d >> (8 * sizeof(d) - (lrot))))
+#define HASH_SEED 0xa5b35705
+
+void random_set_seed(uint64_t seed) {
+
+  random_seed[0] = XXH64(&seed, sizeof(seed), HASH_SEED);
+  random_seed[1] = random_seed[0] ^ 0x1234567890abcdef;
+  random_seed[2] = (random_seed[0] & 0x1234567890abcdef) ^
+                   (random_seed[1] | 0xfedcba9876543210);
+
+}
+
+#ifdef WORD_SIZE_64
+// romuDuoJr
+//
+// The fastest generator using 64-bit arith., but not suited for huge jobs.
+// Est. capacity = 2^51 bytes. Register pressure = 4. State size = 128 bits.
+RANDOM_RETURN random_next() {
+
+  RANDOM_RETURN xp = random_seed[0];
+  random_seed[0] = 15241094284759029579u * random_seed[1];
+  random_seed[1] = random_seed[1] - xp;
+  random_seed[1] = ROTL(random_seed[1], 27);
+  return xp;
+
+}
+#else
+// RomuTrio32
+//
+// 32-bit arithmetic: Good for general purpose use, except for huge jobs.
+// Est. capacity >= 2^53 bytes. Register pressure = 5. State size = 96 bits.
+RANDOM_RETURN random_next() {
+
+  RANDOM_RETURN xp = random_seed[0], yp = random_seed[1], zp = random_seed[2];
+  random_seed[0] = 3323815723u * zp;
+  random_seed[1] = yp - xp;
+  random_seed[1] = ROTL(random_seed[1], 6);
+  random_seed[2] = zp - yp;
+  random_seed[2] = ROTL(random_seed[2], 22);
+  return xp;
+
+}
+#endif /* WORD_SIZE_64 */
+
+uint32_t random_below(uint32_t limit) {
+
+  if (limit <= 1) return 0;
+
+  /* Modulo is biased - we don't want our fuzzing to be biased so let's do it
+ right. See:
+ https://stackoverflow.com/questions/10984974/why-do-people-say-there-is-modulo-bias-when-using-a-random-number-generator
+ */
+  uint64_t unbiased_rnd;
+  do {
+
+    unbiased_rnd = random_next();
+
+  } while (unlikely(unbiased_rnd >= (UINT64_MAX - (UINT64_MAX % limit))));
+
+  return unbiased_rnd % limit;
 
 }
