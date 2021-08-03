@@ -86,6 +86,10 @@ test_%_memcheck: test_%
 test_%: test_%.o $(LIBS)
 	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS)
 
+.PRECIOUS: test_tree_mutation
+test_tree_mutation: test_tree_mutation.o $(LIBS) $(RXI_MAP_LIB)
+	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(RXI_MAP_LIB)
+
 .PRECIOUS: test_chunk_store
 test_chunk_store: test_chunk_store.o $(LIBS) $(RXI_MAP_LIB)
 	$(CXX) $(CXX_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ../src) $(LDFLAGS) $(RXI_MAP_LIB)
@@ -103,6 +107,10 @@ test_tree.o: test_tree.cpp $(GTEST_INCLUDE)
 	$(CXX) -DENABLE_PARSING_ARRAY_RB -DARRAY_RB_PATH=\"`realpath testcases/array.rb`\" \
 	       $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
 endif
+
+.PRECIOUS: test_tree_mutation.o
+test_tree_mutation.o: test_tree_mutation.cpp $(GTEST_INCLUDE)
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_chunk_store.o
 test_chunk_store.o: test_chunk_store.cpp $(GTEST_INCLUDE)

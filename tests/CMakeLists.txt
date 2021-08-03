@@ -79,7 +79,10 @@ endif ()
 add_executable(test_tree_mutation test_tree_mutation.cpp)
 target_link_libraries(test_tree_mutation
   PRIVATE gtest_main
-  PRIVATE grammarmutator)
+  PRIVATE grammarmutator
+  PRIVATE rxi_map)
+target_include_directories(test_tree_mutation
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)
 add_test(
   NAME test_tree_mutation
   COMMAND test_tree_mutation)
