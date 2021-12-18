@@ -173,7 +173,13 @@ class TreeMutationUniquenessTest : public ::testing::Test {
       // insert to the set
       tree_hash_set.insert(tree_root_hash);
 
+      // free the tree
+      tree_free(tree);
+
     }
+
+    // free the tree
+    tree_free(tmp_tree);
 
     // count the number
     EXPECT_GE(tree_hash_set.size(), ratio * mutation_num);
@@ -208,7 +214,9 @@ TEST_F(TreeMutationUniquenessTest, SplicingMutation) {
 
   // add 5 randomly generated trees
   for (int i = 0; i < 5; ++i) {
-    chunk_store_add_tree(gen_init__(1000));
+    tree_t *tree = gen_init__(1000);
+    chunk_store_add_tree(tree);
+    tree_free(tree);
   }
 
   RunTest(default_splicing_mutation_steps, 0, splicing_mutation);
