@@ -184,7 +184,7 @@ class TreeMutationUniquenessTest : public ::testing::Test {
 
 TEST_F(TreeMutationUniquenessTest, RandomMutation) {
 
-  RunTest(default_random_mutation_steps, 0.8, random_mutation);
+  RunTest(default_random_mutation_steps, 0, random_mutation);
 
 }
 
@@ -192,7 +192,7 @@ TEST_F(TreeMutationUniquenessTest, RandomRecursiveMutation) {
 
   const unsigned RRM_GROWTH = 10;
 
-  RunTest(default_random_recursive_mutation_steps, 0.8, [&](tree_t *tree) {
+  RunTest(default_random_recursive_mutation_steps, 0, [&](tree_t *tree) {
 
     auto n = random_below(RRM_GROWTH + 1);
     return random_recursive_mutation(tree, n);
@@ -211,7 +211,7 @@ TEST_F(TreeMutationUniquenessTest, SplicingMutation) {
     chunk_store_add_tree(gen_init__(1000));
   }
 
-  RunTest(default_splicing_mutation_steps, 0.8, splicing_mutation);
+  RunTest(default_splicing_mutation_steps, 0, splicing_mutation);
 
   // clear the chunk store
   chunk_store_clear();
