@@ -252,69 +252,10 @@ class PyCompiledFuzzer(PooledFuzzer):
         return k[1:-1].replace('-', '_')
 
 
-class PyRecCompiledFuzzer(PyCompiledFuzzer):
+class CFuzzer(PyCompiledFuzzer):
     def __init__(self, grammar):
         super().__init__(grammar)
-        self.key_recursion = {}
-        self.rule_recursion = {}
         assert self.ordered_grammar
-        self.rec_cost = {}
-        self.compute_rule_recursion()
-
-    def kr_to_s(self, key, i):
-        return 'gen_%s_%d' % (self.k_to_s(key), i)
-
-    # the grammar needs to be ordered by the cost.
-    # else the ordering will change at the end.
-
-    def is_rule_recursive(self, rname, rule, seen):
-        if not rule:
-            return False
-        if rname in seen:
-            # reached another recursive rule without seeing this one
-            return False
-        for token in rule:
-            if token not in self.grammar:
-                continue
-            for i, trule in enumerate(self.grammar[token]):
-                rn = self.kr_to_s(token, i)
-                if rn == rname:
-                    return True
-                if rn in seen:
-                    return False
-                v = self.is_rule_recursive(rname, trule, seen | {rn})
-                if v:
-                    return True
-        return False
-
-    def is_key_recursive(self, check, key, seen):
-        if key not in self.grammar:
-            return False
-        if key in seen:
-            return False
-        for rule in self.grammar[key]:
-            for token in rule:
-                if token not in self.grammar:
-                    continue
-                if token == check:
-                    return True
-                v = self.is_key_recursive(check, token, seen | {token})
-                if v:
-                    return True
-        return False
-
-    def compute_rule_recursion(self):
-        for k in self.grammar_keys:
-            for i_rule, rule in enumerate(self.grammar[k]):
-                n = self.kr_to_s(k, i_rule)
-                self.rule_recursion[n] = self.is_rule_recursive(n, rule, set())
-        for k in self.grammar_keys:
-            self.key_recursion[k] = self.is_key_recursive(k, k, set())
-
-
-class CFuzzer(PyRecCompiledFuzzer):
-    def __init__(self, grammar):
-        super().__init__(grammar)
 
     def gen_rule_src(self, rule, key, min_rule_cost):
         res = []

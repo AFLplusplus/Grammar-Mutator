@@ -25,6 +25,7 @@ import random
 
 from f1_common import LimitFuzzer
 
+
 #
 # The original Sanitize and AntlrG class are borrowed from F1 fuzzer:
 # https://github.com/vrthra/F1
@@ -89,7 +90,7 @@ entry
         for k in self.grammar_keys:
             rules = self.grammar[k]
             v = '\n    | '.join([self.rule_to_s(rule, self.grammar)
-                                for rule in rules])
+                                 for rule in rules])
             lines.append('''\
 %s
     : %s
