@@ -16,10 +16,16 @@
 
  */
 
+#include <array>
+#include <set>
+
 #include "chunk_store.h"
+#include "custom_mutator.h"
+#include "f1_c_fuzz.h"
 #include "tree.h"
 #include "tree_mutation.h"
 #include "utils.h"
+#include "../src/chunk_store_internal.h"
 
 #include "gtest/gtest.h"
 #include "gtest_ext.h"
@@ -125,5 +131,97 @@ TEST(TreeMutationTest, SplicingMutation) {
   tree_free(tree2);
   tree_free(tree3);
   tree_free(tree4);
+
+}
+
+class TreeMutationUniquenessTest : public ::testing::Test {
+
+ protected:
+  std::set<std::array<char, 16+1>> tree_hash_set;
+
+  TreeMutationUniquenessTest() = default;
+
+  void SetUp() override { }
+
+  void TearDown() override {
+
+    // clean the set
+    tree_hash_set.clear();
+
+  }
+
+  using mutation_func = std::function<tree_t *(tree_t *)>;
+  void RunTest(size_t mutation_num, double ratio, const mutation_func &func) {
+
+    random_set_seed(0);  // Fix the random seed
+
+    // create a tree
+    auto tmp_tree = gen_init__(1000);
+    tree_get_size(tmp_tree);
+
+    tree_t *tree;
+    std::array<char, 16+1> tree_root_hash = {};
+
+    for (size_t i = 0; i < mutation_num; ++i) {
+
+      // mutate
+      tree = func(tmp_tree);
+
+      // calculate hash
+      hash_node(tree->root, tree_root_hash.data());
+
+      // insert to the set
+      tree_hash_set.insert(tree_root_hash);
+
+      // free the tree
+      tree_free(tree);
+
+    }
+
+    // free the tree
+    tree_free(tmp_tree);
+
+    // count the number
+    EXPECT_GE(tree_hash_set.size(), ratio * mutation_num);
+
+  }
+
+};
+
+TEST_F(TreeMutationUniquenessTest, RandomMutation) {
+
+  RunTest(default_random_mutation_steps, 0, random_mutation);
+
+}
+
+TEST_F(TreeMutationUniquenessTest, RandomRecursiveMutation) {
+
+  const unsigned RRM_GROWTH = 10;
+
+  RunTest(default_random_recursive_mutation_steps, 0, [&](tree_t *tree) {
+
+    auto n = random_below(RRM_GROWTH + 1);
+    return random_recursive_mutation(tree, n);
+
+  });
+
+}
+
+TEST_F(TreeMutationUniquenessTest, SplicingMutation) {
+
+  // initialize the chunk store
+  chunk_store_init();
+
+  // add 5 randomly generated trees
+  for (int i = 0; i < 5; ++i) {
+    tree_t *tree = gen_init__(1000);
+    chunk_store_add_tree(tree);
+    tree_free(tree);
+  }
+
+  RunTest(default_splicing_mutation_steps, 0, splicing_mutation);
+
+  // clear the chunk store
+  chunk_store_clear();
 
 }
