@@ -46,7 +46,7 @@ int main(int argc, const char *argv[]) {
   out_dir = argv[3];
   tree_out_dir = argv[4];
   if (argc > 5)
-    seed = atoi(argv[1]);
+    seed = atoi(argv[5]);
   else
     seed = (int)time(NULL);
 
