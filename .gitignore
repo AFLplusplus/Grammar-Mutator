@@ -51,3 +51,6 @@ out/
 # Generated targets
 grammar_generator-*
 libgrammarmutator-*.so
+
+# ANTLR
+antlr-*.jar

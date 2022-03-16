@@ -150,6 +150,26 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     return 0;
 
   }
+
+  // Obtain the name of the test case
+  // At the initialization stage of afl-fuzz, there will be an "orig:" tag in
+  // the filename. If so, we will look for dumped tree files with the same name,
+  // as our grammar generator will assign the same name for generated test cases
+  // and trees. If there is no "orig:" tag, we will use its full name of the
+  // test case
+  const char *use_name = strstr(slash_basename, ",orig:");
+  if (use_name) {
+
+    // Skip the prefix ",orig:"
+    use_name += 6;
+
+  } else {
+
+    // Skip the prefix slash
+    use_name = slash_basename + 1;
+
+  }
+
   char *tree_out_dir = strdup(fn);
   tree_out_dir[slash_basename - fn] = '\0';
 
@@ -176,7 +196,9 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     memcpy(last_dir, "/trees", 7);
 
     // Set up the (expected) tree filename
-    snprintf(data->tree_fn_cur, PATH_MAX - 1, "%s%s", tree_out_dir, slash_basename);
+    snprintf(
+        data->tree_fn_cur, PATH_MAX - 1, "%s/%s", tree_out_dir,
+        use_name);
 
     // Check if we need to create the tree output directory
     if (unlikely(data->tree_out_dir_exist == 0)) {

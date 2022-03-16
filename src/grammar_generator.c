@@ -75,7 +75,7 @@ int main(int argc, const char *argv[]) {
 
     snprintf(fn, PATH_MAX, "%s/%d", out_dir, i);
     dump_tree_to_test_case(tree, fn);
-    snprintf(fn, PATH_MAX, "%s/id:%06d,time:0,orig:%d", tree_out_dir, i, i);
+    snprintf(fn, PATH_MAX, "%s/%d", tree_out_dir, i);
     write_tree_to_file(tree, fn);
 
     tree_free(tree);
