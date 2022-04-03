@@ -27,4 +27,6 @@ An example, `test_hex.json`, is included in this directory:
 }
 ```
 
-Note that, this workaround only works for ASCII characters (i.e., `\u0000` \~ `\u007f`). Otherwise, the special characters will be converted into more than one byte in the UTF-8 encoding. A wrong grammar file, `wrong_hex.json`, is included in this directory as well. Please refer to [post1](https://www.utf8-chartable.de/) and [post2](https://stackoverflow.com/a/59624562) for more details.
+Note that, this workaround only works for ASCII characters (i.e., `\u0000` \~ `\u00ff`). Otherwise, the grammar file cannot be processed.
+
+References: [post1](https://www.utf8-chartable.de/), [post2](https://stackoverflow.com/a/59624562), [post3](https://stackoverflow.com/a/66601996), and [post4](https://stackoverflow.com/questions/66601743/python3-str-to-bytes-convertation-problem).

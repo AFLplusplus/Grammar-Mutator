@@ -82,9 +82,14 @@ class TreeNode:
         val_len = len(self.val)
         ret += val_len.to_bytes(4, byteorder='little', signed=False)
         # val
-        val_bytes = bytes(self.val, 'utf-8')
+        # Latin-1 is an 8-bit character set. The first 128 characters of its
+        # set are identical to the US ASCII standard. By encoding the string as
+        # Latin-1, we can handle all hex characters from \u0000 to \u00ff
+        # Refs:
+        # - https://stackoverflow.com/questions/66601743/python3-str-to-bytes-convertation-problem
+        # - https://kb.iu.edu/d/aepu
+        val_bytes = bytes(self.val, 'latin-1')
         if val_len != len(val_bytes):
-            # NOTE: we only support ASCII characters (i.e., single-byte characters)
             print(f'The length of `val` should be {val_len}, but found {len(val_bytes)}.')
             print(f'`val` bytes in UTF-8 encoding: {val_bytes}')
             print('Please check your grammar file!')
