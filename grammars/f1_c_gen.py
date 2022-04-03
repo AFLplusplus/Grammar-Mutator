@@ -82,7 +82,14 @@ class TreeNode:
         val_len = len(self.val)
         ret += val_len.to_bytes(4, byteorder='little', signed=False)
         # val
-        ret += bytes(self.val, 'utf-8')
+        val_bytes = bytes(self.val, 'utf-8')
+        if val_len != len(val_bytes):
+            # NOTE: we only support ASCII characters (i.e., single-byte characters)
+            print(f'The length of `val` should be {val_len}, but found {len(val_bytes)}.')
+            print(f'`val` bytes in UTF-8 encoding: {val_bytes}')
+            print('Please check your grammar file!')
+            sys.exit(1)
+        ret += val_bytes
 
         # subnodes
         for subnode in self.subnodes:

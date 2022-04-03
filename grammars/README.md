@@ -26,3 +26,5 @@ An example, `test_hex.json`, is included in this directory:
               ["\u0018"], ["\u0019"], ["\u001a"], ["\u001b"], ["\u001c"], ["\u001d"], ["\u001e"], ["\u001f"]]
 }
 ```
+
+Note that, this workaround only works for ASCII characters (i.e., `\u0000` \~ `\u007f`). Otherwise, the special characters will be converted into more than one byte in the UTF-8 encoding. A wrong grammar file, `wrong_hex.json`, is included in this directory as well. Please refer to [post1](https://www.utf8-chartable.de/) and [post2](https://stackoverflow.com/a/59624562) for more details.
