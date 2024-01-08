@@ -108,7 +108,7 @@ entry
     ;''' % entries)
         for k in self.grammar_keys:
             rules = self.grammar[k]
-            v = '\n    | '.join([self.rule_to_s(key, rule, self.grammar)
+            v = '\n    | '.join([self.rule_to_s(k, rule, self.grammar)
                                  for rule in rules])
             lines.append('''\
 %s
