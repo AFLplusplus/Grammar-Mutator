@@ -75,29 +75,10 @@ class AntlrG(Sanitize):
         t = t.replace('\t', '\\t')
         return t
 
-    def rule_to_s(self, key, rule, grammar):
-        # feat: add 'directly head/tail recursion' optimized syntax '+'
-        if len(rule) == 0:
-            return ''
-
-        # head recursion
-        recursion = False
-        if rule[0] == key:
-            rule = rule[1:]
-            recursion = True
-        # tail recursion
-        if rule[-1] == key:
-            rule = rule[:-1]
-            recursion = True
-
-        # append rules
-        data = ' '.join(["'%s'" % self.esc_token(t)
+    def rule_to_s(self, rule, grammar):
+        return ' '.join(["'%s'" % self.esc_token(t)
                          if t not in grammar else self.to_key(t)
                          for t in rule])
-
-        if recursion:
-            data = "(%s)+" % data
-        return data
 
     def translate(self):
         lines = ['grammar Grammar;']
@@ -108,7 +89,7 @@ entry
     ;''' % entries)
         for k in self.grammar_keys:
             rules = self.grammar[k]
-            v = '\n    | '.join([self.rule_to_s(k, rule, self.grammar)
+            v = '\n    | '.join([self.rule_to_s(rule, self.grammar)
                                  for rule in rules])
             lines.append('''\
 %s
