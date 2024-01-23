@@ -556,7 +556,11 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
         const unsigned RRM_GROWTH = 10; // Allow 2**RRM_GROWTH of bytes of expansion
         tree_t *rrm_tree = NULL;
         tree_to_buf(tree);
+        int failed_count = 8;
         do {
+          if (failed_count-- <= 0) {
+            break;
+          }
 
           if (rrm_tree) tree_free(rrm_tree);
           rrm_tree =
