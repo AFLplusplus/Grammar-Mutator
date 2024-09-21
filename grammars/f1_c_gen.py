@@ -78,22 +78,13 @@ class TreeNode:
         # subnode_count
         subnode_count = len(self)
         ret += subnode_count.to_bytes(4, byteorder='little', signed=False)
-        # val_len
-        val_len = len(self.val)
+
+        # Encode the value as UTF-8
+        val_bytes = self.val.encode('utf-8')
+        # val_len (now stores the byte length of the UTF-8 encoded string)
+        val_len = len(val_bytes)
         ret += val_len.to_bytes(4, byteorder='little', signed=False)
         # val
-        # Latin-1 is an 8-bit character set. The first 128 characters of its
-        # set are identical to the US ASCII standard. By encoding the string as
-        # Latin-1, we can handle all hex characters from \u0000 to \u00ff
-        # Refs:
-        # - https://stackoverflow.com/questions/66601743/python3-str-to-bytes-convertation-problem
-        # - https://kb.iu.edu/d/aepu
-        val_bytes = bytes(self.val, 'latin-1')
-        if val_len != len(val_bytes):
-            print(f'The length of `val` should be {val_len}, but found {len(val_bytes)}.')
-            print(f'`val` bytes in UTF-8 encoding: {val_bytes}')
-            print('Please check your grammar file!')
-            sys.exit(1)
         ret += val_bytes
 
         # subnodes
@@ -103,6 +94,7 @@ class TreeNode:
         return ret
 
     @staticmethod
+
     def from_bytes(data: bytes):
         node = TreeNode()
         consumed = 0
@@ -132,6 +124,7 @@ class TreeNode:
             consumed += sub_consumed
 
         return node, consumed
+
 
     def __str__(self):
         ret = ''

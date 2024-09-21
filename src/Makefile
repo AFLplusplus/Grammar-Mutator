@@ -47,6 +47,7 @@ BENCHMARK_OBJS = $(BENCHMARK_SRC_FILES:.c=.o)
 OBJS = $(LIB_OBJS) $(GEN_OBJS) $(BENCHMARK_OBJS)
 
 C_FLAGS = $(C_FLAGS_OPT)
+C_FLAGS +=  -Wno-error=bidi-chars
 C_DEFINES =
 C_INCLUDES = -I../include -I../third_party/rxi_map -I../third_party/Cyan4973_xxHash
 
