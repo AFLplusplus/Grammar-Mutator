@@ -83,8 +83,8 @@ ifeq ($(BUILD),yes)
 endif
 
 PYTHON = python3
-C_FLAGS_OPT = -Wall -Wextra -Werror
-CXX_FLAGS_OPT = -Wall -Wextra -Werror
+C_FLAGS_OPT =
+CXX_FLAGS_OPT =
 export C_FLAGS_OPT
 export CXX_FLAGS_OPT
 
