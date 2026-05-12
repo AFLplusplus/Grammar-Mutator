@@ -110,6 +110,14 @@ tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
 
   if (!root) return nullptr;  // parse error
 
+  // Reject degenerate trees whose root is a terminal/error node (id==0).
+  // Such trees have non_term_size==0 and break every mutation that picks a
+  // non-terminal node.
+  if (root->id == 0) {
+    node_free(root);
+    return nullptr;
+  }
+
   tree_t *tree = tree_create();
   tree->root = root;
   return tree;
