@@ -97,7 +97,7 @@ size_t   afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
                          uint8_t **out_buf, uint8_t *add_buf,
                          size_t add_buf_size,  // add_buf can be NULL
                          size_t max_size);
-void     afl_custom_queue_new_entry(my_mutator_t * data,
+uint8_t  afl_custom_queue_new_entry(my_mutator_t * data,
                                     const uint8_t *filename_new_queue,
                                     const uint8_t *filename_orig_queue);
 

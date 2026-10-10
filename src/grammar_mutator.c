@@ -258,6 +258,17 @@ int32_t afl_custom_init_trim(my_mutator_t *                   data,
                              __attribute__((unused)) uint8_t *buf,
                              __attribute__((unused)) size_t   buf_size) {
 
+  /* `data->mutated_tree` comes from the fuzzing stage of the previous queue
+    entry, so it is stale now. AFL++ 5.03c and later can call
+    `afl_custom_queue_new_entry` during trimming. That function must not save
+    the stale tree for a trimmed test case. */
+  if (data->mutated_tree) {
+
+    tree_free(data->mutated_tree);
+    data->mutated_tree = NULL;
+
+  }
+
   if (!data->tree_cur) return 0;
 
   tree_get_non_terminal_nodes(data->tree_cur);
@@ -693,19 +704,19 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
 }
 
 // Save interesting mutated test cases
-void afl_custom_queue_new_entry(my_mutator_t * data,
-                                const uint8_t *filename_new_queue,
-                                const uint8_t *filename_orig_queue) {
+uint8_t afl_custom_queue_new_entry(my_mutator_t * data,
+                                   const uint8_t *filename_new_queue,
+                                   const uint8_t *filename_orig_queue) {
 
-  // If this is an initial case or sync, then we will get called with a null "filename_orig_queue".
-  if (unlikely(!filename_orig_queue || !data->mutated_tree)) {
+  // If this is an initial case, then we will get called with a null "filename_orig_queue".
+  if (unlikely(!filename_orig_queue)) {
 
     // In that situation, we can skip it here and let afl_custom_queue_get() import the data later,
     // or we can prefetch it here to ensure that it gets into our splicing data set (chunk_store) asap.
     // Choosing the second option for now, but if this is inefficient we can just return instead of
     // calling afl_custom_queue_get().
     afl_custom_queue_get(data, filename_new_queue);
-    return;
+    return 0;
 
   }
 
@@ -718,21 +729,38 @@ void afl_custom_queue_new_entry(my_mutator_t * data,
 
     // Should not reach here
     fprintf(stderr, "Invalid filename_new_queue (afl_custom_queue_new_entry)\n");
-    return;
+    return 0;
 
   }
 
   // Replace "queue" with "trees"
   memcpy(found, "/trees", 6);
 
-  // Write the mutated tree to the file
-  write_tree_to_file(data->mutated_tree, data->new_tree_fn);
+  tree_t *tree = data->mutated_tree;
+  if (unlikely(!tree)) {
+
+    /* The test case does not come from `afl_custom_fuzz`. For example, AFL++
+      5.03c and later add trimmed test cases during trimming. Do not call
+      `afl_custom_queue_get`, because it replaces `data->tree_cur` while the
+      trimming loop still uses it (issue #57). Parse the test case into a
+      separate tree. */
+    tree = load_tree_from_test_case(fn);
+    if (unlikely(!tree)) return 0;
+    tree_get_size(tree);
+
+  }
+
+  // Write the tree to the file
+  write_tree_to_file(tree, data->new_tree_fn);
 
   // Store all subtrees in the newly added tree
-  chunk_store_add_tree(data->mutated_tree);
+  chunk_store_add_tree(tree);
 
   /* Once the test case is added into the queue, we will clear `mutated_tree` */
-  tree_free(data->mutated_tree);
+  tree_free(tree);
   data->mutated_tree = NULL;
+
+  // The queue file is not changed
+  return 0;
 
 }
