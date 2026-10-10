@@ -323,6 +323,124 @@ TEST_F(CustomMutatorTest, Trimming) {
 
 }
 
+static void write_test_case(const string &fn, const uint8_t *buf,
+                            size_t buf_size) {
+
+  FILE *f = fopen(fn.c_str(), "wb");
+  ASSERT_NE(f, nullptr);
+  ASSERT_EQ(fwrite(buf, 1, buf_size, f), buf_size);
+  fclose(f);
+
+}
+
+// AFL++ 5.03c and later can add a trimmed case to the queue during the trim
+// loop. Then AFL++ calls `afl_custom_queue_new_entry` before the next
+// `afl_custom_trim` call. See issue #57.
+TEST_F(CustomMutatorTest, QueueNewEntryDuringTrim) {
+
+  random_set_seed(1234);
+
+  uint8_t *buf = nullptr;
+  size_t   buf_size;
+  int32_t  stage_cur;
+  int32_t  stage_max;
+
+  auto tree = gen_init__(20);
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/trim_new_entry_0");
+  write_tree_to_file(tree, "afl_test_fuzz_out/trees/trim_new_entry_0");
+
+  ASSERT_EQ(afl_custom_queue_get(
+                mutator->data,
+                (const uint8_t *)"afl_test_fuzz_out/queue/trim_new_entry_0"),
+            1);
+  tree_t *tree_cur = mutator->data->tree_cur;
+  string  tree_fn_cur = mutator->data->tree_fn_cur;
+
+  stage_cur = 0;
+  stage_max =
+      afl_custom_init_trim(mutator->data, tree->data_buf, tree->data_len);
+  ASSERT_GT(stage_max, 1);
+
+  int i = 0;
+  while (stage_cur < stage_max) {
+
+    buf_size = afl_custom_trim(mutator->data, &buf);
+    ASSERT_NE(buf, nullptr);
+    string trimmed((const char *)buf, buf_size);
+    stage_cur = afl_custom_post_trim(mutator->data, 0);
+
+    // Each trimmed case reaches new coverage
+    string fn_new =
+        "afl_test_fuzz_out/queue/trim_new_entry_0_" + to_string(i++);
+    write_test_case(fn_new, (const uint8_t *)trimmed.data(), trimmed.size());
+    afl_custom_queue_new_entry(
+        mutator->data, (const uint8_t *)fn_new.c_str(),
+        (const uint8_t *)"afl_test_fuzz_out/queue/trim_new_entry_0");
+
+    // The trim loop still uses the current tree
+    EXPECT_EQ(mutator->data->tree_cur, tree_cur);
+    EXPECT_EQ(string(mutator->data->tree_fn_cur), tree_fn_cur);
+
+  }
+
+  tree_free(tree);
+
+}
+
+// A mutated tree from the previous queue entry must not become the tree of
+// a case that AFL++ adds during the trim of the next queue entry.
+TEST_F(CustomMutatorTest, QueueNewEntryDuringTrimAfterFuzzing) {
+
+  random_set_seed(1234);
+
+  uint8_t *buf = nullptr;
+  size_t   buf_size;
+
+  auto tree_a = gen_init__(20);
+  dump_tree_to_test_case(tree_a, "afl_test_fuzz_out/queue/stale_a");
+  write_tree_to_file(tree_a, "afl_test_fuzz_out/trees/stale_a");
+  auto tree_b = gen_init__(20);
+  dump_tree_to_test_case(tree_b, "afl_test_fuzz_out/queue/stale_b");
+  write_tree_to_file(tree_b, "afl_test_fuzz_out/trees/stale_b");
+
+  // Fuzz the first entry once. The mutated case is not interesting.
+  ASSERT_EQ(afl_custom_queue_get(
+                mutator->data, (const uint8_t *)"afl_test_fuzz_out/queue/stale_a"),
+            1);
+  ASSERT_GT(afl_custom_fuzz_count(mutator->data, nullptr, 0), 0u);
+  afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
+  ASSERT_NE(buf, nullptr);
+
+  // Trim the second entry. The first trimmed case reaches new coverage.
+  ASSERT_EQ(afl_custom_queue_get(
+                mutator->data, (const uint8_t *)"afl_test_fuzz_out/queue/stale_b"),
+            1);
+  ASSERT_GT(
+      afl_custom_init_trim(mutator->data, tree_b->data_buf, tree_b->data_len),
+      0);
+  buf_size = afl_custom_trim(mutator->data, &buf);
+  ASSERT_NE(buf, nullptr);
+  string trimmed((const char *)buf, buf_size);
+  afl_custom_post_trim(mutator->data, 0);
+
+  write_test_case("afl_test_fuzz_out/queue/stale_new",
+                  (const uint8_t *)trimmed.data(), trimmed.size());
+  afl_custom_queue_new_entry(mutator->data,
+                             (const uint8_t *)"afl_test_fuzz_out/queue/stale_new",
+                             (const uint8_t *)"afl_test_fuzz_out/queue/stale_b");
+
+  // The saved tree must match the queued case
+  tree_t *saved = read_tree_from_file("afl_test_fuzz_out/trees/stale_new");
+  ASSERT_NE(saved, nullptr);
+  tree_to_buf(saved);
+  EXPECT_EQ(string((const char *)saved->data_buf, saved->data_len), trimmed);
+  tree_free(saved);
+
+  tree_free(tree_a);
+  tree_free(tree_b);
+
+}
+
 int main(int argc, char **argv) {
 
   ::testing::InitGoogleTest(&argc, argv);
