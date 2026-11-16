@@ -40,20 +40,25 @@ size_t default_random_mutation_steps = 1000;
 size_t default_random_recursive_mutation_steps = 1000;
 // env: SPLICING_MUTATION_STEPS
 size_t default_splicing_mutation_steps = 1000;
+// Maximum rules mutations per entry; unlimited by default.
+// env: RULES_MUTATION_STEPS
+size_t default_rules_mutation_steps = SIZE_MAX;
 
 static void load_env_configs() {
 
   char *ptr;
-  char *env_vars[4] = {
+  char *env_vars[5] = {
       "RANDOM_MUTATION_STEPS",
       "RANDOM_RECURSIVE_MUTATION_STEPS",
       "SPLICING_MUTATION_STEPS",
+      "RULES_MUTATION_STEPS",
       NULL
   };
-  size_t *configs[4] = {
+  size_t *configs[5] = {
       &default_random_mutation_steps,
       &default_random_recursive_mutation_steps,
       &default_splicing_mutation_steps,
+      &default_rules_mutation_steps,
       NULL
   };
   int i = 0;
@@ -446,6 +451,16 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
 
 }
 
+// Take this alternative rule with probability needed / left.
+static bool select_rules_mutation_pair(my_mutator_t *data) {
+
+  size_t left = data->rules_mutation_pairs_left--;
+  size_t needed = data->total_rules_mutation_steps - data->cur_fuzzing_step;
+  return needed >= left ||
+         random_below(left < UINT32_MAX ? left : UINT32_MAX) < needed;
+
+}
+
 uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
                                __attribute__((unused)) const uint8_t *buf,
                                __attribute__((unused)) size_t buf_size) {
@@ -457,8 +472,10 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
 
   data->cur_fuzzing_stage = 0;
   data->cur_fuzzing_step = 0;
-  // rules mutation is deterministic for a given tree
   data->total_rules_mutation_steps = rules_mutation_count(data->tree_cur);
+  data->rules_mutation_pairs_left = data->total_rules_mutation_steps;
+  if (data->total_rules_mutation_steps > default_rules_mutation_steps)
+    data->total_rules_mutation_steps = default_rules_mutation_steps;
   data->total_random_mutation_steps = default_random_mutation_steps;
   if (data->tree_cur->recursion_edge_list->size > 0) {
 
@@ -494,7 +511,8 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
       }
 
       if (data->cur_rules_mutation_rule_id !=
-          data->cur_rules_mutation_node->rule_id)
+              data->cur_rules_mutation_node->rule_id &&
+          select_rules_mutation_pair(data))
         break;
 
       // skip the current rule id
@@ -633,7 +651,8 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
         }
 
         if (data->cur_rules_mutation_rule_id !=
-            data->cur_rules_mutation_node->rule_id)
+                data->cur_rules_mutation_node->rule_id &&
+            select_rules_mutation_pair(data))
           break;
 
         // skip the current rule id
