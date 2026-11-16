@@ -72,6 +72,7 @@ typedef struct my_mutator {
   // Rules mutation
   node_t * cur_rules_mutation_node;
   uint32_t cur_rules_mutation_rule_id;
+  size_t   rules_mutation_pairs_left;  // the pairs not passed yet
 
   // Reused buffers:
   BUF_VAR(uint8_t, fuzz);
