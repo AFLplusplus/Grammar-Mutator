@@ -69,7 +69,7 @@ TEST(TreeMutationTest, RandomRecursiveMutation) {
   tree_to_buf(tree);
   EXPECT_MEMEQ("{123}", tree->data_buf, tree->data_len);
 
-  tree_t *mutated_tree = random_recursive_mutation(tree, 1);
+  tree_t *mutated_tree = random_recursive_mutation(tree, 1, SIZE_MAX);
   tree_to_buf(mutated_tree);
   EXPECT_MEMEQ("{{{123}}}", mutated_tree->data_buf, mutated_tree->data_len);
   bool ret = tree_equal(mutated_tree, tree);
@@ -201,7 +201,7 @@ TEST_F(TreeMutationUniquenessTest, RandomRecursiveMutation) {
   RunTest(default_random_recursive_mutation_steps, 0, [&](tree_t *tree) {
 
     auto n = random_below(RRM_GROWTH + 1);
-    return random_recursive_mutation(tree, n);
+    return random_recursive_mutation(tree, n, SIZE_MAX);
 
   });
 

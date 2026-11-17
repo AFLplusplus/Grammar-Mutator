@@ -584,24 +584,21 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
         // random recursive mutation
         const unsigned RRM_GROWTH = 10; // Allow 2**RRM_GROWTH of bytes of expansion
         tree_t *rrm_tree = NULL;
-        tree_to_buf(tree);
         int failed_count = 8;
         do {
           if (failed_count-- <= 0) {
             break;
           }
 
-          if (rrm_tree) tree_free(rrm_tree);
-          rrm_tree =
-              random_recursive_mutation(tree, random_below(RRM_GROWTH + 1));
-          tree_to_buf(rrm_tree);
-
           // Make sure that the mutation doesn't grow more than RRM_GROWTH bytes per attempt!
           // This is protecting against random_recursive_mutation's ability to
           // create MASSIVE growth in a short period of time by duplicating big nodes.
-        } while (rrm_tree->data_len > (1 << RRM_GROWTH) + tree->data_len);
+          rrm_tree = random_recursive_mutation(tree, random_below(RRM_GROWTH + 1),
+                                               1 << RRM_GROWTH);
+        } while (!rrm_tree);
 
-        tree = rrm_tree;
+        // If every attempt grew too much, the tree stays as it was.
+        tree = rrm_tree ? rrm_tree : tree_clone(tree);
         break;
 
       }

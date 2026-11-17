@@ -148,7 +148,20 @@ size_t rules_mutation_count(tree_t *tree) {
 
 }
 
-tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
+// The number of bytes that a subtree serializes to
+static size_t node_data_len(node_t *node) {
+
+  if (!node) return 0;
+  if (node->subnode_count == 0) return node->val_len;
+
+  size_t data_len = 0;
+  for (uint32_t i = 0; i < node->subnode_count; ++i)
+    data_len += node_data_len(node->subnodes[i]);
+  return data_len;
+
+}
+
+tree_t *random_recursive_mutation(tree_t *tree, uint8_t n, size_t max_growth) {
 
   if (unlikely(!tree)) return NULL;
 
@@ -165,12 +178,21 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n) {
   node_t *parent = picked_edge.parent;
   node_t *tail = picked_edge.subnode;
   size_t  offset = picked_edge.subnode_offset;
+  size_t  num = 1 << n;
+
+  // Every repetition adds the parent without the tail to the input. Check it
+  // before the repetitions are built, which may need much memory.
+  if ((node_data_len(parent) - node_data_len(tail)) * num > max_growth) {
+
+    tree_free(mutated_tree);
+    return NULL;
+
+  }
 
   // detach the tail
   tail->parent = NULL;
   parent->subnodes[offset] = NULL;
 
-  size_t  num = 1 << n;
   node_t *cloned_part = NULL;
   for (size_t i = 0; i < num; ++i) {
 
