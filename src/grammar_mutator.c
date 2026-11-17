@@ -43,22 +43,27 @@ size_t default_splicing_mutation_steps = 1000;
 // Maximum rules mutations per entry; unlimited by default.
 // env: RULES_MUTATION_STEPS
 size_t default_rules_mutation_steps = SIZE_MAX;
+// Maximum trimming steps per entry; unlimited by default.
+// env: TRIMMING_STEPS
+size_t default_trimming_steps = SIZE_MAX;
 
 static void load_env_configs() {
 
   char *ptr;
-  char *env_vars[5] = {
+  char *env_vars[6] = {
       "RANDOM_MUTATION_STEPS",
       "RANDOM_RECURSIVE_MUTATION_STEPS",
       "SPLICING_MUTATION_STEPS",
       "RULES_MUTATION_STEPS",
+      "TRIMMING_STEPS",
       NULL
   };
-  size_t *configs[5] = {
+  size_t *configs[6] = {
       &default_random_mutation_steps,
       &default_random_recursive_mutation_steps,
       &default_splicing_mutation_steps,
       &default_rules_mutation_steps,
+      &default_trimming_steps,
       NULL
   };
   int i = 0;
@@ -274,13 +279,14 @@ int32_t afl_custom_init_trim(my_mutator_t *                   data,
 
   }
 
-  if (!data->tree_cur) return 0;
+  if (!data->tree_cur || !default_trimming_steps) return 0;
 
   tree_get_non_terminal_nodes(data->tree_cur);
   tree_get_recursion_edges(data->tree_cur);
 
   data->cur_trimming_stage = 0;
   data->trim_was_effective = false;
+  data->trimming_steps = 0;
 
   data->cur_subtree_trimming_step = 0;
   data->finished_subtree_trimming_nodes = 0;
@@ -437,6 +443,10 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
 
   }
 
+  // Stop after TRIMMING_STEPS steps, keeping what the trimming reached
+  if (++data->trimming_steps >= default_trimming_steps)
+    data->cur_trimming_stage = 2;
+
   // If we're done and we reduced the tree, then save the tree back to the
   // file and write it to the chunk store for use in future splice mutations:
   if (data->trim_was_effective && data->cur_trimming_stage > 1) {
@@ -446,6 +456,10 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     chunk_store_add_tree(data->tree_cur);
 
   }
+
+  if (data->cur_trimming_stage > 1)
+    return data->total_subtree_trimming_steps +
+           data->total_recursive_trimming_steps;
 
   return data->cur_subtree_trimming_step + data->cur_recursive_trimming_step;
 
