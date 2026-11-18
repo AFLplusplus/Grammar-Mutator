@@ -57,6 +57,8 @@ typedef struct my_mutator {
   size_t finished_recursive_trimming_edges;
   size_t total_recursive_trimming_steps;
 
+  size_t trimming_steps;  // the trimming steps run so far
+
   // Fuzzing
   uint8_t cur_fuzzing_stage;  // 0: rules mutation
                               // 1: random mutation (100 times)

@@ -148,18 +148,23 @@ Users can set the number of mutations per queue entry with these environment var
 - `RANDOM_RECURSIVE_MUTATION_STEPS`: the number of random recursive mutations
 - `SPLICING_MUTATION_STEPS`: the number of splicing mutations
 - `RULES_MUTATION_STEPS`: the maximum number of rules mutations
+- `TRIMMING_STEPS`: the maximum number of trimming steps
 
 By default, each of the first three mutation types runs 1000 times, and the
 rules mutation tries every other rule at every nonterminal node of the tree.
 With `RULES_MUTATION_STEPS`, the rules mutation tries at most that many of these
 node and rule pairs, sampled uniformly across the whole tree and tried in tree
-order. Change them as follows, if needed. :)
+order. The trimming of a new queue entry tries every nonterminal node and
+every recursion of its tree, from the root down. With `TRIMMING_STEPS`, it
+stops after that many tries and keeps what it has trimmed by then. Change them
+as follows, if needed. :)
 
 ```bash
 export RANDOM_MUTATION_STEPS=10000
 export RANDOM_RECURSIVE_MUTATION_STEPS=10000
 export SPLICING_MUTATION_STEPS=10000
 export RULES_MUTATION_STEPS=10000
+export TRIMMING_STEPS=10000
 export AFL_CUSTOM_MUTATOR_LIBRARY=./libgrammarmutator-ruby.so
 export AFL_CUSTOM_MUTATOR_ONLY=1
 afl-fuzz -m 128 -i seeds -o out -- /path/to/target @@
