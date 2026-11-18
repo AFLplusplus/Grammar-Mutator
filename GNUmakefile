@@ -34,6 +34,9 @@ endif
 ifeq "$(filter $(MAKECMDGOALS),code-format)" "code-format"
   override BUILD = no
 endif
+ifeq "$(filter $(MAKECMDGOALS),deps)" "deps"
+  override BUILD = no
+endif
 ifeq "$(filter $(MAKECMDGOALS),format-deps)" "format-deps"
   override BUILD = no
 endif
@@ -142,16 +145,25 @@ test:
 test_memcheck:
 	@$(MAKE) -C tests memcheck
 
-# Other clang-format major versions give different output. Keep this value
-# and the default of CLANG_FORMAT_MAJOR in .custom-format.py the same.
-CLANG_FORMAT_VERSION = 23
+# Python tools in .venv. requirements.txt pins their versions. The stamp file
+# installs them again when requirements.txt changes.
+PYTHON ?= python3
+VENV_STAMP = .venv/.requirements.stamp
 
-.venv/bin/clang-format:
-	python3 -m venv .venv
-	.venv/bin/pip install --quiet "clang-format==$(CLANG_FORMAT_VERSION).*"
+$(VENV_STAMP): requirements.txt
+	$(PYTHON) -m venv .venv
+	.venv/bin/pip install --quiet -r requirements.txt
+	@touch $@
+
+.PHONY: deps
+deps: $(VENV_STAMP)
 
 .PHONY: format-deps
-format-deps: .venv/bin/clang-format
+format-deps: deps
+
+# The clang-format major version from requirements.txt. Other major versions
+# give different output.
+CLANG_FORMAT_VERSION := $(shell sed -n 's/^clang-format==\([0-9][0-9]*\)\..*/\1/p' requirements.txt)
 
 .PHONY: code-format
 code-format: export LLVM_VERSION = $(CLANG_FORMAT_VERSION)
@@ -183,8 +195,9 @@ help:
 	@echo "test_memcheck: runs Valgrind with all test cases to pinpoint memory leaks"
 	@echo "               (if ENABLE_TESTING=1 and have Valgrind)"
 	@echo "clean: cleans everything compiled"
-	@echo "code-format: format the code with clang-format 23"
-	@echo "format-deps: install clang-format 23 into .venv with pip"
+	@echo "code-format: format the code with clang-format $(CLANG_FORMAT_VERSION)"
+	@echo "deps: install the Python tools (requirements.txt) into .venv with pip"
+	@echo "format-deps: same as deps"
 	@echo "help: shows help information"
 	@echo "=========================================="
 	@echo

@@ -1,0 +1,8 @@
+# Python dependencies for the Grammar Mutator tools, with exact versions.
+# `make deps` installs them into .venv. Do not install them system-wide.
+#
+# The JSON grammar build does not need these packages.
+
+# The code formatter (`make code-format`). Other major versions give different
+# output, so .custom-format.py requires this major version.
+clang-format==23.1.5

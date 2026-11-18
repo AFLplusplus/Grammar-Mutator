@@ -31,9 +31,9 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
-        python-version: '3.x'
-    - name: Install clang-format
-      run: make -f GNUmakefile format-deps
+        python-version-file: .python-version
+    - name: Install the Python tools
+      run: make -f GNUmakefile deps
     - name: Check the code format
       run: |
         make -f GNUmakefile code-format

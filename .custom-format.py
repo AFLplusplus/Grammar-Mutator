@@ -18,7 +18,7 @@
 #
 # - It requires one clang-format major version on every path, because other
 #   major versions give different output.
-# - It also looks for clang-format in the .venv folder (see `make format-deps`).
+# - It also looks for clang-format in the .venv folder (see `make deps`).
 # - It also runs on systems other than Linux. The pinned clang-format version
 #   gives the same output on all systems.
 # - It does not add a blank line at the end of each file.
@@ -75,7 +75,7 @@ def find_clang_format() -> str:
             return candidate
 
     print(f"[!] clang-format {CLANG_FORMAT_MAJOR} is needed. Aborted.")
-    print("Run `make format-deps` to install it into .venv.")
+    print("Run `make deps` to install it into .venv.")
     sys.exit(1)
 
 
