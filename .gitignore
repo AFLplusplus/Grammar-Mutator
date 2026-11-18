@@ -54,3 +54,9 @@ libgrammarmutator-*.so
 
 # ANTLR
 antlr-*.jar
+
+# Python virtual environment (make format-deps)
+.venv/
+
+# Format cache (.custom-format.py)
+.format-cache/

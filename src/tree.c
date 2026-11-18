@@ -523,9 +523,9 @@ void _node_serialize(tree_t *tree, node_t *node) {
   if (!tree || !node) return;
 
   // allocate or update the buffer
-  size_t len = sizeof(node->id) + sizeof(node->rule_id) +
-               sizeof(node->subnode_count) + sizeof(node->val_len) +
-               node->val_len;
+  size_t   len = sizeof(node->id) + sizeof(node->rule_id) +
+                 sizeof(node->subnode_count) + sizeof(node->val_len) +
+                 node->val_len;
   size_t   ser_len = tree->ser_len;
   uint8_t *ser_buf = maybe_grow(BUF_PARAMS(tree, ser), ser_len + len);
   if (!ser_buf) {
@@ -577,7 +577,7 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
 
   node_t *node = node_create(0);
   size_t  min_len = sizeof(node->id) + sizeof(node->rule_id) +
-                   sizeof(node->subnode_count) + sizeof(node->val_len);
+                    sizeof(node->subnode_count) + sizeof(node->val_len);
   if (data_size - (*consumed_size) < min_len) {
 
     // data is not enough for a node

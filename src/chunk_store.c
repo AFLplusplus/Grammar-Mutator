@@ -29,11 +29,11 @@ list_map_t chunk_store;
 node_map_t seen_chunks;
 
 // Tiny implementation of fixed-length hash to text conversion
-static void uint64_to_hex(uint64_t num, char dest[16+1]) {
+static void uint64_to_hex(uint64_t num, char dest[16 + 1]) {
 
   // Starting at the end and working backward:
-  int i;
-  char * c = &dest[16];
+  int   i;
+  char *c = &dest[16];
 
   *c = '\0';
   for (i = 0; i < 16; ++i) {
@@ -47,7 +47,7 @@ static void uint64_to_hex(uint64_t num, char dest[16+1]) {
 }
 
 // Append the node and its subnodes a hash of the node and its subnodes
-static void node_update_hash(node_t *node, XXH3_state_t* hash) {
+static void node_update_hash(node_t *node, XXH3_state_t *hash) {
 
   // Use the same fields that `node_equal()` uses, so
   // that we can be reasonably certain that if the hashes
@@ -72,7 +72,7 @@ static void node_update_hash(node_t *node, XXH3_state_t* hash) {
 // Use the same fields that `node_equal()` uses, so
 // that we can be reasonably certain that if the hashes
 // are equal than `node_equal()` will return true.
-void hash_node(node_t *node, char dest[16+1]) {
+void hash_node(node_t *node, char dest[16 + 1]) {
 
   // Set up a hash state so we can pass it to sub-nodes recursively:
   XXH3_state_t hash;
@@ -80,16 +80,19 @@ void hash_node(node_t *node, char dest[16+1]) {
 
   node_update_hash(node, &hash);
 
-  // Need to convert the hash to text so that 0-values in the hash don't cause an inordinant amount of collisions.
-  // If we just put the 8-byte integer in as a "string" then the first byte being a zero would cause
-  // a collision approximately 1/256 of the time!
+  // Need to convert the hash to text so that 0-values in the hash don't cause
+  // an inordinant amount of collisions. If we just put the 8-byte integer in as
+  // a "string" then the first byte being a zero would cause a collision
+  // approximately 1/256 of the time!
   uint64_to_hex(XXH3_64bits_digest(&hash), dest);
 
 }
 
 /**
- * Take ownership of a node for the chunk store, storing it if unique or freeing it if not.
- * @param  node The node, which must not be owned/kept by anybody else. It also should not have a parent except when called recursively.
+ * Take ownership of a node for the chunk store, storing it if unique or freeing
+ * it if not.
+ * @param  node The node, which must not be owned/kept by anybody else. It also
+ * should not have a parent except when called recursively.
  */
 void chunk_store_take_node(node_t *node) {
 
@@ -98,13 +101,13 @@ void chunk_store_take_node(node_t *node) {
   const char *node_type = node_type_str(node->id);
 
   // add current subtree
-  char node_hash[16+1];
+  char node_hash[16 + 1];
   hash_node(node, node_hash);
   node_t **seen_node = map_get(&seen_chunks, node_hash);
   if (seen_node) {
 
-    // This node already exists in the tree. So patch up our parent to point at it
-    // and then free the duplicate.
+    // This node already exists in the tree. So patch up our parent to point at
+    // it and then free the duplicate.
     if (node->parent) {
 
       // Replace myself with the already existing node
@@ -174,7 +177,7 @@ node_t *chunk_store_get_alternative_node(node_t *node) {
   if (!node) return NULL;
 
   const char *node_type = node_type_str(node->id);
-  list_t **   p_node_list = map_get(&chunk_store, node_type);
+  list_t    **p_node_list = map_get(&chunk_store, node_type);
   if (unlikely(!p_node_list)) return NULL;
 
   list_t *node_list = *p_node_list;
@@ -193,8 +196,10 @@ void chunk_store_clear() {
   map_iter_t  iter = map_iter(&list_map);
   while ((key = map_next(&chunk_store, &iter))) {
 
-    // NOTE: This needs to only free the CURRENT node and not its children, because we know that the
-    //       chunk store map already contains all the children and they will get freed as well!
+    // NOTE: This needs to only free the CURRENT node and not its children,
+    // because we know that the
+    //       chunk store map already contains all the children and they will get
+    //       freed as well!
     list_free_with_data_free_func(*map_get(&chunk_store, key),
                                   (data_free_t)node_free_only_self);
 

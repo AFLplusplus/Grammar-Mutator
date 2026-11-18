@@ -45,9 +45,9 @@ class ChunkStoreTest : public ::testing::Test {
 
 static size_t num_seen_chunks() {
 
-  int num_seen = 0;
-  const char * key;
-  map_iter_t iter = map_iter(&seen_chunks);
+  int         num_seen = 0;
+  const char *key;
+  map_iter_t  iter = map_iter(&seen_chunks);
   while ((key = map_next(&seen_chunks, &iter))) {
 
     ++num_seen;
@@ -64,10 +64,10 @@ TEST_F(ChunkStoreTest, SeenChunk) {
   auto node2 = node_clone(node1);
 
   // check the comparator
-  char node1_hash[16+1];
+  char node1_hash[16 + 1];
   hash_node(node1, node1_hash);
   EXPECT_EQ(map_set(&seen_chunks, node1_hash, node1), 0);
-  char node2_hash[16+1];
+  char node2_hash[16 + 1];
   hash_node(node1, node2_hash);
   EXPECT_NE(map_get(&seen_chunks, node2_hash), nullptr);
   EXPECT_EQ(*map_get(&seen_chunks, node2_hash), node1);

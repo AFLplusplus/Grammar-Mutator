@@ -21,6 +21,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 // default number of mutations of three mutation strategies
@@ -39,15 +40,15 @@ typedef struct my_mutator {
   bool tree_out_dir_exist;
 
   const uint8_t *filename_cur;
-  tree_t *       tree_cur;
-  tree_t *       mutated_tree;
-  tree_t *       trimmed_tree;
+  tree_t        *tree_cur;
+  tree_t        *mutated_tree;
+  tree_t        *trimmed_tree;
 
   // Trimming
   uint8_t cur_trimming_stage;  // 0: subtree trimming
                                // 1: recursive trimming
 
-  bool trim_was_effective; // Did we change the file *at all* during trim?
+  bool trim_was_effective;  // Did we change the file *at all* during trim?
 
   size_t cur_subtree_trimming_step;
   size_t finished_subtree_trimming_nodes;
@@ -72,7 +73,7 @@ typedef struct my_mutator {
   size_t total_splicing_mutation_steps;
 
   // Rules mutation
-  node_t * cur_rules_mutation_node;
+  node_t  *cur_rules_mutation_node;
   uint32_t cur_rules_mutation_rule_id;
   size_t   rules_mutation_pairs_left;  // the pairs not passed yet
 
@@ -100,12 +101,14 @@ size_t   afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
                          uint8_t **out_buf, uint8_t *add_buf,
                          size_t add_buf_size,  // add_buf can be NULL
                          size_t max_size);
-uint8_t  afl_custom_queue_new_entry(my_mutator_t * data,
+uint8_t  afl_custom_queue_new_entry(my_mutator_t  *data,
                                     const uint8_t *filename_new_queue,
                                     const uint8_t *filename_orig_queue);
 
 #ifdef __cplusplus
+
 }
+
 #endif
 
 #endif

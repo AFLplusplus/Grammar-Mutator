@@ -84,14 +84,14 @@ TEST(TreeMutationTest, SplicingMutation) {
 
   random_set_seed(0);  // Fix the random seed
 
-  auto tree1 = tree_create();  // "{" + "123" + "}"
+  auto tree1 = tree_create();   // "{" + "123" + "}"
   auto node1 = node_create(1);  // <1> -> "{" + <2> + "}"
   auto node2 = node_create_with_val(0, "{", 1);
   auto node3 = node_create(2);  // <2> -> "123"
   auto node4 = node_create_with_val(0, "}", 1);
   auto node5 = node_create_with_val(0, "123", 3);
 
-  auto tree2 = tree_create();  // "321"
+  auto tree2 = tree_create();   // "321"
   auto node6 = node_create(2);  // <2> -> "321"
   auto node7 = node_create_with_val(0, "321", 3);
 
@@ -137,11 +137,13 @@ TEST(TreeMutationTest, SplicingMutation) {
 class TreeMutationUniquenessTest : public ::testing::Test {
 
  protected:
-  std::set<std::array<char, 16+1>> tree_hash_set;
+  std::set<std::array<char, 16 + 1>> tree_hash_set;
 
   TreeMutationUniquenessTest() = default;
 
-  void SetUp() override { }
+  void SetUp() override {
+
+  }
 
   void TearDown() override {
 
@@ -159,8 +161,8 @@ class TreeMutationUniquenessTest : public ::testing::Test {
     auto tmp_tree = gen_init__(1000);
     tree_get_size(tmp_tree);
 
-    tree_t *tree;
-    std::array<char, 16+1> tree_root_hash = {};
+    tree_t                  *tree;
+    std::array<char, 16 + 1> tree_root_hash = {};
 
     for (size_t i = 0; i < mutation_num; ++i) {
 
@@ -214,9 +216,11 @@ TEST_F(TreeMutationUniquenessTest, SplicingMutation) {
 
   // add 5 randomly generated trees
   for (int i = 0; i < 5; ++i) {
+
     tree_t *tree = gen_init__(1000);
     chunk_store_add_tree(tree);
     tree_free(tree);
+
   }
 
   RunTest(default_splicing_mutation_steps, 0, splicing_mutation);

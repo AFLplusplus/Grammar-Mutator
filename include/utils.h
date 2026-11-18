@@ -6,6 +6,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 // File/directory operations
@@ -44,14 +45,15 @@ char *strrstr(const char *haystack, const char *needle);
 // Random number generators
 /* 64bit arch MACRO */
 #if (defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__))
-#define WORD_SIZE_64 1
-#endif /* (defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__)) */
+  #define WORD_SIZE_64 1
+#endif /* (defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__)) \
+        */
 
 #ifdef WORD_SIZE_64
-#define RANDOM_RETURN uint64_t
+  #define RANDOM_RETURN uint64_t
 #else
-#define RANDOM_RETURN uint32_t
-#endif /* WORD_SIZE_64 */
+  #define RANDOM_RETURN uint32_t
+#endif                                                      /* WORD_SIZE_64 */
 
 /**
  * This function sets the random seed for Romu random number generators
@@ -79,7 +81,9 @@ RANDOM_RETURN random_next();
 uint32_t random_below(uint32_t limit);
 
 #ifdef __cplusplus
+
 }
+
 #endif
 
 #endif
