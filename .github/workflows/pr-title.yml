@@ -1,0 +1,44 @@
+#
+# american fuzzy lop++ - grammar mutator
+# --------------------------------------
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at:
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+
+# The squash merge uses the pull request title as the commit message.
+# Release Please reads these commit messages, so the title must follow
+# Conventional Commits.
+name: PR Title
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional-title:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: amannn/action-semantic-pull-request@v6
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        types: |
+          feat
+          fix
+          perf
+          refactor
+          docs
+          test
+          build
+          ci
+          chore
+          style
+          revert
+        requireScope: false
