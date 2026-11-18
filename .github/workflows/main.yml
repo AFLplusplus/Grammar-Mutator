@@ -24,6 +24,21 @@ on:
   pull_request:
 
 jobs:
+  format-check:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: Install clang-format
+      run: make -f GNUmakefile format-deps
+    - name: Check the code format
+      run: |
+        make -f GNUmakefile code-format
+        git diff --exit-code
+
   cmake-build:
     runs-on: ubuntu-24.04
 
