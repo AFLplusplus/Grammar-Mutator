@@ -17,7 +17,11 @@
 
 name: Grammar Mutator CI
 
-on: [push, pull_request]
+# Pull requests test the branches. A push to stable tests the merge result.
+on:
+  push:
+    branches: [stable]
+  pull_request:
 
 jobs:
   cmake-build:
