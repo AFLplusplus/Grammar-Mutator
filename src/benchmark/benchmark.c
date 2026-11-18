@@ -171,7 +171,7 @@ void bench_random_recursive_mutation() {
       n = random_below(10);
 
       start = current_time();
-      mutated_tree = random_recursive_mutation(tree, n);
+      mutated_tree = random_recursive_mutation(tree, n, SIZE_MAX);
       end = current_time();
       times[i] = (end - start);
 

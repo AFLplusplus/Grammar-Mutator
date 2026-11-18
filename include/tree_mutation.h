@@ -46,11 +46,13 @@ size_t rules_mutation_count(tree_t *tree);
 /**
  * Pick a random recursion of a tree and repeats that recursion 2^n times
  * (0 < n < 16). This creates trees with higher degree of nesting.
- * @param  tree A parsing tree
- * @param  n    Recursion factor
- * @return      A mutated parsing tree
+ * @param  tree       A parsing tree
+ * @param  n          Recursion factor
+ * @param  max_growth The most bytes that the repetition may add to the input
+ * @return            A mutated parsing tree, or NULL if the repetition would
+ *                    add more than `max_growth` bytes
  */
-tree_t *random_recursive_mutation(tree_t *tree, uint8_t n);
+tree_t *random_recursive_mutation(tree_t *tree, uint8_t n, size_t max_growth);
 
 /**
  * Combine inputs that found different paths by taking a subtree from one
