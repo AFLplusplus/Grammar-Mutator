@@ -17,10 +17,10 @@
 
 TARGETS = libgtest.a libgtest_main.a
 
-GTEST_VERSION ?= 1.10.0
-GTEST_TAR = release-$(GTEST_VERSION).tar.gz
-GTEST_DOWNLOAD_URL = https://github.com/google/googletest/archive/$(GTEST_TAR)
-GTEST_ROOT_DIR = googletest-release-$(GTEST_VERSION)
+GTEST_VERSION ?= 1.18.0
+GTEST_TAR = v$(GTEST_VERSION).tar.gz
+GTEST_DOWNLOAD_URL = https://github.com/google/googletest/archive/refs/tags/$(GTEST_TAR)
+GTEST_ROOT_DIR = googletest-$(GTEST_VERSION)
 GTEST_DIR = $(GTEST_ROOT_DIR)/googletest
 GTEST_SRC_FILES = \
 	$(GTEST_DIR)/src/gtest-all.cc \
@@ -28,7 +28,7 @@ GTEST_SRC_FILES = \
 GTEST_OBJS = $(GTEST_SRC_FILES:.cc=.o)
 
 
-CXX_FLAGS = -Wall -Wshadow -Werror -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -std=c++11
+CXX_FLAGS = -Wall -Wshadow -Werror -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -std=c++17
 CXX_DEFINES =
 CXX_INCLUDES = -I./$(GTEST_DIR)/include -I./$(GTEST_DIR)
 

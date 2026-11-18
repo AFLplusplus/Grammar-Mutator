@@ -26,18 +26,19 @@ GRAMMAR_MUTATOR_LIB = $(realpath ../src/libgrammarmutator-$(GRAMMAR_FILENAME).so
 RXI_MAP_LIB = $(realpath ../third_party/rxi_map/librxi_map.a)
 
 GTEST_DIR = googletest-download
-GTEST_VERSION = 1.10.0
+GTEST_VERSION = 1.18.0
+GTEST_ROOT_DIR = $(GTEST_DIR)/googletest-$(GTEST_VERSION)
 
 VALGRIND = valgrind
 VALGRIND_LOG_DIR = valgrind_logs
 VALGRIND_CMD = $(VALGRIND) -q --tool=memcheck --leak-check=full --show-leak-kinds=all
 
 GTEST_LIBS = $(GTEST_DIR)/libgtest_main.a $(GTEST_DIR)/libgtest.a
-GTEST_INCLUDE = $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest/include
+GTEST_INCLUDE = $(GTEST_ROOT_DIR)/googletest/include
 
-CXX_FLAGS = -std=gnu++14 $(CXX_FLAGS_OPT)
+CXX_FLAGS = -std=gnu++17 $(CXX_FLAGS_OPT)
 CXX_DEFINES =
-CXX_INCLUDES = -I../include -isystem $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest/include -isystem $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)/googletest
+CXX_INCLUDES = -I../include -isystem $(GTEST_ROOT_DIR)/googletest/include -isystem $(GTEST_ROOT_DIR)/googletest
 
 LIBS = $(GTEST_LIBS) $(GRAMMAR_MUTATOR_LIB)
 LDFLAGS = $(LIBS) -lpthread
@@ -69,10 +70,10 @@ check_test_programs:
 
 export GTEST_VERSION
 
-$(GTEST_DIR)/googletest-release-$(GTEST_VERSION):
+$(GTEST_ROOT_DIR):
 	@$(MAKE) -C $(GTEST_DIR) all
 
-$(GTEST_LIBS) $(GTEST_INCLUDE): $(GTEST_DIR)/googletest-release-$(GTEST_VERSION)
+$(GTEST_LIBS) $(GTEST_INCLUDE): $(GTEST_ROOT_DIR)
 
 run_test_%: test_%
 	@echo "Test: $<"

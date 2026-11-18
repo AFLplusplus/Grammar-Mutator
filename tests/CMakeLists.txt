@@ -15,6 +15,10 @@
 # A grammar-based custom mutator written for GSoC '20.
 #
 
+# GoogleTest 1.17 and later need C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Download and unpack googletest at configure time
 configure_file(
   googletest-download/CMakeLists.txt.in
