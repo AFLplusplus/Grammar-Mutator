@@ -60,3 +60,6 @@ antlr-*.jar
 
 # Format cache (.custom-format.py)
 .format-cache/
+
+# clangd index
+.cache/
