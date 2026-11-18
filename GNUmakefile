@@ -37,18 +37,25 @@ endif
 ifeq "$(filter $(MAKECMDGOALS),deps)" "deps"
   override BUILD = no
 endif
+ifeq "$(filter $(MAKECMDGOALS),antlr-jar)" "antlr-jar"
+  override BUILD = no
+endif
 ifeq "$(filter $(MAKECMDGOALS),format-deps)" "format-deps"
   override BUILD = no
 endif
 
+# ANTLR version. The ANTLR jar must have the same version as the C++ runtime
+# in third_party/antlr4-cpp-runtime.
+export ANTLR_VERSION = 4.13.2
+
 ifeq ($(BUILD),yes)
 
   ifeq "$(ANTLR_JAR_LOCATION)" ""
-    ANTLR_JAR_LOCATION = $(shell ls antlr-4.8-complete.jar 2>/dev/null)
+    ANTLR_JAR_LOCATION = $(shell ls antlr-$(ANTLR_VERSION)-complete.jar 2>/dev/null)
   endif
 
   ifeq "$(ANTLR_JAR_LOCATION)" ""
-    ANTLR_JAR_LOCATION = $(shell ls /usr/local/lib/antlr-4.8-complete.jar 2>/dev/null)
+    ANTLR_JAR_LOCATION = $(shell ls /usr/local/lib/antlr-$(ANTLR_VERSION)-complete.jar 2>/dev/null)
   endif
 
   ifeq "$(ANTLR_JAR_LOCATION)" ""
@@ -63,6 +70,11 @@ ifeq ($(BUILD),yes)
   endif
   ANTLR_NAME := $(basename $(shell basename $(ANTLR_JAR_LOCATION)))
   $(info Found $(ANTLR_NAME): $(ANTLR_JAR_LOCATION))
+  # Check the version of the ANTLR jar
+  ANTLR_JAR_VERSION := $(shell java -jar $(ANTLR_JAR_LOCATION) 2>/dev/null | sed -n 's/.*Version \([0-9.]*\).*/\1/p')
+  ifneq "$(ANTLR_JAR_VERSION)" "$(ANTLR_VERSION)"
+    $(error The ANTLR jar has version '$(ANTLR_JAR_VERSION)', but the build needs $(ANTLR_VERSION): $(ANTLR_JAR_LOCATION))
+  endif
 
   ifndef GRAMMAR_FILE
     $(error Missing the grammar file path. Please specify it's path using: make GRAMMAR_FILE=<path>)
@@ -165,6 +177,17 @@ format-deps: deps
 # give different output.
 CLANG_FORMAT_VERSION := $(shell sed -n 's/^clang-format==\([0-9][0-9]*\)\..*/\1/p' requirements.txt)
 
+# Download the ANTLR jar that matches ANTLR_VERSION into this folder. Build
+# scripts (for example AFL++'s build_grammar_mutator.sh) can use this target, so
+# that they do not need to know the ANTLR version.
+ANTLR_JAR = antlr-$(ANTLR_VERSION)-complete.jar
+
+.PHONY: antlr-jar
+antlr-jar: $(ANTLR_JAR)
+
+$(ANTLR_JAR):
+	wget -q -O $@.tmp https://www.antlr.org/download/$@ && mv $@.tmp $@
+
 .PHONY: code-format
 code-format: export LLVM_VERSION = $(CLANG_FORMAT_VERSION)
 code-format:
@@ -195,6 +218,7 @@ help:
 	@echo "test_memcheck: runs Valgrind with all test cases to pinpoint memory leaks"
 	@echo "               (if ENABLE_TESTING=1 and have Valgrind)"
 	@echo "clean: cleans everything compiled"
+	@echo "antlr-jar: downloads the ANTLR $(ANTLR_VERSION) jar into this folder"
 	@echo "code-format: format the code with clang-format $(CLANG_FORMAT_VERSION)"
 	@echo "deps: install the Python tools (requirements.txt) into .venv with pip"
 	@echo "format-deps: same as deps"
@@ -211,4 +235,4 @@ help:
 	@echo "ANTLR_JAR_LOCATION - the path to ANTLR4 jar file"
 	@echo "=========================================="
 	@echo "e.g.: make ENABLE_TESTING=1 GRAMMAR_FILE=./grammars/ruby.json \\"
-	@echo "           ANTLR_JAR_LOCATION=./antlr-4.8-complete.jar"
+	@echo "           ANTLR_JAR_LOCATION=./antlr-$(ANTLR_VERSION)-complete.jar"

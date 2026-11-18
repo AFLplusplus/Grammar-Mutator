@@ -55,8 +55,13 @@ foreach (_build_type "Release" "MinSizeRel" "RelWithDebInfo")
   endforeach ()
 endforeach ()
 
-# C++ language standard
-set(CMAKE_CXX_STANDARD 14)
+# C++ language standard (the ANTLR 4.13 C++ runtime needs C++17)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# ANTLR version. The ANTLR jar must have the same version as the C++ runtime.
+set(ANTLR_VERSION 4.13.2)
+set(ANTLR_RUNTIME_SHA256 0ed13668906e86dbc0dcddf30fdee68c10203dea4e83852b4edb810821bee3c4)
 
 # Toolchain
 message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
@@ -77,6 +82,14 @@ if (NOT EXISTS "${ANTLR_JAR_LOCATION}")
 endif ()
 get_filename_component(ANTLR_NAME ${ANTLR_JAR_LOCATION} NAME_WE)
 message(STATUS "Found ${ANTLR_NAME}: ${ANTLR_JAR_LOCATION}")
+execute_process(
+  COMMAND ${Java_JAVA_EXECUTABLE} -jar ${ANTLR_JAR_LOCATION}
+  OUTPUT_VARIABLE ANTLR_JAR_OUTPUT
+  ERROR_QUIET)
+string(REGEX MATCH "Version ([0-9.]+)" _ "${ANTLR_JAR_OUTPUT}")
+if (NOT "${CMAKE_MATCH_1}" STREQUAL "${ANTLR_VERSION}")
+  message(FATAL_ERROR "The ANTLR jar has version '${CMAKE_MATCH_1}', but the build needs ${ANTLR_VERSION}: ${ANTLR_JAR_LOCATION}")
+endif ()
 
 # Python
 find_program(PYTHON
