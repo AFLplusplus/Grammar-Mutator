@@ -6,6 +6,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 // a doubly linked list
@@ -13,7 +14,7 @@ typedef struct list_node list_node_t;
 struct list_node {
 
   list_node_t *next, *prev;
-  void *       data;
+  void        *data;
 
 };
 
@@ -94,7 +95,9 @@ void *list_get(list_t *list, size_t i);
 bool list_empty(list_t *list);
 
 #ifdef __cplusplus
+
 }
+
 #endif
 
 #endif

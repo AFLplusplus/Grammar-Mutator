@@ -42,7 +42,7 @@ bool create_directory(const char *path) {
 
 bool remove_directory(const char *path) {
 
-  DIR *  d = opendir(path);
+  DIR   *d = opendir(path);
   size_t path_len = strlen(path);
   int    r = -1;
 
@@ -54,7 +54,7 @@ bool remove_directory(const char *path) {
     while (!r && (p = readdir(d))) {
 
       int    r2 = -1;
-      char * buf = NULL;
+      char  *buf = NULL;
       size_t len;
 
       /* Skip the names "." and ".." as we don't want to recurse on them. */
@@ -97,12 +97,11 @@ bool remove_directory(const char *path) {
 
 }
 
+char *strrstr(const char *haystack, const char *needle) {
 
-char * strrstr(const char * haystack, const char * needle) {
-
-  size_t haystack_len;
-  size_t needle_len;
-  const char * s;
+  size_t      haystack_len;
+  size_t      needle_len;
+  const char *s;
 
   // Don't allow empty needle or haystack
   if (!haystack || !needle) return NULL;
@@ -115,7 +114,7 @@ char * strrstr(const char * haystack, const char * needle) {
 
   for (s = haystack + (haystack_len - needle_len); s != haystack; --s) {
 
-    if (!strncmp(s, needle, needle_len)) return (char *) s;
+    if (!strncmp(s, needle, needle_len)) return (char *)s;
 
   }
 
@@ -151,6 +150,7 @@ RANDOM_RETURN random_next() {
   return xp;
 
 }
+
 #else
 // RomuTrio32
 //
@@ -167,7 +167,8 @@ RANDOM_RETURN random_next() {
   return xp;
 
 }
-#endif /* WORD_SIZE_64 */
+
+#endif                                                      /* WORD_SIZE_64 */
 
 uint32_t random_below(uint32_t limit) {
 

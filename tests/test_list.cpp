@@ -122,7 +122,7 @@ TEST_F(ListTest, ListFreeWithDataFreeFunc) {
 TEST_F(ListTest, ListPopFront) {
 
   size_t list_size = list->size;
-  int *  data = (int *)list_pop_front(list);
+  int   *data = (int *)list_pop_front(list);
   EXPECT_EQ(list->size, list_size - 1);
   EXPECT_EQ(data, _array + 0);
   EXPECT_EQ(*data, _array[0]);

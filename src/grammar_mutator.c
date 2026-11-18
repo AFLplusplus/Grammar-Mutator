@@ -51,31 +51,22 @@ static void load_env_configs() {
 
   char *ptr;
   char *env_vars[6] = {
-      "RANDOM_MUTATION_STEPS",
-      "RANDOM_RECURSIVE_MUTATION_STEPS",
-      "SPLICING_MUTATION_STEPS",
-      "RULES_MUTATION_STEPS",
-      "TRIMMING_STEPS",
-      NULL
-  };
-  size_t *configs[6] = {
-      &default_random_mutation_steps,
-      &default_random_recursive_mutation_steps,
-      &default_splicing_mutation_steps,
-      &default_rules_mutation_steps,
-      &default_trimming_steps,
-      NULL
-  };
-  int i = 0;
+
+      "RANDOM_MUTATION_STEPS",   "RANDOM_RECURSIVE_MUTATION_STEPS",
+      "SPLICING_MUTATION_STEPS", "RULES_MUTATION_STEPS",
+      "TRIMMING_STEPS",          NULL};
+  size_t *configs[6] = {&default_random_mutation_steps,
+                        &default_random_recursive_mutation_steps,
+                        &default_splicing_mutation_steps,
+                        &default_rules_mutation_steps,
+                        &default_trimming_steps,
+                        NULL};
+  int     i = 0;
 
   while (env_vars[i] != NULL && configs[i] != NULL) {
 
     ptr = getenv(env_vars[i]);
-    if (ptr && *ptr) {
-
-      *(configs[i]) = strtol(ptr, NULL, 10);
-
-    }
+    if (ptr && *ptr) { *(configs[i]) = strtol(ptr, NULL, 10); }
     ++i;
 
   }
@@ -206,9 +197,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     memcpy(last_dir, "/trees", 7);
 
     // Set up the (expected) tree filename
-    snprintf(
-        data->tree_fn_cur, PATH_MAX - 1, "%s/%s", tree_out_dir,
-        use_name);
+    snprintf(data->tree_fn_cur, PATH_MAX - 1, "%s/%s", tree_out_dir, use_name);
 
     // Check if we need to create the tree output directory
     if (unlikely(data->tree_out_dir_exist == 0)) {
@@ -235,7 +224,8 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     data->tree_cur = read_tree_from_file(data->tree_fn_cur);
     if (data->tree_cur) {
 
-      // We already had this tree in the trees folder, so compute its size and then we're done!
+      // We already had this tree in the trees folder, so compute its size and
+      // then we're done!
       tree_get_size(data->tree_cur);
       chunk_store_add_tree(data->tree_cur);
       return 1;
@@ -251,7 +241,8 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
     // Now that we've parsed it, cache the info from this test case in
     // our trees folder and in the chunk store
     tree_get_size(data->tree_cur);
-    if (strlen(data->tree_fn_cur)) write_tree_to_file(data->tree_cur, data->tree_fn_cur);
+    if (strlen(data->tree_fn_cur))
+      write_tree_to_file(data->tree_cur, data->tree_fn_cur);
     chunk_store_add_tree(data->tree_cur);
     return 1;
 
@@ -264,7 +255,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 }
 
 // Trimming
-int32_t afl_custom_init_trim(my_mutator_t *                   data,
+int32_t afl_custom_init_trim(my_mutator_t                    *data,
                              __attribute__((unused)) uint8_t *buf,
                              __attribute__((unused)) size_t   buf_size) {
 
@@ -356,6 +347,7 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
 int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
 
   if (success) {
+
     // Keep track that we will need to rewrite the tree file later
     data->trim_was_effective = true;
 
@@ -367,16 +359,18 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     tree_get_non_terminal_nodes(data->tree_cur);
 
     // The idea here is that the results that we've already tried are always at
-    // the start of the non_terminal_node_list, because whenever we get a "yes" result
-    // the nodes get trimmed out and they are always the last thing we've popped off the list.
+    // the start of the non_terminal_node_list, because whenever we get a "yes"
+    // result the nodes get trimmed out and they are always the last thing we've
+    // popped off the list.
     //
-    // So to avoid repeating the previous attempts, just pop them out of the list right away:
+    // So to avoid repeating the previous attempts, just pop them out of the
+    // list right away:
     for (uint32_t i = 0; i < data->finished_subtree_trimming_nodes; ++i)
       list_pop_front(data->tree_cur->non_terminal_node_list);
 
     // We are now pointing *at* the node we just replaced.
     // So we want to skip it and its children!
-    node_t * node = list_pop_front(data->tree_cur->non_terminal_node_list);
+    node_t *node = list_pop_front(data->tree_cur->non_terminal_node_list);
     if (node) {
 
       // Remember to skip these next time as well:
@@ -390,8 +384,8 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     size_t new_node_size = data->tree_cur->non_terminal_node_list->size;
 
     // Set our progress equal to the remaining un-tested nodes in the list:
-    data->cur_subtree_trimming_step = data->total_subtree_trimming_steps - new_node_size;
-
+    data->cur_subtree_trimming_step =
+        data->total_subtree_trimming_steps - new_node_size;
 
     // update the recursion edge list
     tree_get_recursion_edges(data->tree_cur);
@@ -401,7 +395,8 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
 
     // Set our progress equal to the remaining un-tested edges in the list:
-    data->cur_recursive_trimming_step = data->total_recursive_trimming_steps - new_edge_size;
+    data->cur_recursive_trimming_step =
+        data->total_recursive_trimming_steps - new_edge_size;
 
   } else {
 
@@ -475,7 +470,7 @@ static bool select_rules_mutation_pair(my_mutator_t *data) {
 
 }
 
-uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
+uint32_t afl_custom_fuzz_count(my_mutator_t                          *data,
                                __attribute__((unused)) const uint8_t *buf,
                                __attribute__((unused)) size_t buf_size) {
 
@@ -493,7 +488,8 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
   data->total_random_mutation_steps = default_random_mutation_steps;
   if (data->tree_cur->recursion_edge_list->size > 0) {
 
-    data->total_random_recursive_mutation_steps = default_random_recursive_mutation_steps;
+    data->total_random_recursive_mutation_steps =
+        default_random_recursive_mutation_steps;
 
   } else {
 
@@ -553,7 +549,7 @@ uint32_t afl_custom_fuzz_count(my_mutator_t *                         data,
 // `custom_mutator_stage` in `afl-fuzz-one.c`
 size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
                        __attribute__((unused)) size_t   buf_size,
-                       uint8_t **                       out_buf,
+                       uint8_t                        **out_buf,
                        __attribute__((unused)) uint8_t *add_buf,
                        __attribute__((unused)) size_t   add_buf_size,
                        size_t                           max_size) {
@@ -592,30 +588,32 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
       // random mutation
       tree = random_mutation(tree);
       break;
-    case 2:
-      {
+    case 2: {
 
-        // random recursive mutation
-        const unsigned RRM_GROWTH = 10; // Allow 2**RRM_GROWTH of bytes of expansion
-        tree_t *rrm_tree = NULL;
-        int failed_count = 8;
-        do {
-          if (failed_count-- <= 0) {
-            break;
-          }
+      // random recursive mutation
+      const unsigned RRM_GROWTH =
+          10;  // Allow 2**RRM_GROWTH of bytes of expansion
+      tree_t *rrm_tree = NULL;
+      int     failed_count = 8;
+      do {
 
-          // Make sure that the mutation doesn't grow more than RRM_GROWTH bytes per attempt!
-          // This is protecting against random_recursive_mutation's ability to
-          // create MASSIVE growth in a short period of time by duplicating big nodes.
-          rrm_tree = random_recursive_mutation(tree, random_below(RRM_GROWTH + 1),
-                                               1 << RRM_GROWTH);
-        } while (!rrm_tree);
+        if (failed_count-- <= 0) { break; }
 
-        // If every attempt grew too much, the tree stays as it was.
-        tree = rrm_tree ? rrm_tree : tree_clone(tree);
-        break;
+        // Make sure that the mutation doesn't grow more than RRM_GROWTH bytes
+        // per attempt! This is protecting against random_recursive_mutation's
+        // ability to create MASSIVE growth in a short period of time by
+        // duplicating big nodes.
+        rrm_tree = random_recursive_mutation(tree, random_below(RRM_GROWTH + 1),
+                                             1 << RRM_GROWTH);
 
-      }
+      } while (!rrm_tree);
+
+      // If every attempt grew too much, the tree stays as it was.
+      tree = rrm_tree ? rrm_tree : tree_clone(tree);
+      break;
+
+    }
+
     case 3:
       // splicing mutation
       tree = splicing_mutation(tree);
@@ -734,31 +732,36 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
 }
 
 // Save interesting mutated test cases
-uint8_t afl_custom_queue_new_entry(my_mutator_t * data,
+uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
                                    const uint8_t *filename_new_queue,
                                    const uint8_t *filename_orig_queue) {
 
-  // If this is an initial case, then we will get called with a null "filename_orig_queue".
+  // If this is an initial case, then we will get called with a null
+  // "filename_orig_queue".
   if (unlikely(!filename_orig_queue)) {
 
-    // In that situation, we can skip it here and let afl_custom_queue_get() import the data later,
-    // or we can prefetch it here to ensure that it gets into our splicing data set (chunk_store) asap.
-    // Choosing the second option for now, but if this is inefficient we can just return instead of
-    // calling afl_custom_queue_get().
+    // In that situation, we can skip it here and let afl_custom_queue_get()
+    // import the data later, or we can prefetch it here to ensure that it gets
+    // into our splicing data set (chunk_store) asap. Choosing the second option
+    // for now, but if this is inefficient we can just return instead of calling
+    // afl_custom_queue_get().
     afl_custom_queue_get(data, filename_new_queue);
     return 0;
 
   }
 
-  // NOTE: Unlike afl_custom_queue_get(), this function should ALWAYS have /queue/ as the last
-  //       directory in its filename, so the following simplified parsing is acceptable.
+  // NOTE: Unlike afl_custom_queue_get(), this function should ALWAYS have
+  // /queue/ as the last
+  //       directory in its filename, so the following simplified parsing is
+  //       acceptable.
   const char *fn = (const char *)filename_new_queue;
   snprintf(data->new_tree_fn, PATH_MAX - 1, "%s", fn);
   char *found = strrstr(data->new_tree_fn, "/queue/");
   if (unlikely(!found)) {
 
     // Should not reach here
-    fprintf(stderr, "Invalid filename_new_queue (afl_custom_queue_new_entry)\n");
+    fprintf(stderr,
+            "Invalid filename_new_queue (afl_custom_queue_new_entry)\n");
     return 0;
 
   }

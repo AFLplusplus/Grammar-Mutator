@@ -50,7 +50,7 @@ static void dump_test_case(uint8_t *buf, size_t buf_size) {
 class CustomMutatorTest : public ::testing::Test {
 
  protected:
-  afl_t *                afl = nullptr;
+  afl_t                 *afl = nullptr;
   struct custom_mutator *mutator = nullptr;
   string                 out_dir = "afl_test_fuzz_out";
   string                 tree_out_dir = out_dir + "/trees";
@@ -116,7 +116,7 @@ class CustomMutatorTest : public ::testing::Test {
 
 TEST_F(CustomMutatorTest, Fuzzing) {
 
-  uint8_t *                      buf = nullptr;
+  uint8_t                       *buf = nullptr;
   __attribute__((unused)) size_t buf_size;
 
   // prepare a tree
@@ -161,7 +161,7 @@ TEST_F(CustomMutatorTest, Fuzzing) {
 
 TEST_F(CustomMutatorTest, FuzzingParsingError) {
 
-  uint8_t *                      buf = nullptr;
+  uint8_t                       *buf = nullptr;
   __attribute__((unused)) size_t buf_size;
 
   // prepare a tree that does not follow the grammar
@@ -215,7 +215,7 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
 
 TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
 
-  uint8_t *                      buf = nullptr;
+  uint8_t                       *buf = nullptr;
   __attribute__((unused)) size_t buf_size;
 
   // prepare a tree that does not follow the grammar
@@ -270,7 +270,7 @@ TEST_F(CustomMutatorTest, Trimming) {
 
   random_set_seed(1234);
 
-  uint8_t *                      buf = nullptr;
+  uint8_t                       *buf = nullptr;
   __attribute__((unused)) size_t buf_size;
   uint8_t                        ret;
   int32_t                        stage_cur;
@@ -404,17 +404,19 @@ TEST_F(CustomMutatorTest, QueueNewEntryDuringTrimAfterFuzzing) {
   write_tree_to_file(tree_b, "afl_test_fuzz_out/trees/stale_b");
 
   // Fuzz the first entry once. The mutated case is not interesting.
-  ASSERT_EQ(afl_custom_queue_get(
-                mutator->data, (const uint8_t *)"afl_test_fuzz_out/queue/stale_a"),
-            1);
+  ASSERT_EQ(
+      afl_custom_queue_get(mutator->data,
+                           (const uint8_t *)"afl_test_fuzz_out/queue/stale_a"),
+      1);
   ASSERT_GT(afl_custom_fuzz_count(mutator->data, nullptr, 0), 0u);
   afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
   ASSERT_NE(buf, nullptr);
 
   // Trim the second entry. The first trimmed case reaches new coverage.
-  ASSERT_EQ(afl_custom_queue_get(
-                mutator->data, (const uint8_t *)"afl_test_fuzz_out/queue/stale_b"),
-            1);
+  ASSERT_EQ(
+      afl_custom_queue_get(mutator->data,
+                           (const uint8_t *)"afl_test_fuzz_out/queue/stale_b"),
+      1);
   ASSERT_GT(
       afl_custom_init_trim(mutator->data, tree_b->data_buf, tree_b->data_len),
       0);
@@ -425,9 +427,9 @@ TEST_F(CustomMutatorTest, QueueNewEntryDuringTrimAfterFuzzing) {
 
   write_test_case("afl_test_fuzz_out/queue/stale_new",
                   (const uint8_t *)trimmed.data(), trimmed.size());
-  afl_custom_queue_new_entry(mutator->data,
-                             (const uint8_t *)"afl_test_fuzz_out/queue/stale_new",
-                             (const uint8_t *)"afl_test_fuzz_out/queue/stale_b");
+  afl_custom_queue_new_entry(
+      mutator->data, (const uint8_t *)"afl_test_fuzz_out/queue/stale_new",
+      (const uint8_t *)"afl_test_fuzz_out/queue/stale_b");
 
   // The saved tree must match the queued case
   tree_t *saved = read_tree_from_file("afl_test_fuzz_out/trees/stale_new");

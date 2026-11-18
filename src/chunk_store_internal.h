@@ -24,6 +24,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 // Map of lists of chunks, one list for each node type
@@ -38,11 +39,13 @@ typedef map_t(node_t *) node_map_t;
 extern node_map_t seen_chunks;
 
 // private functions
-void   hash_node(node_t *node, char dest[16+1]);
-void   chunk_store_take_node(node_t *node);
+void hash_node(node_t *node, char dest[16 + 1]);
+void chunk_store_take_node(node_t *node);
 
 #ifdef __cplusplus
+
 }
+
 #endif
 
 #endif
