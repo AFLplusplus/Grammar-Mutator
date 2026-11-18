@@ -33,8 +33,10 @@ Before getting started, the following tools/packages should be installed:
 
 ```bash
 sudo apt install valgrind uuid-dev default-jre python3
-wget https://www.antlr.org/download/antlr-4.8-complete.jar
-sudo cp -f antlr-4.8-complete.jar /usr/local/lib
+# ANTLR 4.13.2 needs Java 11 or later. In the Grammar-Mutator folder,
+# `make antlr-jar` downloads the jar that matches the build. Or download it:
+wget https://www.antlr.org/download/antlr-4.13.2-complete.jar
+sudo cp -f antlr-4.13.2-complete.jar /usr/local/lib
 ```
 If you do not leave the JAR file in the Grammar-Mutator directory or do not copy
 it to /usr/local/lib then you must specify the location via ANTLR_JAR_LOCATION=...

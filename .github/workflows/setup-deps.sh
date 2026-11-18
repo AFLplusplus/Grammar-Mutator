@@ -22,4 +22,4 @@ set -x
 sudo apt-get update
 sudo apt-get upgrade -y
 sudo apt install -y valgrind uuid-dev
-wget https://www.antlr.org/download/antlr-4.8-complete.jar
+make -f GNUmakefile antlr-jar

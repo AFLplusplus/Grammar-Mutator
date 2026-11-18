@@ -16,17 +16,10 @@ ANTLR4_CXX_RUNTIME_LIB = $(realpath ../../third_party/antlr4-cpp-runtime/libantl
 ANTLR4_CXX_RUNTIME_DIR = $(realpath ../../third_party/antlr4-cpp-runtime/antlr4-cpp-runtime-src)
 
 # "-Wno-attributes" is only for generated codes, we cannot do more about it
-CXX_FLAGS = -std=gnu++14 -fPIC -Wno-attributes $(CXX_FLAGS_OPT)
+CXX_FLAGS = -std=gnu++17 -fPIC -Wno-attributes $(CXX_FLAGS_OPT)
 CXX_DEFINES =
 CXX_INCLUDES = \
 	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src \
-	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src/atn \
-	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src/dfa \
-	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src/misc \
-	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src/support \
-	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src/tree \
-	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src/tree/pattern \
-	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src/tree/xpath \
 	-I../../include \
 	-I./generated
 

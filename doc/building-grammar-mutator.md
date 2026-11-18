@@ -7,8 +7,10 @@ To build the grammar mutator, the following tools/packages are required
 
 ```bash
 sudo apt install valgrind uuid-dev default-jre python3
-wget https://www.antlr.org/download/antlr-4.8-complete.jar
-sudo mv antlr-4.8-complete.jar /usr/local/lib
+# ANTLR 4.13.2 needs Java 11 or later. In the Grammar-Mutator folder,
+# `make antlr-jar` downloads the jar that matches the build. Or download it:
+wget https://www.antlr.org/download/antlr-4.13.2-complete.jar
+sudo mv antlr-4.13.2-complete.jar /usr/local/lib
 ```
 
 Note that the grammar mutator is based on the latest custom mutator APIs in AFL++, so please use the latest `dev` or `stable` branch of [AFL++](https://github.com/AFLplusplus/AFLplusplus/tree/dev).
@@ -52,7 +54,7 @@ After successfully compiling the grammar mutator, you should have `libgrammarmut
 
 ```bash
 make ENABLE_TESTING=1 \
-     ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar \
+     ANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.13.2-complete.jar \
      GRAMMAR_FILE=grammars/ruby.json \
      GRAMMAR_FILENAME=ruby
 # Generated targets: libgrammarmutator-ruby.so, grammar_generator-ruby
@@ -66,7 +68,7 @@ make test_memcheck  # if with Valgrind installed
 mkdir build
 cd build
 cmake -DENABLE_TESTING=ON \
-      -DANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.8-complete.jar \
+      -DANTLR_JAR_LOCATION=/usr/local/lib/antlr-4.13.2-complete.jar \
       -DGRAMMAR_FILE=$(realpath ../grammars/ruby.json) \
       -DGRAMMAR_FILENAME=ruby ../
 # Generated targets: libgrammarmutator-ruby.so, grammar_generator-ruby
