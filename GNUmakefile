@@ -34,6 +34,9 @@ endif
 ifeq "$(filter $(MAKECMDGOALS),code-format)" "code-format"
   override BUILD = no
 endif
+ifeq "$(filter $(MAKECMDGOALS),format-deps)" "format-deps"
+  override BUILD = no
+endif
 
 ifeq ($(BUILD),yes)
 
@@ -139,7 +142,19 @@ test:
 test_memcheck:
 	@$(MAKE) -C tests memcheck
 
+# Other clang-format major versions give different output. Keep this value
+# and the default of CLANG_FORMAT_MAJOR in .custom-format.py the same.
+CLANG_FORMAT_VERSION = 23
+
+.venv/bin/clang-format:
+	python3 -m venv .venv
+	.venv/bin/pip install --quiet "clang-format==$(CLANG_FORMAT_VERSION).*"
+
+.PHONY: format-deps
+format-deps: .venv/bin/clang-format
+
 .PHONY: code-format
+code-format: export LLVM_VERSION = $(CLANG_FORMAT_VERSION)
 code-format:
 	./.custom-format.py -i src/*.c
 	./.custom-format.py -i tests/*.cpp
@@ -168,7 +183,8 @@ help:
 	@echo "test_memcheck: runs Valgrind with all test cases to pinpoint memory leaks"
 	@echo "               (if ENABLE_TESTING=1 and have Valgrind)"
 	@echo "clean: cleans everything compiled"
-	@echo "code-format: format the code with a clang-format config (llvm 10)"
+	@echo "code-format: format the code with clang-format 23"
+	@echo "format-deps: install clang-format 23 into .venv with pip"
 	@echo "help: shows help information"
 	@echo "=========================================="
 	@echo
