@@ -26,7 +26,7 @@ from typing import Dict, List
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "grammars"))
 
 import g4_to_json
-from g4_to_json import START_KEY, G4Error, convert
+from g4_to_json import START_KEY, G4Error, convert, convert_with_map
 
 # typing.Dict, not dict[...]: this alias runs at import time on Python 3.8.
 Rules = Dict[str, List[List[str]]]
@@ -59,7 +59,7 @@ class ConverterTest(unittest.TestCase):
             s : 'a' B ;
             B : 'b' ;
         """)
-        self.assertEqual(rules[START_KEY], [["<s>"]])
+        self.assertEqual(rules[START_KEY], [["", "<s>"]])
         self.assertEqual(rules["<s>"], [["a", " ", "<B>", " "]])
         self.assertEqual(rules["<B>"], [["b"]])
 
@@ -123,8 +123,8 @@ class ConverterTest(unittest.TestCase):
             first : 'a' ;
             second : 'b' ;
         """
-        self.assertEqual(self.convert_text(text)[START_KEY], [["<first>"]])
-        self.assertEqual(self.convert_text(text, "second")[START_KEY], [["<second>"]])
+        self.assertEqual(self.convert_text(text)[START_KEY], [["", "<first>"]])
+        self.assertEqual(self.convert_text(text, "second")[START_KEY], [["", "<second>"]])
         with self.assertRaises(G4Error):
             self.convert_text(text, "missing")
 
@@ -134,6 +134,57 @@ class ConverterTest(unittest.TestCase):
         rules = convert([lexer, parser])
         self.assertEqual(rules["<s>"], [["<A>", " "]])
         self.assertEqual(rules["<A>"], [["a"]])
+
+    # -- parse map ---------------------------------------------------------
+
+    def test_parse_map_kinds_follow_the_output(self) -> None:
+        rules, pmap = convert_with_map(
+            [
+                self.write(
+                    "T.g4",
+                    """
+            grammar T;
+            s : 'a' B ('<x>' | c)* ;
+            c : B ;
+            B : 'b' ;
+        """,
+                )
+            ]
+        )
+        self.assertEqual(pmap["kinds"][START_KEY], [["lead", "rule"]])
+        self.assertEqual(pmap["kinds"]["<s>"][0][:4], ["literal", "sep", "token", "sep"])
+        self.assertEqual(pmap["token_keys"]["<B>"], "B")
+        self.assertEqual(pmap["parser_rules"], {"s": "<s>", "c": "<c>"})
+        for key, alternatives in pmap["kinds"].items():
+            self.assertEqual([len(a) for a in alternatives], [len(a) for a in rules[key]])
+
+    def test_parse_map_split_literal(self) -> None:
+        _, pmap = convert_with_map([self.write("T.g4", "grammar T;\ns : '<x>' ;\n")])
+        self.assertEqual(pmap["kinds"]["<s>"], [["literal", "literal_cont", "sep"]])
+
+    def test_parse_map_module_names(self) -> None:
+        _, combined = convert_with_map([self.write("J.g4", "grammar J;\ns : A ;\nA : 'a' ;\n")])
+        self.assertEqual((combined["lexer_module"], combined["parser_module"]), ("JLexer", "JParser"))
+        lexer = self.write("L.g4", "lexer grammar L;\nA : 'a' ;\n")
+        parser = self.write("P.g4", "parser grammar P;\noptions { tokenVocab = L; }\ns : A ;\n")
+        _, split = convert_with_map([lexer, parser])
+        self.assertEqual((split["lexer_module"], split["parser_module"], split["start_rule"]), ("L", "P", "s"))
+
+    def test_parse_map_survives_clean(self) -> None:
+        rules, pmap = convert_with_map(
+            [
+                self.write(
+                    "T.g4",
+                    r"""
+            grammar T;
+            s : 'a' | U | 'a' ;
+            U : [\u2028] ;
+        """,
+                )
+            ]
+        )
+        self.assertEqual(rules["<s>"], [["a", " "]])
+        self.assertEqual(pmap["kinds"]["<s>"], [["literal", "sep"]])
 
     # -- references --------------------------------------------------------
 
@@ -171,7 +222,7 @@ class ConverterTest(unittest.TestCase):
         main = self.write("T.g4", "grammar T;\nimport Common;\ns : ID ;\nID : 'main' ;\n")
         for paths in ([main, common], [common, main]):
             rules = convert(paths)
-            self.assertEqual(rules[START_KEY], [["<s>"]])
+            self.assertEqual(rules[START_KEY], [["", "<s>"]])
             self.assertEqual(rules["<ID>"], [["main"]])
 
     # -- lexer rules -------------------------------------------------------
