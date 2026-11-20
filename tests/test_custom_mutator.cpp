@@ -159,6 +159,52 @@ TEST_F(CustomMutatorTest, Fuzzing) {
 
 }
 
+// Give each non-terminal node the unknown rule id, as grammar_parser does for
+// token nodes. Return the number of rules mutation pairs of the tree.
+static size_t set_unknown_rule_ids(node_t *node) {
+
+  if (node->id == 0) return 0;
+  node->rule_id = RULE_ID_UNKNOWN;
+  size_t pairs = node_num_rules[node->id];
+  for (uint32_t i = 0; i < node->subnode_count; ++i)
+    pairs += set_unknown_rule_ids(node->subnodes[i]);
+  return pairs;
+
+}
+
+TEST_F(CustomMutatorTest, FuzzingUnknownRuleIds) {
+
+  uint8_t *buf = nullptr;
+
+  auto   tree = gen_init__(0);
+  size_t pairs = set_unknown_rule_ids(tree->root);
+  ASSERT_GT(pairs, 0u);
+  EXPECT_EQ(rules_mutation_count(tree), pairs);
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/fuzz_unknown_0");
+  write_tree_to_file(tree, "afl_test_fuzz_out/trees/fuzz_unknown_0");
+
+  ASSERT_EQ(afl_custom_queue_get(
+                mutator->data,
+                (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_unknown_0"),
+            1);
+  ASSERT_GE(afl_custom_fuzz_count(mutator->data, nullptr, 0), pairs);
+
+  // Each rules mutation step has a node and a rule to try, also the last one.
+  tree_to_buf(tree);
+  for (size_t i = 0; i < pairs; ++i) {
+
+    buf = nullptr;
+    size_t buf_size = afl_custom_fuzz(mutator->data, tree->data_buf,
+                                      tree->data_len, &buf, nullptr, 0, 4096);
+    EXPECT_NE(buf, nullptr) << i;
+    EXPECT_GT(buf_size, 0u) << i;
+
+  }
+
+  tree_free(tree);
+
+}
+
 TEST_F(CustomMutatorTest, FuzzingParsingError) {
 
   uint8_t                       *buf = nullptr;
