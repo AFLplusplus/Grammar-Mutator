@@ -166,39 +166,40 @@ def check_helpers(grammar: dict[str, list[list[str]]], parse_map: dict[str, Any]
         raise GrammarError(msg)
 
 
+# The folder of the parser that load_classes loaded last
+_loaded_folder: list[str] = []
+
+
 def load_classes(parser_dir: Path, module_names: Sequence[str]) -> list[Any]:
     """Import the class of each module name from the module file in parser_dir.
 
-    The generated modules and the base classes import each other by name. So
-    during the import, parser_dir is first on sys.path and the modules are in
-    sys.modules. After the import, sys.path is as before, and sys.modules
-    has no module from parser_dir. So the modules of another parser folder
-    with the same names do not mix with these. Other modules that the import
-    loads (such as the ANTLR runtime) stay.
+    The generated modules and the base classes import each other by name,
+    also during a parse (for example JavaScriptParserBase.py). So parser_dir
+    stays first on sys.path, and the modules stay in sys.modules. The folder
+    and the modules of an earlier call are removed first, so that modules of
+    two parser folders with the same names do not mix.
     """
     folder = str(parser_dir.resolve())
-    old_path = list(sys.path)
-    old_modules = {name: sys.modules[name] for name in module_names if name in sys.modules}
-    sys.path.insert(0, folder)
-    try:
-        classes = []
-        for module_name in module_names:
-            path = Path(folder) / f"{module_name}.py"
-            spec = importlib.util.spec_from_file_location(module_name, path)
-            if spec is None or spec.loader is None:
-                msg = f"cannot import {path}"
-                raise ImportError(msg)
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[module_name] = module
-            spec.loader.exec_module(module)
-            classes.append(getattr(module, module_name))
-        return classes
-    finally:
-        sys.path[:] = old_path
+    for old in _loaded_folder:
+        while old in sys.path:
+            sys.path.remove(old)
         for name, module in list(sys.modules.items()):
-            if Path(getattr(module, "__file__", None) or "/").parent == Path(folder):
+            if str(Path(getattr(module, "__file__", None) or "/").parent) == old:
                 del sys.modules[name]
-        sys.modules.update(old_modules)
+    _loaded_folder[:] = [folder]
+    sys.path.insert(0, folder)
+    classes = []
+    for module_name in module_names:
+        path = Path(folder) / f"{module_name}.py"
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None or spec.loader is None:
+            msg = f"cannot import {path}"
+            raise ImportError(msg)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        classes.append(getattr(module, module_name))
+    return classes
 
 
 class TreeBuilder:

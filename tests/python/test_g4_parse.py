@@ -282,23 +282,31 @@ class TreeBuilderTest(unittest.TestCase):
                 TreeBuilder(grammar, {**parse_map, "version": version}, parser_dir)
 
     def test_builders_do_not_share_modules(self) -> None:
-        # Two parsers with a base class of the same name, in two folders
+        # Two parsers with a base class of the same name, in two folders. The
+        # base class imports the generated parser during the parse, as the
+        # grammars-v4 base classes do.
+        base = (
+            "from antlr4 import Parser\n"
+            "class Base(Parser):\n"
+            "    MARK = {mark}\n"
+            "    def check(self):\n"
+            "        from TParser import TParser\n"
+            "        return TParser.MARK == {mark}\n"
+        )
         loaded = []
         for mark in (1, 2):
             tmp = Path(self.tmp.name) / str(mark)
             tmp.mkdir()
             grammar, parse_map, parser_dir = build_parser(
-                tmp, {"T.g4": "grammar T;\noptions { superClass = Base; }\ns : ID ;\nID : [a-z]+ ;\n"}
+                tmp, {"T.g4": "grammar T;\noptions { superClass = Base; }\ns : {self.check()}? ID ;\nID : [a-z]+ ;\n"}
             )
-            (parser_dir / "Base.py").write_text(f"from antlr4 import Parser\nclass Base(Parser):\n    MARK = {mark}\n")
+            (parser_dir / "Base.py").write_text(base.format(mark=mark))
             builder = TreeBuilder(grammar, parse_map, parser_dir)
             loaded.append(builder.parser_class.MARK)
             self.assertEqual(text(builder.build(b"ab")), "ab")
-            self.assertNotIn(str(parser_dir), sys.path)
-            self.assertFalse(
-                [m for m in list(sys.modules.values()) if str(parser_dir) in str(getattr(m, "__file__", None))]
-            )
         self.assertEqual(loaded, [1, 2])
+        tmp_path = str(Path(self.tmp.name).resolve())
+        self.assertEqual([p for p in sys.path if p.startswith(tmp_path)], [str(parser_dir.resolve())])
 
     def test_thread_settings_come_back_after_a_failure(self) -> None:
         builder = TreeBuilder(*self.json)
