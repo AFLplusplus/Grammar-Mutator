@@ -188,3 +188,105 @@ uint32_t random_below(uint32_t limit) {
   return unbiased_rnd % limit;
 
 }
+
+uint64_t hash_bytes(const void *buf, size_t len) {
+
+  return XXH3_64bits(buf, len);
+
+}
+
+// Open addressing with linear probing. The value 0 marks a free slot, so the
+// hash 0 is kept in a flag.
+struct hash_set {
+
+  uint64_t *slots;
+  size_t    capacity;  // a power of two
+  size_t    count;     // the number of slots in use
+  bool      has_zero;
+
+};
+
+#define HASH_SET_INITIAL_CAPACITY 64
+
+hash_set_t *hash_set_create(void) {
+
+  hash_set_t *set = calloc(1, sizeof(hash_set_t));
+  if (unlikely(!set)) return NULL;
+  set->slots = calloc(HASH_SET_INITIAL_CAPACITY, sizeof(uint64_t));
+  if (unlikely(!set->slots)) {
+
+    free(set);
+    return NULL;
+
+  }
+
+  set->capacity = HASH_SET_INITIAL_CAPACITY;
+  return set;
+
+}
+
+void hash_set_free(hash_set_t *set) {
+
+  if (!set) return;
+  free(set->slots);
+  free(set);
+
+}
+
+// Put a hash that is not 0 into the slots. Return false if it is there.
+static bool hash_set_insert(uint64_t *slots, size_t capacity, uint64_t hash) {
+
+  size_t i = hash & (capacity - 1);
+  while (slots[i]) {
+
+    if (slots[i] == hash) return false;
+    i = (i + 1) & (capacity - 1);
+
+  }
+
+  slots[i] = hash;
+  return true;
+
+}
+
+bool hash_set_add(hash_set_t *set, uint64_t hash) {
+
+  if (hash == 0) {
+
+    if (set->has_zero) return false;
+    set->has_zero = true;
+    return true;
+
+  }
+
+  if (set->count * 2 >= set->capacity) {
+
+    // Keep the load below one half
+    size_t    capacity = set->capacity * 2;
+    uint64_t *slots = calloc(capacity, sizeof(uint64_t));
+    if (unlikely(!slots)) {
+
+      perror("Unable to allocate memory (hash_set_add)");
+      exit(EXIT_FAILURE);
+
+    }
+
+    for (size_t i = 0; i < set->capacity; ++i)
+      if (set->slots[i]) hash_set_insert(slots, capacity, set->slots[i]);
+    free(set->slots);
+    set->slots = slots;
+    set->capacity = capacity;
+
+  }
+
+  if (!hash_set_insert(set->slots, set->capacity, hash)) return false;
+  ++set->count;
+  return true;
+
+}
+
+size_t hash_set_size(const hash_set_t *set) {
+
+  return set->count + (set->has_zero ? 1 : 0);
+
+}

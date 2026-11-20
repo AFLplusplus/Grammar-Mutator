@@ -148,3 +148,13 @@ add_dependencies(test_grammar_generator grammar_generator)
 add_test(
   NAME test_grammar_generator
   COMMAND test_grammar_generator)
+
+# Test suite 9:
+# test the helper APIs in utils.c
+add_executable(test_utils test_utils.cpp)
+target_link_libraries(test_utils
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
+add_test(
+  NAME test_utils
+  COMMAND test_utils)

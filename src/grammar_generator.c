@@ -16,8 +16,6 @@
 
  */
 
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,72 +29,6 @@
 // The number of tries to find a new test case. If all tries give an empty test
 // case or a test case that the generator already wrote, the generator stops.
 #define MAX_TRIES 100
-
-// A set of 64-bit hashes (open addressing). The value 0 marks a free slot.
-typedef struct hash_set {
-
-  uint64_t *slots;
-  size_t    capacity;
-  size_t    count;
-
-} hash_set_t;
-
-// Return the FNV-1a hash of the bytes (never 0)
-static uint64_t hash_bytes(const uint8_t *buf, size_t len) {
-
-  uint64_t hash = 0xcbf29ce484222325ULL;
-  for (size_t i = 0; i < len; ++i) {
-
-    hash ^= buf[i];
-    hash *= 0x100000001b3ULL;
-
-  }
-
-  return hash ? hash : 1;
-
-}
-
-static void hash_set_insert(hash_set_t *set, uint64_t hash) {
-
-  size_t i = hash & (set->capacity - 1);
-  while (set->slots[i] && set->slots[i] != hash)
-    i = (i + 1) & (set->capacity - 1);
-  if (!set->slots[i]) {
-
-    set->slots[i] = hash;
-    ++set->count;
-
-  }
-
-}
-
-// Add the hash to the set. Return false if the set already has it.
-static bool hash_set_add(hash_set_t *set, uint64_t hash) {
-
-  if (set->count * 2 >= set->capacity) {
-
-    // Keep the load below one half
-    hash_set_t bigger = {calloc(set->capacity * 2, sizeof(uint64_t)),
-                         set->capacity * 2, 0};
-    if (!bigger.slots) {
-
-      perror("Unable to allocate memory (hash_set_add)");
-      exit(EXIT_FAILURE);
-
-    }
-
-    for (size_t i = 0; i < set->capacity; ++i)
-      if (set->slots[i]) hash_set_insert(&bigger, set->slots[i]);
-    free(set->slots);
-    *set = bigger;
-
-  }
-
-  size_t old_count = set->count;
-  hash_set_insert(set, hash);
-  return set->count != old_count;
-
-}
 
 // Generate a test case that is not empty and is not in `seen`. Return NULL if
 // MAX_TRIES tries do not give one.
@@ -159,11 +91,11 @@ int main(int argc, const char *argv[]) {
   }
 
   // The generator writes no empty test case and no test case twice
-  char       fn[PATH_MAX];
-  tree_t    *tree = NULL;
-  hash_set_t seen = {calloc(64, sizeof(uint64_t)), 64, 0};
-  int        num = 0;
-  if (!seen.slots) {
+  char        fn[PATH_MAX];
+  tree_t     *tree = NULL;
+  hash_set_t *seen = hash_set_create();
+  int         num = 0;
+  if (!seen) {
 
     perror("Unable to allocate memory");
     return EXIT_FAILURE;
@@ -172,7 +104,7 @@ int main(int argc, const char *argv[]) {
 
   for (; num < max_num; ++num) {
 
-    tree = generate_new_tree(max_len, &seen);
+    tree = generate_new_tree(max_len, seen);
     if (!tree) {
 
       printf("No new test case after %d tries; stop at %d test cases\n",
@@ -190,7 +122,7 @@ int main(int argc, const char *argv[]) {
 
   }
 
-  free(seen.slots);
+  hash_set_free(seen);
   printf("Wrote %d test cases\n", num);
   return 0;
 
