@@ -45,6 +45,37 @@ class TreeFileTest(unittest.TestCase):
         node.children.append(Node(0, 0, "end"))
         self.assertEqual(text(deserialize(serialize(root))), "end")
 
+    def test_round_trip_keeps_the_tree_shape(self) -> None:
+        tree = Node(1, 2, "", [Node(0, 0, "a"), Node(3, RULE_ID_UNKNOWN, "", [Node(0, 0, "b")]), Node(4, 1)])
+        self.assertEqual(deserialize(serialize(tree)), tree)
+        self.assertNotEqual(deserialize(serialize(tree)), Node(1, 2, "", [Node(0, 0, "a")]))
+
+    def test_deep_tree_compares_and_prints(self) -> None:
+        def chain(leaf: str) -> Node:
+            root = node = Node(1, 0)
+            for _ in range(100000):
+                child = Node(1, 0)
+                node.children.append(child)
+                node = child
+            node.children.append(Node(0, 0, leaf))
+            return root
+
+        self.assertEqual(chain("x"), chain("x"))
+        self.assertNotEqual(chain("x"), chain("y"))
+        self.assertIn("children=1", repr(chain("x")))
+
+    def test_non_utf8_leaf_bytes_round_trip(self) -> None:
+        # A mutation in the C code can write any bytes into a leaf.
+        data = serialize(Node(1, 0, "", [Node(0, 0, "a")])).replace(b"a", b"\xff")
+        tree = deserialize(data)
+        self.assertEqual(serialize(tree), data)
+
+    def test_bad_tree_files_raise_value_error(self) -> None:
+        data = serialize(Node(1, 0, "", [Node(0, 0, "ab")]))
+        for bad in (b"", data[:10], data[:-1], data[:16], data + b"x"):
+            with self.assertRaises(ValueError, msg=bad):
+                deserialize(bad)
+
 
 if __name__ == "__main__":
     unittest.main()

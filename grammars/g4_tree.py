@@ -18,8 +18,9 @@ as little-endian u32 values, and then its value bytes:
 - rule_id: the alternative number. RULE_ID_UNKNOWN means the alternative is
   not known.
 - subnode_count: the number of child nodes.
-- val_len: the number of UTF-8 bytes in val.
-- val: the value, as UTF-8 bytes.
+- val_len: the number of bytes in val.
+- val: the value, as UTF-8 bytes. A mutation can write other bytes. The
+  functions keep them as surrogate escapes, so they round trip.
 
 The functions in this file use a loop, not recursion, so a deep tree works.
 The format matches TreeNode.to_bytes in f1_c_gen.py.
@@ -36,14 +37,33 @@ RULE_ID_UNKNOWN = 0xFFFFFFFF
 _HEADER = struct.Struct("<4I")
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class Node:
-    """A node of a parse tree."""
+    """A node of a parse tree.
+
+    The comparison uses a loop, not recursion, so a deep tree works.
+    """
 
     id: int
     rule_id: int = 0
     val: str = ""
     children: list[Node] = field(default_factory=list)
+
+    __hash__ = None  # type: ignore[assignment]  # a Node can change
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Node):
+            return NotImplemented
+        stack = [(self, other)]
+        while stack:
+            a, b = stack.pop()
+            if (a.id, a.rule_id, a.val, len(a.children)) != (b.id, b.rule_id, b.val, len(b.children)):
+                return False
+            stack.extend(zip(a.children, b.children))
+        return True
+
+    def __repr__(self) -> str:
+        return f"Node(id={self.id}, rule_id={self.rule_id}, val={self.val!r}, children={len(self.children)})"
 
 
 def serialize(root: Node) -> bytes:
@@ -52,7 +72,7 @@ def serialize(root: Node) -> bytes:
     stack = [root]
     while stack:
         node = stack.pop()
-        val = node.val.encode("utf-8")
+        val = node.val.encode("utf-8", "surrogateescape")
         out += _HEADER.pack(node.id, node.rule_id, len(node.children), len(val))
         out += val
         # Push the children in reverse, so the first child is read next.
@@ -62,12 +82,14 @@ def serialize(root: Node) -> bytes:
 
 def _read_node(data: bytes, pos: int) -> tuple[Node, int, int]:
     """Read one node header and value at pos. Return the node, the end position, and the child count."""
-    node_id, rule_id, count, val_len = _HEADER.unpack_from(data, pos)
     start = pos + _HEADER.size
+    if start > len(data):
+        raise ValueError("tree file ends inside a node header")
+    node_id, rule_id, count, val_len = _HEADER.unpack_from(data, pos)
     end = start + val_len
     if end > len(data):
         raise ValueError("tree file ends inside a node value")
-    return Node(node_id, rule_id, data[start:end].decode("utf-8")), end, count
+    return Node(node_id, rule_id, data[start:end].decode("utf-8", "surrogateescape")), end, count
 
 
 def deserialize(data: bytes) -> Node:
