@@ -104,6 +104,9 @@ ifeq ($(BUILD),yes)
     # The folder with the base classes and the rewrite script of a grammar
     # with action code, for example grammars-v4 javascript/javascript/Python3
     ifdef G4_SUPPORT_DIR
+      ifneq "$(words $(G4_SUPPORT_DIR))" "1"
+        $(error G4_SUPPORT_DIR must not have spaces: $(G4_SUPPORT_DIR))
+      endif
       override G4_SUPPORT_DIR := $(abspath $(G4_SUPPORT_DIR))
       ifeq (,$(wildcard $(G4_SUPPORT_DIR)/.))
         $(error G4_SUPPORT_DIR is not a folder: $(G4_SUPPORT_DIR))
@@ -125,9 +128,13 @@ ifeq ($(BUILD),yes)
   # folder. A change in them makes the build generate the code again.
   GRAMMAR_STAMP := $(strip $(GRAMMAR_FILE) $(GRAMMAR_START) $(G4_SUPPORT_DIR))
   ifneq "$(shell cat .grammar 2> /dev/null)" "$(GRAMMAR_STAMP)"
-    # Create or update .grammar
+    # Create or update .grammar. Also remove the files that the build makes
+    # from the grammar: make 3.81 compares file times in full seconds, so a
+    # build in the same second as the last one may not see the change.
     $(info Create or update .grammar)
     $(shell echo $(GRAMMAR_STAMP) > .grammar)
+    $(shell rm -rf src/f1_c_fuzz.c include/f1_c_fuzz.h grammars/Grammar.g4 grammars/g4_grammar.json \
+      grammars/g4_parse_map.json grammars/g4_python lib/antlr4_shim/generated)
   endif
   ifndef GRAMMAR_FILENAME
     ifneq "$(G4_FILES)" ""
@@ -197,23 +204,23 @@ $(PARSE_MAP): $(GRAMMAR_JSON)
 # gives a clear message when grammar_parser-<name> runs.
 PARSER_STAMP = $(PARSER_DIR)/.built
 $(PARSER_STAMP): .grammar $(G4_FILES) $(if $(G4_SUPPORT_DIR),$(wildcard $(G4_SUPPORT_DIR)/*)) $(VENV_STAMP)
-	rm -rf $(PARSER_DIR)
-	mkdir -p $(PARSER_DIR)
-	cp $(G4_FILES) $(PARSER_DIR)/
-	$(if $(G4_SUPPORT_DIR),if [ -f $(G4_SUPPORT_DIR)/transformGrammar.py ]; then \
-	     (cd $(PARSER_DIR) && $(CURDIR)/.venv/bin/python $(G4_SUPPORT_DIR)/transformGrammar.py); fi)
-	$(if $(G4_SUPPORT_DIR),for f in $(G4_SUPPORT_DIR)/*.py; do \
-	     [ "$$(basename $$f)" = transformGrammar.py ] || cp $$f $(PARSER_DIR)/; done)
+	rm -rf "$(PARSER_DIR)"
+	mkdir -p "$(PARSER_DIR)"
+	cp $(G4_FILES) "$(PARSER_DIR)/"
+	$(if $(G4_SUPPORT_DIR),if [ -f "$(G4_SUPPORT_DIR)/transformGrammar.py" ]; then \
+	     (cd "$(PARSER_DIR)" && "$(CURDIR)/.venv/bin/python" "$(G4_SUPPORT_DIR)/transformGrammar.py"); fi)
+	$(if $(G4_SUPPORT_DIR),for f in "$(G4_SUPPORT_DIR)"/*.py; do \
+	     [ "$$(basename "$$f")" = transformGrammar.py ] || cp "$$f" "$(PARSER_DIR)/" || exit 1; done)
 	java -jar $(ANTLR_JAR_LOCATION) -Dlanguage=Python3 -Xexact-output-dir \
-	     -o $(PARSER_DIR) $(PARSER_DIR)/*.g4
+	     -o "$(PARSER_DIR)" "$(PARSER_DIR)"/*.g4
 	@touch $@
 
 $(PARSER_LAUNCHER): grammars/grammar_parser.in .grammar $(GRAMMAR_JSON) $(PARSE_MAP) $(PARSER_STAMP)
-	rm -rf $(PARSER_DATA)
-	mkdir -p $(PARSER_DATA)
-	cp $(GRAMMAR_JSON) $(PARSER_DATA)/grammar.json
-	cp $(PARSE_MAP) $(PARSER_DATA)/parse_map.json
-	cp -R $(PARSER_DIR) $(PARSER_DATA)/python
+	rm -rf "$(PARSER_DATA)"
+	mkdir -p "$(PARSER_DATA)"
+	cp "$(GRAMMAR_JSON)" "$(PARSER_DATA)/grammar.json"
+	cp "$(PARSE_MAP)" "$(PARSER_DATA)/parse_map.json"
+	cp -R "$(PARSER_DIR)" "$(PARSER_DATA)/python"
 	sed -e 's|@VENV_PYTHON@|$(CURDIR)/.venv/bin/python|' \
 	    -e 's|@G4_PARSE@|$(CURDIR)/grammars/g4_parse.py|' \
 	    -e 's|@PARSER_DATA@|$(CURDIR)/$(PARSER_DATA)|g' \
