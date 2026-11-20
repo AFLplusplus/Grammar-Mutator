@@ -496,6 +496,12 @@ TEST_F(TreeTest, DeserializeRejectsBadLengths) {
 
   }
 
+  // A leaf (id 0) with a subnode
+  const uint32_t leaf_with_child[8] = {0, 0, 1, 0, 0, 0, 0, 0};
+  EXPECT_EQ(tree_deserialize((const uint8_t *)leaf_with_child,
+                             sizeof(leaf_with_child)),
+            nullptr);
+
   // A tree file that ends early
   for (size_t len : {(size_t)0, (size_t)15, tree->ser_len - 1})
     EXPECT_EQ(tree_deserialize(tree->ser_buf, len), nullptr) << len;

@@ -15,6 +15,7 @@ Run them with `make test-python`.
 
 from __future__ import annotations
 
+import struct
 import sys
 import unittest
 from pathlib import Path
@@ -72,7 +73,8 @@ class TreeFileTest(unittest.TestCase):
 
     def test_bad_tree_files_raise_value_error(self) -> None:
         data = serialize(Node(1, 0, "", [Node(0, 0, "ab")]))
-        for bad in (b"", data[:10], data[:-1], data[:16], data + b"x"):
+        leaf_with_child = struct.pack("<8I", 0, 0, 1, 0, 0, 0, 0, 0)
+        for bad in (b"", data[:10], data[:-1], data[:16], data + b"x", leaf_with_child):
             with self.assertRaises(ValueError, msg=bad):
                 deserialize(bad)
 

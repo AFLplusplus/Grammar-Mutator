@@ -607,8 +607,9 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
   ser_len += sizeof(node->val_len);
 
   // A corrupt length must not read past the data or allocate too much. Each
-  // subnode needs at least `min_len` bytes.
-  if (node->val_len > data_size - ser_len ||
+  // subnode needs at least `min_len` bytes. A leaf (id 0) has no subnodes.
+  if ((node->id == 0 && node->subnode_count) ||
+      node->val_len > data_size - ser_len ||
       node->subnode_count > (data_size - ser_len - node->val_len) / min_len) {
 
     node->val_len = 0;

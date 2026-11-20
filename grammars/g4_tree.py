@@ -89,6 +89,8 @@ def _read_node(data: bytes, pos: int) -> tuple[Node, int, int]:
     end = start + val_len
     if end > len(data):
         raise ValueError("tree file ends inside a node value")
+    if node_id == TERM_ID and count:
+        raise ValueError("tree file has a leaf with child nodes")
     return Node(node_id, rule_id, data[start:end].decode("utf-8", "surrogateescape")), end, count
 
 
