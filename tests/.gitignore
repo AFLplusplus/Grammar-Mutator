@@ -1,6 +1,8 @@
 # Ignore executable files
 test_*
 !test_*.cpp
+!python/
+!python/test_*.py
 
 # Ignore Valgrind logs
 valgrind_logs/**
