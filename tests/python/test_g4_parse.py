@@ -487,6 +487,17 @@ class CommandLineTest(unittest.TestCase):
         self.assertEqual((code, err), (0, ""))
         self.assertTrue((self.dir / "other" / "a.json").exists())
 
+    def test_cli_folder_check_error_exits_2(self) -> None:
+        # Python 3.8 to 3.11 raise PermissionError in Path.exists() below a
+        # folder without search permission.
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        with mock.patch("pathlib.Path.exists", side_effect=PermissionError(13, "Permission denied")):
+            code, _out, err = self.run_main(parser_dir, seeds, self.dir / "locked" / "trees", map_file, grammar_file)
+        self.assertEqual(code, 2)
+        self.assertIn("[-] Cannot check TREES_DIR", err)
+
     def test_cli_parse_map_that_is_not_an_object(self) -> None:
         parser_dir, _map_file, grammar_file = self.json_cli()
         map_file = self.dir / "list.json"

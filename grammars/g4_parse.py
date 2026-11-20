@@ -542,17 +542,21 @@ def check_folders(seeds_dir: Path, trees_dir: Path) -> None:
     names. So it also finds the same folder under a name with other case,
     a symbolic link, or a firmlink.
     """
-    seeds = os.stat(seeds_dir)
-    # The folders that do not exist yet cannot be SEEDS_DIR. Start at the
-    # deepest folder that exists, and walk up its real path.
-    folder = trees_dir.absolute()
-    while not folder.exists() and folder != folder.parent:
-        folder = folder.parent
-    real = folder.resolve()
-    for parent in (real, *real.parents):
-        if os.path.samestat(seeds, os.stat(parent)):
-            msg = "TREES_DIR must not be SEEDS_DIR or a folder in SEEDS_DIR"
-            raise CommandError(msg)
+    try:
+        seeds = os.stat(seeds_dir)
+        # The folders that do not exist yet cannot be SEEDS_DIR. Start at the
+        # deepest folder that exists, and walk up its real path.
+        folder = trees_dir.absolute()
+        while not folder.exists() and folder != folder.parent:
+            folder = folder.parent
+        real = folder.resolve()
+        same = any(os.path.samestat(seeds, os.stat(parent)) for parent in (real, *real.parents))
+    except OSError as e:
+        msg = f"Cannot check TREES_DIR {shown(trees_dir)}: {e}"
+        raise CommandError(msg) from e
+    if same:
+        msg = "TREES_DIR must not be SEEDS_DIR or a folder in SEEDS_DIR"
+        raise CommandError(msg)
 
 
 def write_trees(builder: TreeBuilder, seeds_dir: Path, trees_dir: Path) -> str:
