@@ -161,24 +161,21 @@ class ConverterTest(unittest.TestCase):
         for key, alternatives in pmap["kinds"].items():
             self.assertEqual([len(a) for a in alternatives], [len(a) for a in rules[key]])
 
+    def split(self, lexer: str, parser: str) -> list[Path]:
+        """Write a lexer grammar L and a parser grammar T that uses it.
+
+        ANTLR accepts tokens { ... } with type(...) only in a lexer grammar.
+        """
+        return [
+            self.write("L.g4", "lexer grammar L;\n" + lexer),
+            self.write("T.g4", "parser grammar T;\noptions { tokenVocab = L; }\n" + parser),
+        ]
+
     def test_parse_map_token_keys_of_type_commands(self) -> None:
         # Y has one producer (A), so the token key is <A>. Z has two producers,
         # so the token key is <Z__type>, which the parser never looks into.
-        _, pmap = convert_with_map(
-            [
-                self.write(
-                    "T.g4",
-                    """
-            grammar T;
-            tokens { Y, Z }
-            s : Y Z ;
-            A : 'a' -> type(Y) ;
-            B : 'b' -> type(Z) ;
-            C : 'c' -> type(Z) ;
-        """,
-                )
-            ]
-        )
+        lexer = "tokens { Y, Z }\nA : 'a' -> type(Y) ;\nB : 'b' -> type(Z) ;\nC : 'c' -> type(Z) ;\n"
+        _, pmap = convert_with_map(self.split(lexer, "s : Y Z ;\n"))
         self.assertEqual(pmap["token_keys"], {"<A>": "Y", "<Z__type>": "Z"})
         self.assertNotIn("<Z__type>", pmap["kinds"])
 
@@ -190,9 +187,7 @@ class ConverterTest(unittest.TestCase):
         # The tokens of A have the type X, so a reference to A and the
         # wildcard give the same name, in each order.
         for body in ("s : A . ;", "s : . A ;"):
-            _, pmap = convert_with_map(
-                [self.write("T.g4", f"grammar T;\ntokens {{ X }}\n{body}\nA : 'a' -> type(X) ;\n")]
-            )
+            _, pmap = convert_with_map(self.split("tokens { X }\nA : 'a' -> type(X) ;\n", body + "\n"))
             self.assertEqual(pmap["token_keys"]["<A>"], "X", body)
 
     def test_parse_map_command_line(self) -> None:
