@@ -20,12 +20,15 @@ import contextlib
 import copy
 import io
 import json
+import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "grammars"))
@@ -34,6 +37,8 @@ from f1_c_gen import CFuzzer
 from g4_helpers import ROOT, build_parser
 from g4_parse import (
     MAX_TREE_DEPTH,
+    PARSER_RECURSION_LIMIT,
+    GrammarError,
     ParseError,
     TreeBuilder,
     alternative_order,
@@ -153,6 +158,18 @@ class TreeBuilderTest(unittest.TestCase):
         self.assertEqual(s.rule_id, alternative_order(grammar)["<s>"].index(1))
         self.assertEqual(s.rule_id, 0)
 
+    def test_helpers_take_the_f1_first_alternative(self) -> None:
+        # The empty alternative of ID? is first in F1 order. So the first ID?
+        # stays empty, and the second one takes the token.
+        builder, grammar = self.builder("s : ID? ID? ;\nID : [a-z]+ ;")
+        tree = self.round_trip(builder, "a")
+        ids = node_ids(grammar)
+        (first,) = find(tree, ids["<s__1>"])
+        (second,) = find(tree, ids["<s__2>"])
+        self.assertEqual(grammar["<s__1>"][alternative_order(grammar)["<s__1>"][0]], [])
+        self.assertEqual((first.rule_id, first.children), (0, []))
+        self.assertEqual(leaves(second), ["a", ""])
+
     def test_token_node_has_unknown_rule_id(self) -> None:
         builder, grammar = self.builder("s : ID ;\nID : [a-z]+ ;")
         tree = self.round_trip(builder, "hello")
@@ -231,9 +248,9 @@ class TreeBuilderTest(unittest.TestCase):
             self.assertEqual(e.reason, "parser limit")
 
     def test_parser_limit_keeps_the_cause(self) -> None:
-        # 400000 levels are too deep for the ANTLR runtime on Python 3.8 and 3.14.
+        # The ANTLR runtime needs at least one Python frame for each level.
         builder, _ = self.builder("e : '(' e ')' | 'x' ;")
-        data = "(" * 400000 + "x" + ")" * 400000
+        data = "(" * PARSER_RECURSION_LIMIT + "x" + ")" * PARSER_RECURSION_LIMIT
         with self.assertRaises(ParseError) as caught:
             builder.build(data.encode("utf-8"))
         self.assertEqual(caught.exception.reason, "parser limit")
@@ -251,6 +268,46 @@ class TreeBuilderTest(unittest.TestCase):
         with self.assertRaises(Exception) as caught:
             TreeBuilder(grammar, parse_map, Path(self.tmp.name))
         self.assertNotIsInstance(caught.exception, ParseError)
+
+    def test_missing_start_method_raises_at_construction(self) -> None:
+        grammar, parse_map, parser_dir = self.json
+        with self.assertRaises(AttributeError):
+            TreeBuilder(grammar, {**parse_map, "start_rule": "missing"}, parser_dir)
+
+    def test_unknown_parse_map_version_raises_at_construction(self) -> None:
+        grammar, parse_map, parser_dir = self.json
+        for version in (None, 2):
+            with self.assertRaises(GrammarError):
+                TreeBuilder(grammar, {**parse_map, "version": version}, parser_dir)
+
+    def test_builders_do_not_share_modules(self) -> None:
+        # Two parsers with a base class of the same name, in two folders
+        loaded = []
+        for mark in (1, 2):
+            tmp = Path(self.tmp.name) / str(mark)
+            tmp.mkdir()
+            grammar, parse_map, parser_dir = build_parser(
+                tmp, {"T.g4": "grammar T;\noptions { superClass = Base; }\ns : ID ;\nID : [a-z]+ ;\n"}
+            )
+            (parser_dir / "Base.py").write_text(f"from antlr4 import Parser\nclass Base(Parser):\n    MARK = {mark}\n")
+            builder = TreeBuilder(grammar, parse_map, parser_dir)
+            loaded.append(builder.parser_class.MARK)
+            self.assertEqual(text(builder.build(b"ab")), "ab")
+            self.assertNotIn(str(parser_dir), sys.path)
+            self.assertFalse(
+                [m for m in list(sys.modules.values()) if str(parser_dir) in str(getattr(m, "__file__", None))]
+            )
+        self.assertEqual(loaded, [1, 2])
+
+    def test_thread_settings_come_back_after_a_failure(self) -> None:
+        builder = TreeBuilder(*self.json)
+        size, limit = threading.stack_size(), sys.getrecursionlimit()
+        failure = RuntimeError("can't start new thread")
+        with mock.patch("g4_parse.threading.Thread.start", side_effect=failure):  # noqa: SIM117 (Python 3.8)
+            with self.assertRaises(RuntimeError) as caught:
+                builder.build(b"[]")
+        self.assertNotIsInstance(caught.exception, ParseError)
+        self.assertEqual((threading.stack_size(), sys.getrecursionlimit()), (size, limit))
 
     def test_syntax_error(self) -> None:
         builder = TreeBuilder(*self.json)
@@ -321,6 +378,124 @@ class CommandLineTest(unittest.TestCase):
             "duplicate name 2, no match 0",
         )
 
+    def json_cli(self) -> tuple[Path, Path, Path]:
+        grammar, parse_map, parser_dir = build_parser(self.dir, {"JSON.g4": JSON_G4.read_text()})
+        grammar_file, map_file = self.write_maps(grammar, parse_map)
+        return parser_dir, map_file, grammar_file
+
+    def test_cli_reports_parser_limit_and_no_match(self) -> None:
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        (seeds / "deep.json").write_text("[" * MAX_TREE_DEPTH + "]" * MAX_TREE_DEPTH, encoding="utf-8")
+        code, out, err = self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file)
+        self.assertEqual((code, err), (0, "[!] deep.json: parser limit\n"))
+        self.assertIn("parser limit 1", out)
+
+        other = self.dir / "other"
+        other.mkdir()
+        grammar, parse_map, parser_dir = build_parser(other, {"T.g4": "grammar T;\ns : 'é' | ID ;\nID : [a-z]+ ;\n"})
+        grammar_file, map_file = self.write_maps(grammar, parse_map)
+        (seeds / "deep.json").write_text("é", encoding="utf-8")
+        code, out, err = self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file)
+        self.assertEqual((code, err), (0, "[!] deep.json: no match\n"))
+        self.assertIn("no match 1", out)
+
+    def test_cli_removes_the_old_tree_of_a_skipped_file(self) -> None:
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds, trees = self.dir / "seeds", self.dir / "trees"
+        seeds.mkdir()
+        (seeds / "a.json").write_text("[]", encoding="utf-8")
+        self.assertEqual(self.run_main(parser_dir, seeds, trees, map_file, grammar_file)[0], 0)
+        self.assertTrue((trees / "a.json").exists())
+        (seeds / "a.json").write_text("[", encoding="utf-8")
+        self.assertEqual(self.run_main(parser_dir, seeds, trees, map_file, grammar_file)[0], 0)
+        self.assertFalse((trees / "a.json").exists())
+
+    def test_cli_names_that_differ_only_in_case_are_duplicates(self) -> None:
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds = self.dir / "seeds"
+        (seeds / "sub").mkdir(parents=True)
+        (seeds / "A.json").write_text("[]", encoding="utf-8")
+        (seeds / "sub" / "a.json").write_text("[1]", encoding="utf-8")
+        code, _out, err = self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file)
+        self.assertEqual((code, err), (0, "[!] sub/a.json: duplicate name\n"))
+        self.assertEqual(text(deserialize((self.dir / "trees" / "A.json").read_bytes())), "[]")
+
+    def test_cli_refuses_trees_in_the_seeds_folder(self) -> None:
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        (seeds / "a.json").write_text("[]", encoding="utf-8")
+        for trees in (seeds, seeds / "trees", self.dir / "seeds" / ".." / "seeds"):
+            code, _out, err = self.run_main(parser_dir, seeds, trees, map_file, grammar_file)
+            self.assertEqual(code, 2, trees)
+            self.assertIn("[-] TREES_DIR", err)
+        self.assertEqual((seeds / "a.json").read_text(encoding="utf-8"), "[]")
+        self.assertFalse((seeds / "trees").exists())
+
+    def test_cli_read_and_write_errors_exit_2(self) -> None:
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds, trees = self.dir / "seeds", self.dir / "trees"
+        seeds.mkdir()
+        (seeds / "a.json").write_text("[]", encoding="utf-8")
+        for target in ("pathlib.Path.read_bytes", "pathlib.Path.write_bytes"):
+            with mock.patch(target, side_effect=PermissionError(13, "Permission denied")):
+                code, _out, err = self.run_main(parser_dir, seeds, trees, map_file, grammar_file)
+            self.assertEqual(code, 2, target)
+            self.assertIn("a.json", err)
+            self.assertNotIn("Traceback", err)
+
+    def test_cli_thread_failure_exits_2(self) -> None:
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        (seeds / "a.json").write_text("[]", encoding="utf-8")
+        with mock.patch("g4_parse.threading.Thread.start", side_effect=RuntimeError("can't start new thread")):
+            code, _out, err = self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file)
+        self.assertEqual(code, 2)
+        self.assertIn("[-] Cannot start the parser thread", err)
+
+    def test_cli_bad_parse_map_does_not_name_g4_support_dir(self) -> None:
+        parser_dir, _map_file, grammar_file = self.json_cli()
+        grammar, parse_map = convert_with_map([JSON_G4])
+        _, map_file = self.write_maps(grammar, {**parse_map, "version": 2})
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        code, _out, err = self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file)
+        self.assertEqual(code, 2)
+        self.assertIn("[-] The grammar or the parse map is not valid", err)
+        self.assertNotIn("G4_SUPPORT_DIR", err)
+
+    @unittest.skipIf(sys.platform == "darwin", "macOS file names must be UTF-8")
+    def test_cli_prints_undecodable_file_names(self) -> None:
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        try:
+            (Path(os.fsdecode(bytes(seeds) + b"/bad\xff.json"))).write_text("[", encoding="utf-8")
+        except OSError:
+            self.skipTest("the file system needs UTF-8 file names")
+        err = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            argv = ["--grammar", str(grammar_file), "--parse-map", str(map_file), "--parser-dir", str(parser_dir)]
+            code = main([*argv, str(seeds), str(self.dir / "trees")])
+        err.flush()
+        self.assertEqual(code, 0)
+        self.assertIn(b"bad\\xff.json: syntax error", err.buffer.getvalue())
+
+    def test_cli_action_code_without_support_files_names_g4_support_dir(self) -> None:
+        grammar, parse_map, parser_dir = build_parser(
+            self.dir, {"T.g4": "grammar T;\noptions { superClass = MissingBase; }\ns : ID ;\nID : [a-z]+ ;\n"}
+        )
+        grammar_file, map_file = self.write_maps(grammar, parse_map)
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        code, _out, err = self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file)
+        self.assertEqual(code, 2)
+        self.assertIn("MissingBase", err)
+        self.assertIn("G4_SUPPORT_DIR", err)
+
     def test_cli_missing_parser_dir_names_g4_support_dir(self) -> None:
         grammar, parse_map = convert_with_map([JSON_G4])
         grammar_file, map_file = self.write_maps(grammar, parse_map)
@@ -350,10 +525,21 @@ class OrderTest(unittest.TestCase):
             grammar, parse_map = convert_with_map(paths)
             check_helpers(grammar, parse_map)
 
-    def test_check_helpers_rejects_a_helper_cycle(self) -> None:
+    def test_check_helpers_rejects_a_self_reference_before_the_end(self) -> None:
         grammar = {"<START>": [["", "<s>"]], "<s>": [["<s__1>", "x"]], "<s__1>": [["<s__1>", "y"], []]}
         kinds = {"<START>": [["lead", "rule"]], "<s>": [["helper", "literal"]], "<s__1>": [["helper", "literal"], []]}
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(GrammarError, "refers to itself"):
+            check_helpers(grammar, {"kinds": kinds})
+
+    def test_check_helpers_rejects_a_helper_cycle(self) -> None:
+        grammar = {"<START>": [["", "<s>"]], "<s>": [["<a>"]], "<a>": [["<b>"], []], "<b>": [["<a>", "x"]]}
+        kinds = {
+            "<START>": [["lead", "rule"]],
+            "<s>": [["helper"]],
+            "<a>": [["helper"], []],
+            "<b>": [["helper", "literal"]],
+        }
+        with self.assertRaisesRegex(GrammarError, "cycle: <a>, <b>"):
             check_helpers(grammar, {"kinds": kinds})
 
 

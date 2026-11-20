@@ -164,10 +164,11 @@ class ConverterTest(unittest.TestCase):
     def test_parse_map_token_keys_of_type_commands(self) -> None:
         # Y has one producer (A), so the token key is <A>. Z has two producers,
         # so the token key is <Z__type>, which the parser never looks into.
-        _, pmap = convert_with_map([
-            self.write(
-                "T.g4",
-                """
+        _, pmap = convert_with_map(
+            [
+                self.write(
+                    "T.g4",
+                    """
             grammar T;
             tokens { Y, Z }
             s : Y Z ;
@@ -175,8 +176,9 @@ class ConverterTest(unittest.TestCase):
             B : 'b' -> type(Z) ;
             C : 'c' -> type(Z) ;
         """,
-            )
-        ])
+                )
+            ]
+        )
         self.assertEqual(pmap["token_keys"], {"<A>": "Y", "<Z__type>": "Z"})
         self.assertNotIn("<Z__type>", pmap["kinds"])
 
@@ -188,9 +190,9 @@ class ConverterTest(unittest.TestCase):
         # The tokens of A have the type X, so a reference to A and the
         # wildcard give the same name, in each order.
         for body in ("s : A . ;", "s : . A ;"):
-            _, pmap = convert_with_map([
-                self.write("T.g4", f"grammar T;\ntokens {{ X }}\n{body}\nA : 'a' -> type(X) ;\n")
-            ])
+            _, pmap = convert_with_map(
+                [self.write("T.g4", f"grammar T;\ntokens {{ X }}\n{body}\nA : 'a' -> type(X) ;\n")]
+            )
             self.assertEqual(pmap["token_keys"]["<A>"], "X", body)
 
     def test_parse_map_command_line(self) -> None:

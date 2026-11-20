@@ -55,6 +55,8 @@ PARSER_RECURSION_LIMIT = 200000
 # crashes on a tree between 60000 and 100000 levels deep. 20000 leaves a margin.
 # A deeper tree gives "parser limit".
 MAX_TREE_DEPTH = 20000
+# The parse map format that g4_to_json.py writes
+PARSE_MAP_VERSION = 1
 
 # The events of a match, which _build_nodes changes into nodes
 _OPEN = 0  # (_OPEN, key, alternative): start a node of key
@@ -77,6 +79,14 @@ class ParseError(Exception):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+class GrammarError(ValueError):
+    """A JSON grammar or a parse map that the parser cannot use."""
+
+
+class ParserThreadError(RuntimeError):
+    """The parser thread does not start."""
 
 
 class Kid(NamedTuple):
@@ -138,7 +148,7 @@ def check_helpers(grammar: dict[str, list[list[str]]], parse_map: dict[str, Any]
                     edges[k].add(symbol)
                 elif i != len(alternative) - 1:
                     msg = f"the helper key {k} refers to itself before the end of an alternative"
-                    raise ValueError(msg)
+                    raise GrammarError(msg)
     # Remove the keys without references until no key is left (Kahn).
     refs = dict.fromkeys(edges, 0)
     for targets in edges.values():
@@ -153,45 +163,69 @@ def check_helpers(grammar: dict[str, list[list[str]]], parse_map: dict[str, Any]
     cycle = sorted(k for k, count in refs.items() if count > 0)
     if cycle:
         msg = f"the helper keys make a cycle: {', '.join(cycle)}"
-        raise ValueError(msg)
+        raise GrammarError(msg)
 
 
-def load_class(parser_dir: Path, module_name: str) -> Any:
-    """Import the class module_name from the module module_name.py in parser_dir.
+def load_classes(parser_dir: Path, module_names: Iterable[str]) -> list[Any]:
+    """Import the class of each module name from the module file in parser_dir.
 
-    The folder goes on sys.path, and the module goes into sys.modules with
-    its name, because the base classes of a grammar with action code import
-    the generated modules by name. A module with the same name from an
-    earlier call is replaced.
+    The generated modules and the base classes import each other by name. So
+    during the import, parser_dir is first on sys.path and the modules are in
+    sys.modules. After the import, both are as before, so that the modules
+    of another parser folder with the same names do not mix with these.
     """
-    path = parser_dir / f"{module_name}.py"
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    if spec is None or spec.loader is None:
-        msg = f"cannot import {path}"
-        raise ImportError(msg)
-    if str(parser_dir) not in sys.path:
-        sys.path.insert(0, str(parser_dir))
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return getattr(module, module_name)
+    folder = str(parser_dir.resolve())
+    old_path = list(sys.path)
+    old_modules = dict(sys.modules)
+    sys.path.insert(0, folder)
+    try:
+        classes = []
+        for module_name in module_names:
+            path = Path(folder) / f"{module_name}.py"
+            spec = importlib.util.spec_from_file_location(module_name, path)
+            if spec is None or spec.loader is None:
+                msg = f"cannot import {path}"
+                raise ImportError(msg)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            spec.loader.exec_module(module)
+            classes.append(getattr(module, module_name))
+        return classes
+    finally:
+        sys.path[:] = old_path
+        for name in set(sys.modules) - set(old_modules):
+            del sys.modules[name]
+        sys.modules.update(old_modules)
 
 
 class TreeBuilder:
     """Change test cases into trees of a JSON grammar from g4_to_json.py."""
 
     def __init__(self, grammar: dict[str, list[list[str]]], parse_map: dict[str, Any], parser_dir: Path) -> None:
-        check_helpers(grammar, parse_map)
-        self.grammar = grammar
-        self.kinds: dict[str, list[list[str]]] = parse_map["kinds"]
-        self.token_keys: dict[str, str] = parse_map["token_keys"]
-        self.parser_rules: dict[str, str] = parse_map["parser_rules"]
-        self.start_rule: str = parse_map["start_rule"]
-        self.ids = node_ids(grammar)
-        self.order = alternative_order(grammar)
+        """Check the grammar and the parse map, and load the parser.
+
+        Raise GrammarError for a grammar or a parse map that is not valid.
+        Other exceptions come from the generated parser modules.
+        """
+        version = parse_map.get("version")
+        if version != PARSE_MAP_VERSION:
+            msg = f"the parse map has version {version!r}, not {PARSE_MAP_VERSION}"
+            raise GrammarError(msg)
+        try:
+            check_helpers(grammar, parse_map)
+            self.grammar = grammar
+            self.kinds: dict[str, list[list[str]]] = parse_map["kinds"]
+            self.token_keys: dict[str, str] = parse_map["token_keys"]
+            self.parser_rules: dict[str, str] = parse_map["parser_rules"]
+            self.start_rule: str = parse_map["start_rule"]
+            self.ids = node_ids(grammar)
+            self.order = alternative_order(grammar)
+            module_names = (parse_map["lexer_module"], parse_map["parser_module"])
+        except (KeyError, TypeError) as e:
+            msg = f"the grammar and the parse map do not agree: {e!r}"
+            raise GrammarError(msg) from e
         self.rule_ids = {k: {alt: i for i, alt in enumerate(order)} for k, order in self.order.items()}
-        self.lexer_class = load_class(parser_dir, parse_map["lexer_module"])
-        self.parser_class = load_class(parser_dir, parse_map["parser_module"])
+        self.lexer_class, self.parser_class = load_classes(parser_dir, module_names)
         # The Python target adds "_" to a rule name that Python reserves.
         names = [n for n in (self.start_rule, self.start_rule + "_") if callable(getattr(self.parser_class, n, None))]
         if not names:
@@ -259,7 +293,10 @@ class TreeBuilder:
         return root
 
     def _parse_in_thread(self, source: str) -> Any:
-        """Parse source with ANTLR in a thread with a large stack."""
+        """Parse source with ANTLR in a thread with a large stack.
+
+        Raise ParserThreadError if the thread does not start.
+        """
         result: list[Any] = []
 
         def parse() -> None:
@@ -269,12 +306,15 @@ class TreeBuilder:
                 result.append(e)
 
         old_limit = sys.getrecursionlimit()
-        old_size = threading.stack_size(PARSER_STACK_SIZE)
+        old_size = threading.stack_size()
         try:
+            threading.stack_size(PARSER_STACK_SIZE)
             sys.setrecursionlimit(max(old_limit, PARSER_RECURSION_LIMIT))
             thread = threading.Thread(target=parse)
             thread.start()
             thread.join()
+        except (RuntimeError, ValueError) as e:
+            raise ParserThreadError(str(e)) from e
         finally:
             threading.stack_size(old_size)
             sys.setrecursionlimit(old_limit)
@@ -439,6 +479,89 @@ class TreeBuilder:
 REASONS = ("not UTF-8", "syntax error", "parser limit", "duplicate name", "no match")
 
 
+def shown(name: object) -> str:
+    """Return a file name that prints in any case. Undecodable bytes become backslash escapes."""
+    return str(name).encode("utf-8", "surrogateescape").decode("utf-8", "backslashreplace")
+
+
+class CommandError(Exception):
+    """An error that stops grammar_parser with exit code 2."""
+
+
+def load_builder(args: argparse.Namespace) -> TreeBuilder:
+    """Read the grammar and the parse map, and load the parser."""
+    try:
+        grammar = json.loads(args.grammar.read_text(encoding="utf-8"))
+        parse_map = json.loads(args.parse_map.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        msg = f"Cannot read the grammar or the parse map: {e}"
+        raise CommandError(msg) from e
+    try:
+        return TreeBuilder(grammar, parse_map, args.parser_dir)
+    except GrammarError as e:
+        msg = f"The grammar or the parse map is not valid: {e}"
+        raise CommandError(msg) from e
+    except Exception as e:  # any load problem of the generated parser
+        msg = (
+            f"Cannot load the Python parser in {shown(args.parser_dir)}: {e}. If the grammar has action code or "
+            "a superClass, build with G4_SUPPORT_DIR (see doc/customizing-grammars.md)."
+        )
+        raise CommandError(msg) from e
+
+
+def write_trees(builder: TreeBuilder, seeds_dir: Path, trees_dir: Path) -> str:
+    """Write the tree of each file in seeds_dir to trees_dir. Return the summary."""
+    files = sorted((p for p in seeds_dir.rglob("*") if p.is_file()), key=lambda p: p.relative_to(seeds_dir))
+    skipped = dict.fromkeys(REASONS, 0)
+    # The names of the trees, without case: the macOS file systems ignore it.
+    names: set[str] = set()
+    parsed = 0
+    try:
+        trees_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        msg = f"Cannot make the folder {shown(trees_dir)}: {e}"
+        raise CommandError(msg) from e
+    for path in files:
+        relative = shown(path.relative_to(seeds_dir).as_posix())
+        # AFL++ changes each space in a queue name to "_" (no_spaces() in
+        # afl-fuzz-init.c), and the mutator looks for the tree with that name.
+        name = path.name.replace(" ", "_")
+        tree_path = trees_dir / name
+        try:
+            if name.casefold() in names:
+                raise ParseError("duplicate name")
+            data = path.read_bytes()
+            tree = builder.build(data)
+        except ParseError as e:
+            skipped[e.reason] += 1
+            print(f"[!] {relative}: {e.reason}", file=sys.stderr)
+            if e.reason != "duplicate name":
+                # A tree from an earlier run does not match the file now.
+                try:
+                    tree_path.unlink()
+                except FileNotFoundError:
+                    pass
+                except OSError as error:
+                    msg = f"Cannot remove the old tree of {relative}: {error}"
+                    raise CommandError(msg) from error
+            continue
+        except OSError as e:
+            msg = f"Cannot read {relative}: {e}"
+            raise CommandError(msg) from e
+        except ParserThreadError as e:
+            msg = f"Cannot start the parser thread: {e}"
+            raise CommandError(msg) from e
+        names.add(name.casefold())
+        try:
+            tree_path.write_bytes(serialize(tree))
+        except OSError as e:
+            msg = f"Cannot write the tree of {relative}: {e}"
+            raise CommandError(msg) from e
+        parsed += 1
+    counts = ", ".join(f"{reason} {count}" for reason, count in skipped.items())
+    return f"[+] Parsed {parsed} of {len(files)} files; skipped: {counts}"
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--grammar", required=True, type=Path, help="the JSON grammar")
@@ -449,47 +572,19 @@ def main(argv: Iterable[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        grammar = json.loads(args.grammar.read_text(encoding="utf-8"))
-        parse_map = json.loads(args.parse_map.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        print(f"[-] Cannot read the grammar or the parse map: {e}", file=sys.stderr)
+        if not args.seeds_dir.is_dir():
+            msg = f"Not a folder: {shown(args.seeds_dir)}"
+            raise CommandError(msg)
+        seeds_dir, trees_dir = args.seeds_dir.resolve(), args.trees_dir.resolve()
+        if trees_dir == seeds_dir or seeds_dir in trees_dir.parents:
+            msg = "TREES_DIR must not be SEEDS_DIR or a folder in SEEDS_DIR"
+            raise CommandError(msg)
+        builder = load_builder(args)
+        summary = write_trees(builder, args.seeds_dir, args.trees_dir)
+    except CommandError as e:
+        print(f"[-] {e}", file=sys.stderr)
         return 2
-    if not args.seeds_dir.is_dir():
-        print(f"[-] Not a folder: {args.seeds_dir}", file=sys.stderr)
-        return 2
-    try:
-        builder = TreeBuilder(grammar, parse_map, args.parser_dir)
-    except Exception as e:  # any load problem of the generated parser
-        print(
-            f"[-] Cannot load the Python parser in {args.parser_dir}: {e}. If the grammar has action code or a "
-            "superClass, build with G4_SUPPORT_DIR (see doc/customizing-grammars.md).",
-            file=sys.stderr,
-        )
-        return 2
-
-    files = sorted((p for p in args.seeds_dir.rglob("*") if p.is_file()), key=lambda p: p.relative_to(args.seeds_dir))
-    args.trees_dir.mkdir(parents=True, exist_ok=True)
-    skipped = dict.fromkeys(REASONS, 0)
-    names: set[str] = set()
-    parsed = 0
-    for path in files:
-        relative = path.relative_to(args.seeds_dir).as_posix()
-        # AFL++ changes each space in a queue name to "_" (no_spaces() in
-        # afl-fuzz-init.c), and the mutator looks for the tree with that name.
-        name = path.name.replace(" ", "_")
-        try:
-            if name in names:
-                raise ParseError("duplicate name")
-            tree = builder.build(path.read_bytes())
-        except ParseError as e:
-            skipped[e.reason] += 1
-            print(f"[!] {relative}: {e.reason}", file=sys.stderr)
-            continue
-        names.add(name)
-        (args.trees_dir / name).write_bytes(serialize(tree))
-        parsed += 1
-    counts = ", ".join(f"{reason} {count}" for reason, count in skipped.items())
-    print(f"[+] Parsed {parsed} of {len(files)} files; skipped: {counts}")
+    print(summary)
     return 0
 
 
