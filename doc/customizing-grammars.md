@@ -101,6 +101,9 @@ afl-fuzz -i SEEDS_DIR -o out ...
   only.
 - It prints one line for each skipped file and a summary with one count for
   each reason. The exit code is 0 also when it skips files.
+- `grammar_parser-<name>` keeps its own copy of the grammar and the parser in
+  `src/grammar_parser-<name>.d`. A later build of a different grammar does not
+  change it.
 - A tree gives the exact bytes of the test case again, together with the
   whitespace and the comments.
 - Each token gets one leaf. So the mutator changes a parsed token only as a

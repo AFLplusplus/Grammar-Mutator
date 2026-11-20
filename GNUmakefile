@@ -167,8 +167,10 @@ src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar $(GRAMMAR_JSO
 	$(PYTHON) grammars/f1_c_gen.py $(GRAMMAR_JSON) $(CURDIR)
 
 # The launcher of the parser for .g4 files. It runs grammars/g4_parse.py with
-# the grammar and the Python parser.
+# the grammar and the Python parser. The launcher uses only its own copy of
+# them in PARSER_DATA, so a build of a different grammar does not change it.
 PARSER_LAUNCHER = src/grammar_parser-$(GRAMMAR_FILENAME)
+PARSER_DATA = $(PARSER_LAUNCHER).d
 
 # The Python parser for .g4 files, from the ANTLR 4 meta-grammar. A build
 # finds the jar (ANTLR_JAR_LOCATION). "make test-python" does not, so it uses
@@ -207,11 +209,14 @@ $(PARSER_STAMP): .grammar $(G4_FILES) $(if $(G4_SUPPORT_DIR),$(wildcard $(G4_SUP
 	@touch $@
 
 $(PARSER_LAUNCHER): grammars/grammar_parser.in .grammar $(GRAMMAR_JSON) $(PARSE_MAP) $(PARSER_STAMP)
+	rm -rf $(PARSER_DATA)
+	mkdir -p $(PARSER_DATA)
+	cp $(GRAMMAR_JSON) $(PARSER_DATA)/grammar.json
+	cp $(PARSE_MAP) $(PARSER_DATA)/parse_map.json
+	cp -R $(PARSER_DIR) $(PARSER_DATA)/python
 	sed -e 's|@VENV_PYTHON@|$(CURDIR)/.venv/bin/python|' \
 	    -e 's|@G4_PARSE@|$(CURDIR)/grammars/g4_parse.py|' \
-	    -e 's|@GRAMMAR_JSON@|$(GRAMMAR_JSON)|' \
-	    -e 's|@PARSE_MAP@|$(PARSE_MAP)|' \
-	    -e 's|@PARSER_DIR@|$(PARSER_DIR)|' \
+	    -e 's|@PARSER_DATA@|$(CURDIR)/$(PARSER_DATA)|g' \
 	    grammars/grammar_parser.in > $@
 	chmod +x $@
 
@@ -314,6 +319,7 @@ clean:
 	@$(MAKE) -C third_party $@
 	@rm -rf $(GEN_FILES)
 	@rm -rf grammars/__pycache__
+	@rm -rf src/grammar_parser-*.d
 	@rm -f grammar_generator-* libgrammarmutator-*.so grammar_parser-* src/grammar_parser-*
 
 .PHONY: help

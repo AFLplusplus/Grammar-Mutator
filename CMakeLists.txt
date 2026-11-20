@@ -195,11 +195,18 @@ if (_g4_file_count GREATER 0)
     message(FATAL_ERROR "Unable to convert the .g4 grammar: ${result}")
   endif ()
 
+  # The data of grammar_parser-<name>: a copy of the JSON grammar and the
+  # parse map, and the Python parser. The launcher uses only this folder, so a
+  # build of a different grammar does not change it.
+  set(PARSER_DATA ${CMAKE_BINARY_DIR}/src/grammar_parser-${GRAMMAR_FILENAME}.d)
+  file(REMOVE_RECURSE ${PARSER_DATA})
+  file(MAKE_DIRECTORY ${PARSER_DATA})
+  file(COPY ${GRAMMAR_JSON} ${PARSE_MAP} DESTINATION ${PARSER_DATA})
+
   # The Python parser for test cases. G4_SUPPORT_DIR is the folder with the
   # base classes and the rewrite script of a grammar with action code, for
   # example grammars-v4 javascript/javascript/Python3.
-  set(PARSER_DIR ${CMAKE_BINARY_DIR}/g4_python)
-  file(REMOVE_RECURSE ${PARSER_DIR})
+  set(PARSER_DIR ${PARSER_DATA}/python)
   file(MAKE_DIRECTORY ${PARSER_DIR})
   file(COPY ${G4_FILES} DESTINATION ${PARSER_DIR})
   if (G4_SUPPORT_DIR)
