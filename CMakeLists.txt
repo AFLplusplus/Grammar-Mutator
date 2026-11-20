@@ -102,38 +102,118 @@ else ()
 endif ()
 
 # Generate "f1_c_fuzz.c" and "f1_c_fuzz.h"
-# Check the input grammar file
+# Check the input grammar files. GRAMMAR_FILE is one .json file, or a list of
+# ANTLR 4 .g4 files (for example "/path/Lexer.g4;/path/Parser.g4").
 if (NOT GRAMMAR_FILE)
   message(FATAL_ERROR "Missing the grammar file path. You can specify it's path using: -DGRAMMAR_FILE=<path>")
 endif ()
-if (NOT IS_ABSOLUTE ${GRAMMAR_FILE})
-  message(FATAL_ERROR "Please provide the full path to the grammar file")
+set(G4_FILES "")
+foreach (_grammar_file IN LISTS GRAMMAR_FILE)
+  if (NOT IS_ABSOLUTE ${_grammar_file})
+    message(FATAL_ERROR "Please provide the full path to the grammar file: ${_grammar_file}")
+  endif ()
+  if (NOT EXISTS ${_grammar_file})
+    message(FATAL_ERROR "The grammar file does not exist: ${_grammar_file}")
+  endif ()
+  if (_grammar_file MATCHES "\\.g4$")
+    list(APPEND G4_FILES ${_grammar_file})
+  endif ()
+endforeach ()
+list(LENGTH GRAMMAR_FILE _grammar_file_count)
+list(LENGTH G4_FILES _g4_file_count)
+if (_g4_file_count GREATER 0 AND NOT _g4_file_count EQUAL _grammar_file_count)
+  message(FATAL_ERROR "Do not mix .g4 files with other grammar files: ${GRAMMAR_FILE}")
 endif ()
-if (NOT EXISTS ${GRAMMAR_FILE})
-  message(FATAL_ERROR "The grammar file does not exist: ${GRAMMAR_FILE}")
+if (_g4_file_count EQUAL 0 AND _grammar_file_count GREATER 1)
+  message(FATAL_ERROR "Give one JSON grammar file: ${GRAMMAR_FILE}")
 endif ()
+if (_g4_file_count EQUAL 0 AND GRAMMAR_START)
+  message(FATAL_ERROR "GRAMMAR_START works only with .g4 grammar files")
+endif ()
+# Configure again when a grammar file changes
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${GRAMMAR_FILE})
+
 if (NOT GRAMMAR_FILENAME)
-  get_filename_component(GRAMMAR_FILENAME ${GRAMMAR_FILE} NAME_WE)
-  string(TOLOWER ${GRAMMAR_FILENAME} GRAMMAR_FILENAME)
-  STRING(REGEX REPLACE "[_.-].*" "" GRAMMAR_FILENAME ${GRAMMAR_FILENAME})
+  if (_g4_file_count GREATER 0)
+    # For example, JavaScriptLexer.g4 and JavaScriptParser.g4 give "javascript"
+    list(GET G4_FILES -1 _last_g4_file)
+    get_filename_component(GRAMMAR_FILENAME ${_last_g4_file} NAME_WE)
+    string(REGEX REPLACE "(Parser|Lexer)$" "" GRAMMAR_FILENAME ${GRAMMAR_FILENAME})
+    string(TOLOWER ${GRAMMAR_FILENAME} GRAMMAR_FILENAME)
+  else ()
+    get_filename_component(GRAMMAR_FILENAME ${GRAMMAR_FILE} NAME_WE)
+    string(TOLOWER ${GRAMMAR_FILENAME} GRAMMAR_FILENAME)
+    STRING(REGEX REPLACE "[_.-].*" "" GRAMMAR_FILENAME ${GRAMMAR_FILENAME})
+  endif ()
   message(STATUS "Selected grammar name: ${GRAMMAR_FILENAME} (from ${GRAMMAR_FILE})")
 else ()
   message(STATUS "Selected grammar name: ${GRAMMAR_FILENAME}")
 endif ()
 
-
 # Generate files at configure time
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/f1/src ${CMAKE_BINARY_DIR}/f1/include)
+if (_g4_file_count GREATER 0)
+  # The Python tools (requirements.txt) in a virtual environment in the build
+  # folder
+  set(GRAMMAR_VENV ${CMAKE_BINARY_DIR}/venv)
+  if (NOT EXISTS ${GRAMMAR_VENV}/bin/python)
+    execute_process(
+      COMMAND ${PYTHON} -m venv ${GRAMMAR_VENV}
+      RESULT_VARIABLE result)
+    if (result)
+      message(FATAL_ERROR "Unable to create the Python virtual environment: ${result}")
+    endif ()
+  endif ()
+  execute_process(
+    COMMAND ${GRAMMAR_VENV}/bin/pip install --quiet -r ${CMAKE_SOURCE_DIR}/requirements.txt
+    RESULT_VARIABLE result)
+  if (result)
+    message(FATAL_ERROR "Unable to install the Python tools (requirements.txt): ${result}")
+  endif ()
+  # The Python parser for .g4 files, from the ANTLR 4 meta-grammar
+  execute_process(
+    COMMAND ${Java_JAVA_EXECUTABLE} -jar ${ANTLR_JAR_LOCATION} -Dlanguage=Python3
+            -Xexact-output-dir -o ${CMAKE_BINARY_DIR}/antlr4_meta
+            ${CMAKE_SOURCE_DIR}/grammars/antlr4/ANTLRv4Lexer.g4
+            ${CMAKE_SOURCE_DIR}/grammars/antlr4/ANTLRv4Parser.g4
+    RESULT_VARIABLE result)
+  if (result)
+    message(FATAL_ERROR "Unable to generate the parser for .g4 files: ${result}")
+  endif ()
+  set(_start_option "")
+  if (GRAMMAR_START)
+    set(_start_option --start ${GRAMMAR_START})
+  endif ()
+  set(GRAMMAR_JSON ${CMAKE_BINARY_DIR}/f1/grammar.json)
+  execute_process(
+    COMMAND ${GRAMMAR_VENV}/bin/python ${CMAKE_SOURCE_DIR}/grammars/g4_to_json.py
+            ${_start_option} --meta-dir ${CMAKE_BINARY_DIR}/antlr4_meta
+            -o ${GRAMMAR_JSON} ${G4_FILES}
+    RESULT_VARIABLE result)
+  if (result)
+    message(FATAL_ERROR "Unable to convert the .g4 grammar: ${result}")
+  endif ()
+  # Parsing test cases with .g4 grammars is not supported yet. The shim gets a
+  # parser that rejects all input.
+  set(GRAMMAR_G4_FILE "${CMAKE_SOURCE_DIR}/grammars/g4_placeholder/Grammar.g4")
+else ()
+  set(GRAMMAR_JSON ${GRAMMAR_FILE})
+  execute_process(
+    COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_g4_translate.py ${GRAMMAR_JSON} ${CMAKE_BINARY_DIR}/f1
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  if (result)
+    message(FATAL_ERROR "CMake step for g4 translation failed: ${result}")
+  endif ()
+  set(GRAMMAR_G4_FILE "${CMAKE_BINARY_DIR}/f1/Grammar.g4")
+endif ()
 execute_process(
-  COMMAND mkdir -p f1/src
-  COMMAND mkdir -p f1/include
-  COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_c_gen.py ${GRAMMAR_FILE} ${CMAKE_BINARY_DIR}/f1
-  COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_g4_translate.py ${GRAMMAR_FILE} ${CMAKE_BINARY_DIR}/f1
+  COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_c_gen.py ${GRAMMAR_JSON} ${CMAKE_BINARY_DIR}/f1
   RESULT_VARIABLE result
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 if (result)
-  message(FATAL_ERROR "CMake step for f1_c_fuzz and g4 translation failed: ${result}")
+  message(FATAL_ERROR "CMake step for f1_c_fuzz failed: ${result}")
 endif ()
-set(GRAMMAR_G4_FILE "${CMAKE_BINARY_DIR}/f1/Grammar.g4")
 if (EXISTS ${GRAMMAR_G4_FILE})
   message(STATUS "Grammar g4: ${GRAMMAR_G4_FILE}")
 else ()

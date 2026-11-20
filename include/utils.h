@@ -1,6 +1,7 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -79,6 +80,23 @@ RANDOM_RETURN random_next();
  *              https://github.com/AFLplusplus/AFLplusplus/blob/stable/include/afl-fuzz.h#L1157-L1185
  */
 uint32_t random_below(uint32_t limit);
+
+// Hash operations
+
+// Return the 64-bit hash (XXH3) of the bytes
+uint64_t hash_bytes(const void *buf, size_t len);
+
+// A set of 64-bit hashes, for example to find repeated test cases
+typedef struct hash_set hash_set_t;
+
+hash_set_t *hash_set_create(void);
+
+void hash_set_free(hash_set_t *set);
+
+// Add the hash to the set. Return false if the set already has it.
+bool hash_set_add(hash_set_t *set, uint64_t hash);
+
+size_t hash_set_size(const hash_set_t *set);
 
 #ifdef __cplusplus
 

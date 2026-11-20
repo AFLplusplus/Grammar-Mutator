@@ -6,3 +6,7 @@
 # The code formatter (`make code-format`). Other major versions give different
 # output, so .custom-format.py requires this major version.
 clang-format==23.1.5
+
+# The ANTLR runtime for grammars/g4_to_json.py, which reads .g4 grammar files.
+# Keep the same version as ANTLR_VERSION in GNUmakefile and CMakeLists.txt.
+antlr4-python3-runtime==4.13.2
