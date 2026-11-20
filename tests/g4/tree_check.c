@@ -1,7 +1,7 @@
 /*
  * Round-trip check for grammar_parser-<name>.
- * For each tree file in TREES_DIR, find the seed with the same base name under
- * SEEDS_DIR. Load the tree, convert it to bytes, and compare with the seed.
+ * For each tree file in TREES_DIR, load the tree and convert it to bytes. The
+ * bytes must equal a seed with the same base name under SEEDS_DIR.
  * Usage: tree_check SEEDS_DIR TREES_DIR
  */
 #define _POSIX_C_SOURCE 200809L
@@ -14,37 +14,6 @@
 #include <sys/stat.h>
 
 #include "tree.h"
-
-/* Return a malloc'ed path of the first file called `name` under `dir`. */
-static char *find_seed(const char *dir, const char *name) {
-
-  DIR *d = opendir(dir);
-  if (!d) return NULL;
-
-  char          *found = NULL;
-  struct dirent *entry;
-  while (!found && (entry = readdir(d)) != NULL) {
-
-    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-      continue;
-
-    char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/%s", dir, entry->d_name);
-
-    struct stat st;
-    if (stat(path, &st) != 0) continue;
-
-    if (S_ISDIR(st.st_mode))
-      found = find_seed(path, name);
-    else if (strcmp(entry->d_name, name) == 0)
-      found = strdup(path);
-
-  }
-
-  closedir(d);
-  return found;
-
-}
 
 /* Read a whole file. Return NULL on error. */
 static unsigned char *read_file(const char *path, size_t *len) {
@@ -67,6 +36,50 @@ static unsigned char *read_file(const char *path, size_t *len) {
 
   fclose(f);
   return buf;
+
+}
+
+/* Look for files called `name` under `dir`. Count them in `*found`. Return 1
+ * if one of them has the bytes `buf`. The parser skips a file with a name that
+ * it already used, so the tree can belong to any file with this name. */
+static int match_seed(const char *dir, const char *name,
+                      const unsigned char *buf, size_t len, int *found) {
+
+  DIR *d = opendir(dir);
+  if (!d) return 0;
+
+  int            matched = 0;
+  struct dirent *entry;
+  while (!matched && (entry = readdir(d)) != NULL) {
+
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+      continue;
+
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", dir, entry->d_name);
+
+    struct stat st;
+    if (stat(path, &st) != 0) continue;
+
+    if (S_ISDIR(st.st_mode)) {
+
+      matched = match_seed(path, name, buf, len, found);
+
+    } else if (strcmp(entry->d_name, name) == 0) {
+
+      ++*found;
+      size_t         seed_len = 0;
+      unsigned char *seed = read_file(path, &seed_len);
+      matched = seed && seed_len == len &&
+                (len == 0 || memcmp(seed, buf, len) == 0);
+      free(seed);
+
+    }
+
+  }
+
+  closedir(d);
+  return matched;
 
 }
 
@@ -97,44 +110,30 @@ int main(int argc, char **argv) {
     char tree_path[PATH_MAX];
     snprintf(tree_path, sizeof(tree_path), "%s/%s", argv[2], name);
 
-    char *seed_path = find_seed(argv[1], name);
-    if (!seed_path) {
+    tree_t *tree = read_tree_from_file(tree_path);
+    if (!tree) {
 
-      printf("[-] %s: no seed\n", name);
+      printf("[-] %s: cannot load\n", name);
       ++failed;
       continue;
 
     }
 
-    size_t         seed_len = 0;
-    unsigned char *seed = read_file(seed_path, &seed_len);
-    tree_t        *tree = read_tree_from_file(tree_path);
-    if (!seed || !tree) {
+    tree_get_size(tree);
+    tree_to_buf(tree);
+    int found = 0;
+    if (match_seed(argv[1], name, tree->data_buf, tree->data_len, &found)) {
 
-      printf("[-] %s: cannot load\n", name);
-      ++failed;
+      ++ok;
 
     } else {
 
-      tree_get_size(tree);
-      tree_to_buf(tree);
-      if (tree->data_len == seed_len &&
-          (seed_len == 0 || memcmp(tree->data_buf, seed, seed_len) == 0)) {
-
-        ++ok;
-
-      } else {
-
-        printf("[-] %s: bytes differ\n", name);
-        ++failed;
-
-      }
+      printf("[-] %s: %s\n", name, found ? "bytes differ" : "no seed");
+      ++failed;
 
     }
 
-    free(seed);
     tree_free(tree);
-    free(seed_path);
 
   }
 
