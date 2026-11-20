@@ -82,13 +82,67 @@ The conversion works as follows:
   test case can break a rule that only a predicate or an action checks.
 - The rules that the start rule cannot reach are removed.
 
-Limits of the current version:
+### Parse Existing Test Cases
 
-- The mutator does not parse test cases with a `.g4` grammar yet. Use
-  `grammar_generator-<name>` to make the seeds and their trees (see
-  [README.md](../README.md#using-generated-seeds)). The mutator skips a queue
-  entry that has no tree, and AFL++ fuzzes that entry with its own mutators.
+A `.g4` build also makes `grammar_parser-<name>`. It parses your own test cases
+with the ANTLR parser of the grammar and writes a tree file for each one. Use it
+like `grammar_generator-<name>`. Then copy the trees folder into the AFL++
+output folder (see [README.md](../README.md#using-generated-seeds)).
+
+```bash
+./grammar_parser-javascript SEEDS_DIR TREES_DIR
+mkdir -p out/default
+cp -r TREES_DIR out/default/trees
+afl-fuzz -i SEEDS_DIR -o out ...
+```
+
+- The tool reads each file in `SEEDS_DIR` and its subfolders. It writes
+  `TREES_DIR/<file name>`, because the mutator finds a tree by the file name
+  only.
+- It prints one line for each skipped file and a summary with one count for
+  each reason. The exit code is 0 also when it skips files.
+- A tree gives the exact bytes of the test case again, together with the
+  whitespace and the comments.
+- Each token gets one leaf. So the mutator changes a parsed token only as a
+  whole. For example, it does not change one character of a string literal.
+
+The tool skips a file for one of these reasons:
+
+- `not UTF-8`: the file is not valid UTF-8.
+- `syntax error`: the ANTLR lexer or parser rejects the file.
+- `parser limit`: the ANTLR runtime fails on the file, for example on very deep
+  nesting.
+- `duplicate name`: a file with the same name in a different folder already has
+  a tree.
+- `no match`: ANTLR accepts the file, but the parse tree does not match the
+  JSON grammar. This is usually a bug. Please report it with the file.
+
+Many grammars from grammars-v4 have action code or predicates that call methods
+of a base class, for example `{this.IsStrictMode()}?`. For these grammars, set
+`G4_SUPPORT_DIR` (CMake: `-DG4_SUPPORT_DIR`) to the folder with the Python base
+classes. This is the `Python3/` folder of the grammar in grammars-v4. If the
+folder has `transformGrammar.py`, the build runs it on copies of the `.g4`
+files. The build then copies the `.py` files next to the Python parser.
+
+```bash
+make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4" \
+     G4_SUPPORT_DIR=grammars/g4/javascript/Python3
+```
+
+A grammar with no action code does not need `G4_SUPPORT_DIR`. If a grammar
+needs it and you do not set it, `grammar_parser-<name>` stops with a message.
+Generation and the mutator do not need `G4_SUPPORT_DIR`.
+
+### Limits
+
+- The mutator does not parse test cases with a `.g4` grammar itself. Use
+  `grammar_parser-<name>` or `grammar_generator-<name>` to make the trees.
+  The mutator still skips a queue entry that has no tree, for example an entry
+  from a different fuzzer (`-M`/`-S` sync) or an entry that AFL++ trimmed.
+  AFL++ fuzzes such an entry with its own mutators.
 - A token that only the code of a grammar makes (a `tokens { ... }` entry with
   no lexer rule, such as `INDENT` in a Python grammar) cannot be generated.
-  The build removes the alternatives that use it and prints a warning.
+  The build removes the alternatives that use it and prints a warning. For the
+  same reason, `grammar_parser-<name>` does not support such grammars. A test
+  case that uses such a token gives `no match`.
 - Generated characters are ASCII only.
