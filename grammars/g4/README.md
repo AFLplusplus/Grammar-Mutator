@@ -17,5 +17,12 @@ the grammar mutator with a `.g4` grammar.
   The grammar has action code and a base class (`superClass`) for checks such
   as strict mode. Generation ignores them, so not all generated test cases
   are valid JavaScript.
+- `javascript/Python3/` has the base classes and the grammar rewrite script for
+  the Python 3 target: `JavaScriptLexerBase.py`, `JavaScriptParserBase.py`,
+  `transformGrammar.py`, and `README.md`. They come from
+  [grammars-v4](https://github.com/antlr/grammars-v4/tree/master/javascript/javascript/Python3),
+  commit `30c6ea0dac4a03f0f8bb454a6d15435c424b6f69`, with no local changes (MIT
+  license). The build uses them through `G4_SUPPORT_DIR`:
+  `make GRAMMAR_FILE="<lexer> <parser>" G4_SUPPORT_DIR=grammars/g4/javascript/Python3`.
 
 Many more grammars are in [grammars-v4](https://github.com/antlr/grammars-v4).
