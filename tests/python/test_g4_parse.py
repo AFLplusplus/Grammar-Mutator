@@ -16,7 +16,10 @@ g4_helpers.py).
 
 from __future__ import annotations
 
+import contextlib
 import copy
+import io
+import json
 import sys
 import tempfile
 import time
@@ -29,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "grammars"))
 
 from f1_c_gen import CFuzzer
 from g4_helpers import ROOT, build_parser
-from g4_parse import ParseError, TreeBuilder, alternative_order, check_helpers, node_ids
+from g4_parse import ParseError, TreeBuilder, alternative_order, check_helpers, main, node_ids
 from g4_to_json import convert, convert_with_map
 from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
 
@@ -245,6 +248,66 @@ class TreeBuilderTest(unittest.TestCase):
         builder, _ = self.builder("s : 'é' | ID ;\nID : [a-z]+ ;")
         self.round_trip(builder, "x")
         self.assert_reason(builder, "é".encode(), "no match")
+
+
+class CommandLineTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+
+    def run_main(
+        self, parser_dir: Path, seeds: Path, trees: Path, parse_map: Path, grammar: Path
+    ) -> tuple[int, str, str]:
+        out, err = io.StringIO(), io.StringIO()
+        argv = ["--grammar", str(grammar), "--parse-map", str(parse_map), "--parser-dir", str(parser_dir)]
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = main([*argv, str(seeds), str(trees)])
+        return code, out.getvalue(), err.getvalue()
+
+    def write_maps(self, grammar: dict[str, list[list[str]]], parse_map: dict[str, Any]) -> tuple[Path, Path]:
+        grammar_file, map_file = self.dir / "grammar.json", self.dir / "parse_map.json"
+        grammar_file.write_text(json.dumps(grammar), encoding="utf-8")
+        map_file.write_text(json.dumps(parse_map), encoding="utf-8")
+        return grammar_file, map_file
+
+    def test_cli_writes_trees_and_reports_skips(self) -> None:
+        grammar, parse_map, parser_dir = build_parser(self.dir, {"JSON.g4": JSON_G4.read_text()})
+        grammar_file, map_file = self.write_maps(grammar, parse_map)
+        seeds, trees = self.dir / "seeds", self.dir / "out" / "trees"
+        (seeds / "sub").mkdir(parents=True)
+        (seeds / "a.json").write_text('{"a": 1}', encoding="utf-8")
+        (seeds / "sub" / "b c.json").write_text("[1, 2]\n", encoding="utf-8")
+        (seeds / "bad.json").write_text("{", encoding="utf-8")
+        (seeds / "sub" / "a.json").write_text("[]", encoding="utf-8")
+        (seeds / "x.bin").write_bytes(b"\xff\xfe")
+        code, out, err = self.run_main(parser_dir, seeds, trees, map_file, grammar_file)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(sorted(p.name for p in trees.iterdir()), ["a.json", "b c.json"])
+        self.assertEqual(text(deserialize((trees / "a.json").read_bytes())), '{"a": 1}')
+        self.assertEqual(text(deserialize((trees / "b c.json").read_bytes())), "[1, 2]\n")
+        self.assertEqual(
+            sorted(err.splitlines()),
+            ["[!] bad.json: syntax error", "[!] sub/a.json: duplicate name", "[!] x.bin: not UTF-8"],
+        )
+        self.assertEqual(
+            out.strip(),
+            "[+] Parsed 2 of 5 files; skipped: not UTF-8 1, syntax error 1, parser limit 0, "
+            "duplicate name 1, no match 0",
+        )
+
+    def test_cli_missing_parser_dir_names_g4_support_dir(self) -> None:
+        grammar, parse_map = convert_with_map([JSON_G4])
+        grammar_file, map_file = self.write_maps(grammar, parse_map)
+        empty = self.dir / "empty"
+        empty.mkdir()
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        code, _out, err = self.run_main(empty, seeds, self.dir / "trees", map_file, grammar_file)
+        self.assertEqual(code, 2)
+        self.assertIn("G4_SUPPORT_DIR", err)
+        self.assertIn("[-] Cannot load the Python parser in", err)
+        self.assertNotIn("Traceback", err)
 
 
 class OrderTest(unittest.TestCase):

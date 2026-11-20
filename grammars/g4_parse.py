@@ -31,17 +31,20 @@ So the leaves of the tree give the exact text of the test case.
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
+import json
 import sys
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple
 
 from f1_common import LimitFuzzer
 from g4_to_json import START_KEY, SyntaxErrorCounter
-from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, text
+from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, serialize, text
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from collections.abc import Iterable
 
 # The ANTLR runtime parses with recursion, one level (or more) for each level
 # of the input. A thread with a large stack and a high recursion limit lets it
@@ -413,3 +416,62 @@ class TreeBuilder:
                 stack[-1].children.append(child)
                 rule_kids.append((kid, child))
         return rule_kids
+
+
+# The reasons to skip a file, in the order of the summary
+REASONS = ("not UTF-8", "syntax error", "parser limit", "duplicate name", "no match")
+
+
+def main(argv: Iterable[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+    parser.add_argument("--grammar", required=True, type=Path, help="the JSON grammar")
+    parser.add_argument("--parse-map", required=True, type=Path, help="the parse map from g4_to_json.py")
+    parser.add_argument("--parser-dir", required=True, type=Path, help="the folder of the ANTLR Python parser")
+    parser.add_argument("seeds_dir", type=Path, help="the folder of the test cases")
+    parser.add_argument("trees_dir", type=Path, help="the folder for the tree files")
+    args = parser.parse_args(argv)
+
+    try:
+        grammar = json.loads(args.grammar.read_text(encoding="utf-8"))
+        parse_map = json.loads(args.parse_map.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        print(f"[-] Cannot read the grammar or the parse map: {e}", file=sys.stderr)
+        return 2
+    if not args.seeds_dir.is_dir():
+        print(f"[-] Not a folder: {args.seeds_dir}", file=sys.stderr)
+        return 2
+    try:
+        builder = TreeBuilder(grammar, parse_map, args.parser_dir)
+    except Exception as e:  # any load problem of the generated parser
+        print(
+            f"[-] Cannot load the Python parser in {args.parser_dir}: {e}. If the grammar has action code or a "
+            "superClass, build with G4_SUPPORT_DIR (see doc/customizing-grammars.md).",
+            file=sys.stderr,
+        )
+        return 2
+
+    files = sorted((p for p in args.seeds_dir.rglob("*") if p.is_file()), key=lambda p: p.relative_to(args.seeds_dir))
+    args.trees_dir.mkdir(parents=True, exist_ok=True)
+    skipped = dict.fromkeys(REASONS, 0)
+    names: set[str] = set()
+    parsed = 0
+    for path in files:
+        relative = path.relative_to(args.seeds_dir).as_posix()
+        try:
+            if path.name in names:
+                raise ParseError("duplicate name")
+            tree = builder.build(path.read_bytes())
+        except ParseError as e:
+            skipped[e.reason] += 1
+            print(f"[!] {relative}: {e.reason}", file=sys.stderr)
+            continue
+        names.add(path.name)
+        (args.trees_dir / path.name).write_bytes(serialize(tree))
+        parsed += 1
+    counts = ", ".join(f"{reason} {count}" for reason, count in skipped.items())
+    print(f"[+] Parsed {parsed} of {len(files)} files; skipped: {counts}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
