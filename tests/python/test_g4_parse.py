@@ -298,19 +298,27 @@ class CommandLineTest(unittest.TestCase):
         (seeds / "bad.json").write_text("{", encoding="utf-8")
         (seeds / "sub" / "a.json").write_text("[]", encoding="utf-8")
         (seeds / "x.bin").write_bytes(b"\xff\xfe")
+        # AFL++ changes each space in a queue name to "_", so "b c.json" and
+        # "b_c.json" have the same tree name.
+        (seeds / "sub" / "b_c.json").write_text("[3]", encoding="utf-8")
         code, out, err = self.run_main(parser_dir, seeds, trees, map_file, grammar_file)
         self.assertEqual(code, 0, err)
-        self.assertEqual(sorted(p.name for p in trees.iterdir()), ["a.json", "b c.json"])
+        self.assertEqual(sorted(p.name for p in trees.iterdir()), ["a.json", "b_c.json"])
         self.assertEqual(text(deserialize((trees / "a.json").read_bytes())), '{"a": 1}')
-        self.assertEqual(text(deserialize((trees / "b c.json").read_bytes())), "[1, 2]\n")
+        self.assertEqual(text(deserialize((trees / "b_c.json").read_bytes())), "[1, 2]\n")
         self.assertEqual(
             sorted(err.splitlines()),
-            ["[!] bad.json: syntax error", "[!] sub/a.json: duplicate name", "[!] x.bin: not UTF-8"],
+            [
+                "[!] bad.json: syntax error",
+                "[!] sub/a.json: duplicate name",
+                "[!] sub/b_c.json: duplicate name",
+                "[!] x.bin: not UTF-8",
+            ],
         )
         self.assertEqual(
             out.strip(),
-            "[+] Parsed 2 of 5 files; skipped: not UTF-8 1, syntax error 1, parser limit 0, "
-            "duplicate name 1, no match 0",
+            "[+] Parsed 2 of 6 files; skipped: not UTF-8 1, syntax error 1, parser limit 0, "
+            "duplicate name 2, no match 0",
         )
 
     def test_cli_missing_parser_dir_names_g4_support_dir(self) -> None:

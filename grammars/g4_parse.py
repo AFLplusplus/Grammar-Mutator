@@ -474,16 +474,19 @@ def main(argv: Iterable[str] | None = None) -> int:
     parsed = 0
     for path in files:
         relative = path.relative_to(args.seeds_dir).as_posix()
+        # AFL++ changes each space in a queue name to "_" (no_spaces() in
+        # afl-fuzz-init.c), and the mutator looks for the tree with that name.
+        name = path.name.replace(" ", "_")
         try:
-            if path.name in names:
+            if name in names:
                 raise ParseError("duplicate name")
             tree = builder.build(path.read_bytes())
         except ParseError as e:
             skipped[e.reason] += 1
             print(f"[!] {relative}: {e.reason}", file=sys.stderr)
             continue
-        names.add(path.name)
-        (args.trees_dir / path.name).write_bytes(serialize(tree))
+        names.add(name)
+        (args.trees_dir / name).write_bytes(serialize(tree))
         parsed += 1
     counts = ", ".join(f"{reason} {count}" for reason, count in skipped.items())
     print(f"[+] Parsed {parsed} of {len(files)} files; skipped: {counts}")

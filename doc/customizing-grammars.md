@@ -98,7 +98,9 @@ afl-fuzz -i SEEDS_DIR -o out ...
 
 - The tool reads each file in `SEEDS_DIR` and its subfolders. It writes
   `TREES_DIR/<file name>`, because the mutator finds a tree by the file name
-  only.
+  only. AFL++ changes each space in a queue file name to `_`. So the tool also
+  changes each space in the tree file name to `_`. For example, the tree of
+  `a b.js` is `a_b.js`.
 - It prints one line for each skipped file and a summary with one count for
   each reason. The exit code is 0 also when it skips files.
 - `grammar_parser-<name>` keeps its own copy of the grammar and the parser in
@@ -117,8 +119,9 @@ The tool skips a file for one of these reasons:
   nesting. Or the tree is more than 20000 levels deep. The mutator walks a tree
   with recursion, and a much deeper tree can crash it. Each item of a list adds
   one level or more. So a file with 20000 statements gives such a deep tree.
-- `duplicate name`: a file with the same name in a different folder already has
-  a tree.
+- `duplicate name`: a file with the same tree name in a different folder
+  already has a tree. For example, `a b.js` and `a_b.js` have the same tree
+  name.
 - `no match`: ANTLR accepts the file, but the parse tree does not match the
   JSON grammar. This is usually a bug. Please report it with the file.
 
