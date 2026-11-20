@@ -128,13 +128,11 @@ ifeq ($(BUILD),yes)
   # folder. A change in them makes the build generate the code again.
   GRAMMAR_STAMP := $(strip $(GRAMMAR_FILE) $(GRAMMAR_START) $(G4_SUPPORT_DIR))
   ifneq "$(shell cat .grammar 2> /dev/null)" "$(GRAMMAR_STAMP)"
-    # Create or update .grammar. Also remove the files that the build makes
-    # from the grammar: make 3.81 compares file times in full seconds, so a
-    # build in the same second as the last one may not see the change.
+    # Create or update .grammar. Make 3.81 compares file times in full
+    # seconds. Wait one second first, so that .grammar is newer than each
+    # file of the last build, and the build makes all of them again.
     $(info Create or update .grammar)
-    $(shell echo $(GRAMMAR_STAMP) > .grammar)
-    $(shell rm -rf src/f1_c_fuzz.c include/f1_c_fuzz.h grammars/Grammar.g4 grammars/g4_grammar.json \
-      grammars/g4_parse_map.json grammars/g4_python lib/antlr4_shim/generated)
+    $(shell sleep 1; echo $(GRAMMAR_STAMP) > .grammar)
   endif
   ifndef GRAMMAR_FILENAME
     ifneq "$(G4_FILES)" ""
@@ -177,6 +175,9 @@ src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar $(GRAMMAR_JSO
 # the grammar and the Python parser. The launcher uses only its own copy of
 # them in PARSER_DATA, so a build of a different grammar does not change it.
 PARSER_LAUNCHER = src/grammar_parser-$(GRAMMAR_FILENAME)
+# Escape the characters that are special in a sed replacement with the
+# delimiter "|": "\", "&", and "|"
+sed_escape = $(subst |,\|,$(subst &,\&,$(subst \,\\,$(1))))
 PARSER_DATA = $(PARSER_LAUNCHER).d
 
 # The Python parser for .g4 files, from the ANTLR 4 meta-grammar. A build
@@ -221,9 +222,9 @@ $(PARSER_LAUNCHER): grammars/grammar_parser.in .grammar $(GRAMMAR_JSON) $(PARSE_
 	cp "$(GRAMMAR_JSON)" "$(PARSER_DATA)/grammar.json"
 	cp "$(PARSE_MAP)" "$(PARSER_DATA)/parse_map.json"
 	cp -R "$(PARSER_DIR)" "$(PARSER_DATA)/python"
-	sed -e 's|@VENV_PYTHON@|$(CURDIR)/.venv/bin/python|' \
-	    -e 's|@G4_PARSE@|$(CURDIR)/grammars/g4_parse.py|' \
-	    -e 's|@PARSER_DATA@|$(CURDIR)/$(PARSER_DATA)|g' \
+	sed -e 's|@VENV_PYTHON@|$(call sed_escape,$(CURDIR)/.venv/bin/python)|' \
+	    -e 's|@G4_PARSE@|$(call sed_escape,$(CURDIR)/grammars/g4_parse.py)|' \
+	    -e 's|@PARSER_DATA@|$(call sed_escape,$(CURDIR)/$(PARSER_DATA))|g' \
 	    grammars/grammar_parser.in > $@
 	chmod +x $@
 
