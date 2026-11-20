@@ -73,6 +73,8 @@ The conversion works as follows:
   or `.` gives one printable ASCII character, a tab, or a newline. A Unicode
   property such as `\p{L}` gives ASCII characters of the same kind (letters
   for `\p{L}`). A lexer rule that cannot give an ASCII character is removed.
+- A literal with a non-ASCII character (for example `'\u200C'`) is removed,
+  together with the alternative that contains it.
 - A space comes after each token of a parser rule, because the lexer usually
   skips whitespace. A token that continues to the end of the line, such as a
   line comment, gets a newline after it.

@@ -166,6 +166,14 @@ class ConverterTest(unittest.TestCase):
         main = self.write("T.g4", "grammar T;\nimport Common;\ns : ID ;\n")
         self.assertEqual(convert([main, common])["<s>"], [["<ID>", " "]])
 
+    def test_importing_grammar_wins_in_any_file_order(self) -> None:
+        common = self.write("Common.g4", "grammar Common;\nc : 'c' ;\nID : 'common' ;\n")
+        main = self.write("T.g4", "grammar T;\nimport Common;\ns : ID ;\nID : 'main' ;\n")
+        for paths in ([main, common], [common, main]):
+            rules = convert(paths)
+            self.assertEqual(rules[START_KEY], [["<s>"]])
+            self.assertEqual(rules["<ID>"], [["main"]])
+
     # -- lexer rules -------------------------------------------------------
 
     def test_character_sets(self) -> None:
@@ -184,6 +192,34 @@ class ConverterTest(unittest.TestCase):
         self.assertEqual(chars["C"], ["\t", "\n", "\r"])
         self.assertEqual(len(chars["D"]), 52)
         self.assertEqual(chars["E"], ["\t", "\n"])
+
+    def test_general_category_names_give_their_own_characters(self) -> None:
+        rules = self.convert_text(r"""
+            grammar T;
+            s : A B C D E F ;
+            A : [\p{Pc}] ;
+            B : [\p{Lu}] ;
+            C : [\p{Sc}] ;
+            D : [\p{Nd}] ;
+            E : [\p{Uppercase_Letter}] ;
+            F : [\p{Cc}] ;
+        """)
+        chars = {name: self.chars_of(rules, f"<{name}>") for name in "ABCDEF"}
+        self.assertEqual(chars["A"], ["_"])
+        self.assertEqual(chars["B"], [chr(c) for c in range(0x41, 0x5B)])
+        self.assertEqual(chars["C"], ["$"])
+        self.assertEqual(chars["D"], list("0123456789"))
+        self.assertEqual(chars["E"], chars["B"])
+        self.assertEqual(chars["F"], ["\t", "\n", "\r"])
+
+    def test_non_ascii_literals_are_removed(self) -> None:
+        rules = self.convert_text(r"""
+            grammar T;
+            s : A | 'x' | 'é' ;
+            A : 'a' | '‌' ;
+        """)
+        self.assertEqual(rules["<s>"], [["<A>", " "], ["x", " "]])
+        self.assertEqual(rules["<A>"], [["a"]])
 
     def test_literal_escapes(self) -> None:
         rules = self.convert_text(r"""

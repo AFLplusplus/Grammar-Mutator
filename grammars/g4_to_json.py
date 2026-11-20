@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
@@ -50,6 +51,8 @@ DEFAULT_META_PARSER_DIR = META_DIR / "generated"
 # The characters that a character set can give. The JSON grammar format and
 # f1_c_gen.py work with ASCII characters only.
 CHAR_POOL = "\t\n\r" + "".join(chr(c) for c in range(0x20, 0x7F))
+# A literal with a character above this code is removed, for the same reason
+MAX_ASCII = 0x7F
 
 # The text after each token of a parser rule. It is after the token, not before
 # it, because some tokens must be at the start of the input (for example "#!").
@@ -197,21 +200,86 @@ def unescape_literal(text: str) -> str:
 ASCII_LETTERS = frozenset(chr(c) for c in range(0x41, 0x5B)) | frozenset(chr(c) for c in range(0x61, 0x7B))
 ASCII_DIGITS = frozenset("0123456789")
 
+# The long names of the Unicode General_Category values
+CATEGORY_NAMES = {
+    "letter": "L",
+    "cased_letter": "LC",
+    "uppercase_letter": "Lu",
+    "lowercase_letter": "Ll",
+    "titlecase_letter": "Lt",
+    "modifier_letter": "Lm",
+    "other_letter": "Lo",
+    "mark": "M",
+    "nonspacing_mark": "Mn",
+    "spacing_mark": "Mc",
+    "enclosing_mark": "Me",
+    "number": "N",
+    "decimal_number": "Nd",
+    "letter_number": "Nl",
+    "other_number": "No",
+    "punctuation": "P",
+    "connector_punctuation": "Pc",
+    "dash_punctuation": "Pd",
+    "open_punctuation": "Ps",
+    "close_punctuation": "Pe",
+    "initial_punctuation": "Pi",
+    "final_punctuation": "Pf",
+    "other_punctuation": "Po",
+    "symbol": "S",
+    "math_symbol": "Sm",
+    "currency_symbol": "Sc",
+    "modifier_symbol": "Sk",
+    "other_symbol": "So",
+    "separator": "Z",
+    "space_separator": "Zs",
+    "line_separator": "Zl",
+    "paragraph_separator": "Zp",
+    "other": "C",
+    "control": "Cc",
+    "format": "Cf",
+}
+CATEGORY_CODES = frozenset(CATEGORY_NAMES.values()) | frozenset(
+    {"Cs", "Co", "Cn"},
+)
+
+# Binary properties that grammars often use
+BINARY_PROPERTIES = {
+    "alpha": ASCII_LETTERS,
+    "alphabetic": ASCII_LETTERS,
+    "id_start": ASCII_LETTERS,
+    "xid_start": ASCII_LETTERS,
+    "digit": ASCII_DIGITS,
+    "id_continue": ASCII_LETTERS | ASCII_DIGITS | frozenset("_"),
+    "xid_continue": ASCII_LETTERS | ASCII_DIGITS | frozenset("_"),
+    "alnum": ASCII_LETTERS | ASCII_DIGITS,
+    "word": ASCII_LETTERS | ASCII_DIGITS | frozenset("_"),
+    "white_space": frozenset(c for c in CHAR_POOL if c.isspace()),
+    "space": frozenset(c for c in CHAR_POOL if c.isspace()),
+    "pattern_white_space": frozenset(c for c in CHAR_POOL if c.isspace()),
+}
+
+
+def category_chars(code: str) -> frozenset[str]:
+    """Return the CHAR_POOL characters of a General_Category, such as Lu or L."""
+    if code == "LC":
+        return frozenset(c for c in CHAR_POOL if unicodedata.category(c) in ("Lu", "Ll", "Lt"))
+    return frozenset(c for c in CHAR_POOL if unicodedata.category(c).startswith(code))
+
 
 def property_chars(name: str) -> frozenset[str]:
-    """Return the CHAR_POOL characters for a Unicode property such as L."""
-    key = name.rsplit("=", maxsplit=1)[-1].lower()
-    if key.startswith(("l", "alpha", "id_start", "xid_start")):
-        return ASCII_LETTERS
-    if key.startswith(("n", "digit")):
-        return ASCII_DIGITS
-    if key.startswith(("id_continue", "xid_continue", "alnum", "word")):
-        return ASCII_LETTERS | ASCII_DIGITS | frozenset("_")
-    if key.startswith(("z", "white_space", "space")):
-        return frozenset(" ")
-    if key.startswith(("p", "s")):
-        return frozenset(c for c in CHAR_POOL if not c.isalnum() and not c.isspace())
-    return frozenset()
+    """Return the CHAR_POOL characters for a Unicode property such as L or Lu.
+
+    General_Category values (short or long names) use the real categories of
+    the CHAR_POOL characters. Some binary properties have a fixed ASCII set.
+    Other properties give no characters.
+    """
+    value = name.rsplit("=", maxsplit=1)[-1]
+    if value in CATEGORY_CODES:
+        return category_chars(value)
+    key = value.lower()
+    if key in CATEGORY_NAMES:
+        return category_chars(CATEGORY_NAMES[key])
+    return BINARY_PROPERTIES.get(key, frozenset())
 
 
 def char_set_members(text: str) -> frozenset[str]:
@@ -447,6 +515,26 @@ def set_element_members(ctx: Any) -> frozenset[str]:
     return frozenset()
 
 
+def import_order(names: Sequence[str], imports: Sequence[Sequence[str]]) -> list[int]:
+    """Return the file indexes, with each grammar before the grammars it imports.
+
+    Files that do not import each other keep their order.
+    """
+    importers: dict[str, list[int]] = {}
+    for index, imported in enumerate(imports):
+        for name in imported:
+            importers.setdefault(name, []).append(index)
+    depths: dict[int, int] = {}
+
+    def depth(index: int, seen: frozenset[int]) -> int:
+        if index not in depths:
+            parents = [i for i in importers.get(names[index], []) if i not in seen]
+            depths[index] = max((depth(i, seen | {index}) + 1 for i in parents), default=0)
+        return depths[index]
+
+    return sorted(range(len(names)), key=lambda index: depth(index, frozenset()))
+
+
 def read_grammar(paths: Sequence[Path], meta_parser_dir: Path = DEFAULT_META_PARSER_DIR) -> Grammar:
     """Read the rules of all .g4 files."""
     rules: dict[str, Rule] = {}
@@ -466,15 +554,26 @@ def read_grammar(paths: Sequence[Path], meta_parser_dir: Path = DEFAULT_META_PAR
         if not rule.is_lexer:
             parser_rule_order.append(rule.name)
 
-    for path in paths:
-        tree = parse_g4(path, meta_parser_dir)
+    trees = [parse_g4(path, meta_parser_dir) for path in paths]
+    file_imports: list[list[str]] = []
+    for tree in trees:
         grammar_names.append(tree.grammarDecl().identifier().getText())
+        file_imports.append([])
         for prequel in tree.prequelConstruct():
             if prequel.delegateGrammars() is not None:
                 # `import A, B=C;`: the last name is the grammar to import
-                imports.extend(d.identifier()[-1].getText() for d in prequel.delegateGrammars().delegateGrammar())
+                file_imports[-1].extend(
+                    d.identifier()[-1].getText() for d in prequel.delegateGrammars().delegateGrammar()
+                )
             if prequel.tokensSpec() is not None and prequel.tokensSpec().idList() is not None:
                 declared_tokens.update(i.getText() for i in prequel.tokensSpec().idList().identifier())
+        imports.extend(file_imports[-1])
+
+    # The first definition of a rule wins, and the default start rule is the
+    # first parser rule. So read a grammar before the grammars that it imports,
+    # as in ANTLR, where the rules of the importing grammar win.
+    for index in import_order(grammar_names, file_imports):
+        path, tree = paths[index], trees[index]
         lexer_specs = []
         for spec in tree.rules().ruleSpec():
             if spec.parserRuleSpec() is not None:
@@ -665,6 +764,10 @@ class JsonWriter:
         if isinstance(node, Literal):
             if not node.text:
                 return []
+            if any(ord(c) > MAX_ASCII for c in node.text):
+                # f1_c_gen.py cannot write non-ASCII text. An empty character
+                # set makes the alternative impossible, so clean() removes it.
+                return [self.char_set(())]
             text = literal_symbols(node.text)
             return [*text, TOKEN_SEPARATOR] if in_parser else text
         if isinstance(node, RuleRef):
