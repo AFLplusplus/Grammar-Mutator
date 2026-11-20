@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import sys
 import threading
 from pathlib import Path
@@ -41,7 +42,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Tuple
 
 from f1_common import LimitFuzzer
 from g4_to_json import START_KEY, SyntaxErrorCounter
-from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, serialize, text
+from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -211,6 +212,9 @@ class TreeBuilder:
         Raise GrammarError for a grammar or a parse map that is not valid.
         Other exceptions come from the generated parser modules.
         """
+        if not isinstance(grammar, dict) or not isinstance(parse_map, dict):
+            msg = "the grammar and the parse map must be JSON objects"
+            raise GrammarError(msg)
         version = parse_map.get("version")
         if version != PARSE_MAP_VERSION:
             msg = f"the parse map has version {version!r}, not {PARSE_MAP_VERSION}"
@@ -513,12 +517,52 @@ def load_builder(args: argparse.Namespace) -> TreeBuilder:
         raise CommandError(msg) from e
 
 
+def file_id(path: Path) -> tuple[int, int] | None:
+    """Return the device and inode of a file, or None if it does not exist."""
+    try:
+        st = path.stat()
+    except FileNotFoundError:
+        return None
+    return st.st_dev, st.st_ino
+
+
+def is_tree_file(path: Path) -> bool:
+    """Return True if path holds a tree file."""
+    try:
+        deserialize(path.read_bytes())
+    except (ValueError, UnicodeError):
+        return False
+    return True
+
+
+def check_folders(seeds_dir: Path, trees_dir: Path) -> None:
+    """Stop if TREES_DIR is SEEDS_DIR or a folder in it.
+
+    The check compares the device and inode of the folders, not their
+    names. So it also finds the same folder under a name with other case,
+    a symbolic link, or a firmlink.
+    """
+    seeds = os.stat(seeds_dir)
+    # The folders that do not exist yet cannot be SEEDS_DIR. Start at the
+    # deepest folder that exists, and walk up its real path.
+    folder = trees_dir.absolute()
+    while not folder.exists() and folder != folder.parent:
+        folder = folder.parent
+    real = folder.resolve()
+    for parent in (real, *real.parents):
+        if os.path.samestat(seeds, os.stat(parent)):
+            msg = "TREES_DIR must not be SEEDS_DIR or a folder in SEEDS_DIR"
+            raise CommandError(msg)
+
+
 def write_trees(builder: TreeBuilder, seeds_dir: Path, trees_dir: Path) -> str:
     """Write the tree of each file in seeds_dir to trees_dir. Return the summary."""
     files = sorted((p for p in seeds_dir.rglob("*") if p.is_file()), key=lambda p: p.relative_to(seeds_dir))
     skipped = dict.fromkeys(REASONS, 0)
-    # The names of the trees, without case: the macOS file systems ignore it.
-    names: set[str] = set()
+    # The tree files of this run, by device and inode. Two tree names are
+    # the same name if the file system gives them one file, for example
+    # A.json and a.json on macOS.
+    written: set[tuple[int, int]] = set()
     parsed = 0
     try:
         trees_dir.mkdir(parents=True, exist_ok=True)
@@ -532,7 +576,7 @@ def write_trees(builder: TreeBuilder, seeds_dir: Path, trees_dir: Path) -> str:
         name = path.name.replace(" ", "_")
         tree_path = trees_dir / name
         try:
-            if name.casefold() in names:
+            if file_id(tree_path) in written:
                 raise ParseError("duplicate name")
             data = path.read_bytes()
             tree = builder.build(data)
@@ -540,14 +584,7 @@ def write_trees(builder: TreeBuilder, seeds_dir: Path, trees_dir: Path) -> str:
             skipped[e.reason] += 1
             print(f"[!] {relative}: {e.reason}", file=sys.stderr)
             if e.reason != "duplicate name":
-                # A tree from an earlier run does not match the file now.
-                try:
-                    tree_path.unlink()
-                except FileNotFoundError:
-                    pass
-                except OSError as error:
-                    msg = f"Cannot remove the old tree of {relative}: {error}"
-                    raise CommandError(msg) from error
+                remove_old_tree(tree_path, relative)
             continue
         except OSError as e:
             msg = f"Cannot read {relative}: {e}"
@@ -555,15 +592,32 @@ def write_trees(builder: TreeBuilder, seeds_dir: Path, trees_dir: Path) -> str:
         except ParserThreadError as e:
             msg = f"Cannot start the parser thread: {e}"
             raise CommandError(msg) from e
-        names.add(name.casefold())
         try:
             tree_path.write_bytes(serialize(tree))
+            written.add(file_id(tree_path) or (0, 0))
         except OSError as e:
             msg = f"Cannot write the tree of {relative}: {e}"
             raise CommandError(msg) from e
         parsed += 1
     counts = ", ".join(f"{reason} {count}" for reason, count in skipped.items())
     return f"[+] Parsed {parsed} of {len(files)} files; skipped: {counts}"
+
+
+def remove_old_tree(tree_path: Path, relative: str) -> None:
+    """Remove a tree from an earlier run, which does not match the file now.
+
+    A file that is not a tree stays.
+    """
+    try:
+        if not tree_path.is_file():
+            return
+        if not is_tree_file(tree_path):
+            print(f"[!] {shown(tree_path)} is not a tree. It stays.", file=sys.stderr)
+            return
+        tree_path.unlink()
+    except OSError as e:
+        msg = f"Cannot remove the old tree of {relative}: {e}"
+        raise CommandError(msg) from e
 
 
 def main(argv: Iterable[str] | None = None) -> int:
@@ -579,10 +633,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         if not args.seeds_dir.is_dir():
             msg = f"Not a folder: {shown(args.seeds_dir)}"
             raise CommandError(msg)
-        seeds_dir, trees_dir = args.seeds_dir.resolve(), args.trees_dir.resolve()
-        if trees_dir == seeds_dir or seeds_dir in trees_dir.parents:
-            msg = "TREES_DIR must not be SEEDS_DIR or a folder in SEEDS_DIR"
-            raise CommandError(msg)
+        check_folders(args.seeds_dir, args.trees_dir)
         builder = load_builder(args)
         summary = write_trees(builder, args.seeds_dir, args.trees_dir)
     except CommandError as e:

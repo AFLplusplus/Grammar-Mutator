@@ -435,27 +435,67 @@ class CommandLineTest(unittest.TestCase):
         self.assertEqual(self.run_main(parser_dir, seeds, trees, map_file, grammar_file)[0], 0)
         self.assertFalse((trees / "a.json").exists())
 
-    def test_cli_names_that_differ_only_in_case_are_duplicates(self) -> None:
+    def test_cli_keeps_a_file_that_is_not_a_tree(self) -> None:
         parser_dir, map_file, grammar_file = self.json_cli()
-        seeds = self.dir / "seeds"
+        seeds, trees = self.dir / "seeds", self.dir / "trees"
+        seeds.mkdir()
+        trees.mkdir()
+        (seeds / "a.json").write_text("[", encoding="utf-8")
+        (trees / "a.json").write_text("notes", encoding="utf-8")
+        code, _out, err = self.run_main(parser_dir, seeds, trees, map_file, grammar_file)
+        self.assertEqual(code, 0)
+        self.assertEqual((trees / "a.json").read_text(encoding="utf-8"), "notes")
+        self.assertIn("is not a tree", err)
+
+    def test_cli_duplicate_names_follow_the_file_system(self) -> None:
+        # A file system that ignores case (macOS) gives A.json and a.json one
+        # tree file. A file system with case (Linux) gives two.
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds, trees = self.dir / "seeds", self.dir / "trees"
         (seeds / "sub").mkdir(parents=True)
         (seeds / "A.json").write_text("[]", encoding="utf-8")
         (seeds / "sub" / "a.json").write_text("[1]", encoding="utf-8")
-        code, _out, err = self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file)
-        self.assertEqual((code, err), (0, "[!] sub/a.json: duplicate name\n"))
-        self.assertEqual(text(deserialize((self.dir / "trees" / "A.json").read_bytes())), "[]")
+        (self.dir / "probe").write_text("", encoding="utf-8")
+        ignores_case = (self.dir / "PROBE").exists()
+        code, _out, err = self.run_main(parser_dir, seeds, trees, map_file, grammar_file)
+        self.assertEqual(code, 0)
+        self.assertEqual(text(deserialize((trees / "A.json").read_bytes())), "[]")
+        if ignores_case:
+            self.assertEqual(err, "[!] sub/a.json: duplicate name\n")
+        else:
+            self.assertEqual(err, "")
+            self.assertEqual(text(deserialize((trees / "a.json").read_bytes())), "[1]")
 
     def test_cli_refuses_trees_in_the_seeds_folder(self) -> None:
         parser_dir, map_file, grammar_file = self.json_cli()
         seeds = self.dir / "seeds"
         seeds.mkdir()
         (seeds / "a.json").write_text("[]", encoding="utf-8")
-        for trees in (seeds, seeds / "trees", self.dir / "seeds" / ".." / "seeds"):
+        other_case = self.dir / "SEEDS"
+        same_folders = [seeds, seeds / "trees", self.dir / "seeds" / ".." / "seeds", self.dir / "link"]
+        (self.dir / "link").symlink_to(seeds)
+        if other_case.exists():  # a file system that ignores case
+            same_folders += [other_case, other_case / "trees"]
+        for trees in same_folders:
             code, _out, err = self.run_main(parser_dir, seeds, trees, map_file, grammar_file)
             self.assertEqual(code, 2, trees)
             self.assertIn("[-] TREES_DIR", err)
         self.assertEqual((seeds / "a.json").read_text(encoding="utf-8"), "[]")
         self.assertFalse((seeds / "trees").exists())
+        # A sibling folder through ".." is not in SEEDS_DIR.
+        code, _out, err = self.run_main(parser_dir, seeds, seeds / ".." / "other", map_file, grammar_file)
+        self.assertEqual((code, err), (0, ""))
+        self.assertTrue((self.dir / "other" / "a.json").exists())
+
+    def test_cli_parse_map_that_is_not_an_object(self) -> None:
+        parser_dir, _map_file, grammar_file = self.json_cli()
+        map_file = self.dir / "list.json"
+        map_file.write_text("[]", encoding="utf-8")
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        code, _out, err = self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file)
+        self.assertEqual(code, 2)
+        self.assertIn("[-] The grammar or the parse map is not valid", err)
 
     def test_cli_read_and_write_errors_exit_2(self) -> None:
         parser_dir, map_file, grammar_file = self.json_cli()
