@@ -102,6 +102,9 @@ afl-fuzz -i SEEDS_DIR -o out ...
   changes each space in the tree file name to `_`. For example, the tree of
   `a b.js` is `a_b.js`.
 - `TREES_DIR` must not be `SEEDS_DIR` or a folder in it.
+- The tool parses the files in parallel, with one process for each CPU. Set
+  the number of processes with `-j N`, for example `-j 1` for one process.
+  The output does not depend on the number of processes.
 - It prints one line for each skipped file and a summary with one count for
   each reason. The exit code is 0 also when it skips files. If `TREES_DIR`
   has a tree from an earlier run for a skipped file, the tool removes it.

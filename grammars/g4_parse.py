@@ -32,11 +32,15 @@ So the leaves of the tree give the exact text of the test case.
 from __future__ import annotations
 
 import argparse
+import collections
 import importlib.util
+import itertools
 import json
 import os
 import sys
 import threading
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple
 
@@ -45,7 +49,7 @@ from g4_to_json import START_KEY, SyntaxErrorCounter
 from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Callable, Iterable, Iterator, Sequence
 
 # The ANTLR runtime parses with recursion, one level (or more) for each level
 # of the input. A thread with a large stack and a high recursion limit lets it
@@ -233,6 +237,8 @@ class TreeBuilder:
             msg = f"the grammar and the parse map do not agree: {e!r}"
             raise GrammarError(msg) from e
         self.rule_ids = {k: {alt: i for i, alt in enumerate(order)} for k, order in self.order.items()}
+        # The arguments that make the same builder in a worker process
+        self.load_args = (grammar, parse_map, parser_dir)
         self.lexer_class, self.parser_class = load_classes(parser_dir, module_names)
         # The Python target adds "_" to a rule name that Python reserves.
         names = [n for n in (self.start_rule, self.start_rule + "_") if callable(getattr(self.parser_class, n, None))]
@@ -559,8 +565,70 @@ def check_folders(seeds_dir: Path, trees_dir: Path) -> None:
         raise CommandError(msg)
 
 
-def write_trees(builder: TreeBuilder, seeds_dir: Path, trees_dir: Path) -> str:
-    """Write the tree of each file in seeds_dir to trees_dir. Return the summary."""
+# The result of the parse of one file: ("tree", tree file bytes), ("skip",
+# reason), ("read", error message), or ("thread", error message)
+Result = Tuple[str, Any]
+
+
+def parse_file(builder: TreeBuilder, path: Path) -> Result:
+    """Read and parse one file. Return the result."""
+    try:
+        data = path.read_bytes()
+    except OSError as e:
+        return ("read", str(e))
+    try:
+        return ("tree", serialize(builder.build(data)))
+    except ParseError as e:
+        return ("skip", e.reason)
+    except ParserThreadError as e:
+        return ("thread", str(e))
+
+
+# The builder of a worker process
+_worker_builder: list[TreeBuilder] = []
+
+
+def _start_worker(load_args: tuple[Any, ...]) -> None:
+    _worker_builder[:] = [TreeBuilder(*load_args)]
+
+
+def _parse_in_worker(path: Path) -> Result:
+    return parse_file(_worker_builder[0], path)
+
+
+def parse_files(builder: TreeBuilder, files: list[Path], jobs: int) -> Iterator[Callable[[], Result]]:
+    """Give a function for each file, in order, that returns its result.
+
+    With jobs > 1, worker processes parse the files. They parse at most a few
+    files for each worker before the caller asks for the results, so the
+    memory stays small. With jobs == 1, the function parses the file here.
+    """
+    if jobs <= 1:
+        for path in files:
+            yield lambda path=path: parse_file(builder, path)
+        return
+    with ProcessPoolExecutor(jobs, initializer=_start_worker, initargs=(builder.load_args,)) as pool:
+        todo = iter(files)
+        window = collections.deque(pool.submit(_parse_in_worker, path) for path in itertools.islice(todo, 4 * jobs))
+        try:
+            while window:
+                future = window.popleft()
+                path = next(todo, None)
+                if path is not None:
+                    window.append(pool.submit(_parse_in_worker, path))
+                yield future.result
+        finally:
+            # The caller stops early on an error: do not parse the rest.
+            for future in window:
+                future.cancel()
+
+
+def write_trees(builder: TreeBuilder, seeds_dir: Path, trees_dir: Path, jobs: int = 1) -> str:
+    """Write the tree of each file in seeds_dir to trees_dir. Return the summary.
+
+    The output does not depend on jobs: the trees, the messages, and the
+    summary come in file order.
+    """
     files = sorted((p for p in seeds_dir.rglob("*") if p.is_file()), key=lambda p: p.relative_to(seeds_dir))
     skipped = dict.fromkeys(REASONS, 0)
     # The tree files of this run, by device and inode. Two tree names are
@@ -573,36 +641,38 @@ def write_trees(builder: TreeBuilder, seeds_dir: Path, trees_dir: Path) -> str:
     except OSError as e:
         msg = f"Cannot make the folder {shown(trees_dir)}: {e}"
         raise CommandError(msg) from e
-    for path in files:
-        relative = shown(path.relative_to(seeds_dir).as_posix())
-        # AFL++ changes each space in a queue name to "_" (no_spaces() in
-        # afl-fuzz-init.c), and the mutator looks for the tree with that name.
-        name = path.name.replace(" ", "_")
-        tree_path = trees_dir / name
-        try:
-            if file_id(tree_path) in written:
-                raise ParseError("duplicate name")
-            data = path.read_bytes()
-            tree = builder.build(data)
-        except ParseError as e:
-            skipped[e.reason] += 1
-            print(f"[!] {relative}: {e.reason}", file=sys.stderr)
-            if e.reason != "duplicate name":
-                remove_old_tree(tree_path, relative)
-            continue
-        except OSError as e:
-            msg = f"Cannot read {relative}: {e}"
-            raise CommandError(msg) from e
-        except ParserThreadError as e:
-            msg = f"Cannot start the parser thread: {e}"
-            raise CommandError(msg) from e
-        try:
-            tree_path.write_bytes(serialize(tree))
-            written.add(file_id(tree_path) or (0, 0))
-        except OSError as e:
-            msg = f"Cannot write the tree of {relative}: {e}"
-            raise CommandError(msg) from e
-        parsed += 1
+    results = parse_files(builder, files, min(jobs, len(files)))
+    try:
+        for path, result in zip(files, results):
+            relative = shown(path.relative_to(seeds_dir).as_posix())
+            # AFL++ changes each space in a queue name to "_" (no_spaces() in
+            # afl-fuzz-init.c), and the mutator looks for the tree with that name.
+            tree_path = trees_dir / path.name.replace(" ", "_")
+            kind, value = ("skip", "duplicate name") if file_id(tree_path) in written else result()
+            if kind == "read":
+                msg = f"Cannot read {relative}: {value}"
+                raise CommandError(msg)
+            if kind == "thread":
+                msg = f"Cannot start the parser thread: {value}"
+                raise CommandError(msg)
+            if kind == "skip":
+                skipped[value] += 1
+                print(f"[!] {relative}: {value}", file=sys.stderr)
+                if value != "duplicate name":
+                    remove_old_tree(tree_path, relative)
+                continue
+            try:
+                tree_path.write_bytes(value)
+                written.add(file_id(tree_path) or (0, 0))
+            except OSError as e:
+                msg = f"Cannot write the tree of {relative}: {e}"
+                raise CommandError(msg) from e
+            parsed += 1
+    except BrokenProcessPool as e:
+        msg = f"A parser process stopped: {e}"
+        raise CommandError(msg) from e
+    finally:
+        results.close()
     counts = ", ".join(f"{reason} {count}" for reason, count in skipped.items())
     return f"[+] Parsed {parsed} of {len(files)} files; skipped: {counts}"
 
@@ -624,11 +694,27 @@ def remove_old_tree(tree_path: Path, relative: str) -> None:
         raise CommandError(msg) from e
 
 
+def positive_int(text: str) -> int:
+    """Return the value of a number argument that must be 1 or more."""
+    value = int(text)
+    if value < 1:
+        msg = f"must be 1 or more: {text}"
+        raise argparse.ArgumentTypeError(msg)
+    return value
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--grammar", required=True, type=Path, help="the JSON grammar")
     parser.add_argument("--parse-map", required=True, type=Path, help="the parse map from g4_to_json.py")
     parser.add_argument("--parser-dir", required=True, type=Path, help="the folder of the ANTLR Python parser")
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=positive_int,
+        default=os.cpu_count() or 1,
+        help="the number of parser processes (default: the number of CPUs, %(default)s here)",
+    )
     parser.add_argument("seeds_dir", type=Path, help="the folder of the test cases")
     parser.add_argument("trees_dir", type=Path, help="the folder for the tree files")
     args = parser.parse_args(argv)
@@ -639,7 +725,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             raise CommandError(msg)
         check_folders(args.seeds_dir, args.trees_dir)
         builder = load_builder(args)
-        summary = write_trees(builder, args.seeds_dir, args.trees_dir)
+        summary = write_trees(builder, args.seeds_dir, args.trees_dir, args.jobs)
     except CommandError as e:
         print(f"[-] {e}", file=sys.stderr)
         return 2

@@ -340,10 +340,12 @@ class CommandLineTest(unittest.TestCase):
         self.dir = Path(self.tmp.name)
 
     def run_main(
-        self, parser_dir: Path, seeds: Path, trees: Path, parse_map: Path, grammar: Path
+        self, parser_dir: Path, seeds: Path, trees: Path, parse_map: Path, grammar: Path, jobs: int = 1
     ) -> tuple[int, str, str]:
+        """Run grammar_parser in this process. jobs=1 parses here, so mocks apply."""
         out, err = io.StringIO(), io.StringIO()
         argv = ["--grammar", str(grammar), "--parse-map", str(parse_map), "--parser-dir", str(parser_dir)]
+        argv += ["-j", str(jobs)]
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = main([*argv, str(seeds), str(trees)])
         return code, out.getvalue(), err.getvalue()
@@ -405,6 +407,48 @@ class CommandLineTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(text(deserialize((trees / "a.json").read_bytes())), '{"a": [1]}')
+
+    def test_cli_parallel_gives_the_same_output(self) -> None:
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds = self.dir / "seeds"
+        (seeds / "sub").mkdir(parents=True)
+        for i in range(12):
+            (seeds / f"{i:02}.json").write_text(f'{{"n": [{i}, "x"]}}', encoding="utf-8")
+        (seeds / "bad.json").write_text("{", encoding="utf-8")
+        (seeds / "x.bin").write_bytes(b"\xff")
+        (seeds / "sub" / "03.json").write_text("[]", encoding="utf-8")
+        (seeds / "deep.json").write_text("[" * MAX_TREE_DEPTH + "]" * MAX_TREE_DEPTH, encoding="utf-8")
+        outputs = []
+        for jobs in (1, 3):
+            trees = self.dir / f"trees{jobs}"
+            code, out, err = self.run_main(parser_dir, seeds, trees, map_file, grammar_file, jobs=jobs)
+            files = {p.name: p.read_bytes() for p in trees.iterdir()}
+            outputs.append((code, out, err, files))
+        self.assertEqual(outputs[0], outputs[1])
+        self.assertEqual(len(outputs[0][3]), 12)
+        self.assertIn("parser limit 1, duplicate name 1", outputs[0][1])
+
+    def test_cli_parallel_read_error_exits_2(self) -> None:
+        if os.geteuid() == 0:
+            self.skipTest("root can read any file")
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        for name in ("a.json", "b.json", "c.json"):
+            (seeds / name).write_text("[]", encoding="utf-8")
+        (seeds / "b.json").chmod(0)
+        self.addCleanup((seeds / "b.json").chmod, 0o644)
+        code, _out, err = self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file, jobs=2)
+        self.assertEqual(code, 2)
+        self.assertIn("[-] Cannot read b.json", err)
+
+    def test_cli_rejects_zero_jobs(self) -> None:
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds = self.dir / "seeds"
+        seeds.mkdir()
+        with self.assertRaises(SystemExit) as caught, contextlib.redirect_stderr(io.StringIO()):
+            self.run_main(parser_dir, seeds, self.dir / "trees", map_file, grammar_file, jobs=0)
+        self.assertEqual(caught.exception.code, 2)
 
     def test_cli_reports_parser_limit_and_no_match(self) -> None:
         parser_dir, map_file, grammar_file = self.json_cli()
