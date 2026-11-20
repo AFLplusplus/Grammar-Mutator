@@ -107,6 +107,10 @@ jobs:
         sys.exit(1 if bad or not seeds else 0)
         EOF
     - name: Check that the parsed trees give the generated test cases again
+      # Generation ignores the predicates of the JavaScript grammar, so ANTLR
+      # rejects some generated test cases. Allow these skips for JavaScript.
+      env:
+        ALLOW_SKIPS: ${{ matrix.grammar == 'javascript' && '1' || '' }}
       run: tests/g4/roundtrip.sh "${{ matrix.grammar }}" seeds
     - name: Check that the parsed trees give the corpus files again
       run: tests/g4/roundtrip.sh "${{ matrix.grammar }}" "tests/g4/corpus/${{ matrix.grammar }}"
