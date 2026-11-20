@@ -56,6 +56,14 @@ ANTLR4_SHIM_LIB = $(realpath ../lib/antlr4_shim/libantlr4_shim.a)
 XXHASH_LIB = $(realpath ../third_party/Cyan4973_xxHash/libxxhash.a)
 
 LIBS = $(RXI_MAP_LIB) $(ANTLR4_SHIM_LIB) $(ANTLR4_CXX_RUNTIME_LIB) $(XXHASH_LIB)
+
+# The linker option that names the shared library. The macOS linker does not
+# know the GNU option -soname.
+ifeq "$(shell uname -s)" "Darwin"
+SONAME_FLAG = -Wl,-install_name,@rpath/$(GRAMMAR_MUTATOR_LIB)
+else
+SONAME_FLAG = -Wl,-soname,$(GRAMMAR_MUTATOR_LIB)
+endif
 LDFLAGS = $(LIBS)
 
 ifdef ENABLE_DEBUG
@@ -69,7 +77,7 @@ endif
 all: $(TARGETS)
 
 $(GRAMMAR_MUTATOR_LIB): $(LIB_OBJS)
-	$(CXX) -fPIC $(C_FLAGS) -shared -Wl,-soname,$(GRAMMAR_MUTATOR_LIB) -o $@ $^ $(LDFLAGS)
+	$(CXX) -fPIC $(C_FLAGS) -shared $(SONAME_FLAG) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(C_DEFINES) $(C_INCLUDES) -fPIC $(C_FLAGS) -o $@ -c $<
