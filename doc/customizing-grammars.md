@@ -114,7 +114,9 @@ The tool skips a file for one of these reasons:
 - `not UTF-8`: the file is not valid UTF-8.
 - `syntax error`: the ANTLR lexer or parser rejects the file.
 - `parser limit`: the ANTLR runtime fails on the file, for example on very deep
-  nesting.
+  nesting. Or the tree is more than 20000 levels deep. The mutator walks a tree
+  with recursion, and a much deeper tree can crash it. Each item of a list adds
+  one level or more. So a file with 20000 statements gives such a deep tree.
 - `duplicate name`: a file with the same name in a different folder already has
   a tree.
 - `no match`: ANTLR accepts the file, but the parse tree does not match the

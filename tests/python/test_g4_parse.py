@@ -32,7 +32,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "grammars"))
 
 from f1_c_gen import CFuzzer
 from g4_helpers import ROOT, build_parser
-from g4_parse import ParseError, TreeBuilder, alternative_order, check_helpers, main, node_ids
+from g4_parse import (
+    MAX_TREE_DEPTH,
+    ParseError,
+    TreeBuilder,
+    alternative_order,
+    check_helpers,
+    main,
+    node_ids,
+    tree_depth,
+)
 from g4_to_json import convert, convert_with_map
 from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
 
@@ -199,11 +208,19 @@ class TreeBuilderTest(unittest.TestCase):
     # -- size and depth ----------------------------------------------------
 
     def test_long_list(self) -> None:
+        # A list of n items gives a tree of depth n + 4 here. This is the
+        # longest list that MAX_TREE_DEPTH allows.
         builder, _ = self.builder("s : ID* ;\nID : [a-z]+ ;\nWS : ' ' -> skip ;")
-        data = " ".join(["abc"] * 20000)
+        data = " ".join(["abc"] * (MAX_TREE_DEPTH - 4))
         start = time.monotonic()
-        self.round_trip(builder, data)
+        tree = self.round_trip(builder, data)
         self.assertLess(time.monotonic() - start, 10)
+        self.assertEqual(tree_depth(tree), MAX_TREE_DEPTH)
+
+    def test_too_deep_tree_is_a_parser_limit(self) -> None:
+        builder, _ = self.builder("s : ID* ;\nID : [a-z]+ ;\nWS : ' ' -> skip ;")
+        self.assertEqual(tree_depth(builder.build(b"a b c")), 7)
+        self.assert_reason(builder, " ".join(["abc"] * (MAX_TREE_DEPTH - 3)).encode(), "parser limit")
 
     def test_deep_nesting_never_crashes(self) -> None:
         builder, _ = self.builder("e : '(' e ')' | 'x' ;")

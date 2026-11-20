@@ -51,6 +51,10 @@ if TYPE_CHECKING:
 # parse deep input.
 PARSER_STACK_SIZE = 512 * 1024 * 1024
 PARSER_RECURSION_LIMIT = 200000
+# The C mutator walks trees with recursion (src/tree.c). With an 8 MB stack, it
+# crashes on a tree between 60000 and 100000 levels deep. 20000 leaves a margin.
+# A deeper tree gives "parser limit".
+MAX_TREE_DEPTH = 20000
 
 # The events of a match, which _build_nodes changes into nodes
 _OPEN = 0  # (_OPEN, key, alternative): start a node of key
@@ -83,6 +87,17 @@ class Kid(NamedTuple):
     type_name: str | None = None  # the token type name of a token
     text: str | None = None  # the text of a token
     hidden: str = ""  # the text after a token, up to the next token
+
+
+def tree_depth(root: Node) -> int:
+    """Return the number of nodes on the longest path from root to a leaf."""
+    depth = 0
+    stack = [(root, 1)]
+    while stack:
+        node, level = stack.pop()
+        depth = max(depth, level)
+        stack.extend((child, level + 1) for child in node.children)
+    return depth
 
 
 def node_ids(grammar: dict[str, list[list[str]]]) -> dict[str, int]:
@@ -239,6 +254,8 @@ class TreeBuilder:
         # a tree with other text never goes to the fuzzer.
         if text(root) != source:
             raise ParseError("no match")
+        if tree_depth(root) > MAX_TREE_DEPTH:
+            raise ParseError("parser limit")
         return root
 
     def _parse_in_thread(self, source: str) -> Any:
