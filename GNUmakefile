@@ -40,6 +40,9 @@ endif
 ifeq "$(filter $(MAKECMDGOALS),antlr-jar)" "antlr-jar"
   override BUILD = no
 endif
+ifeq "$(filter $(MAKECMDGOALS),test-python)" "test-python"
+  override BUILD = no
+endif
 ifeq "$(filter $(MAKECMDGOALS),format-deps)" "format-deps"
   override BUILD = no
 endif
@@ -47,6 +50,8 @@ endif
 # ANTLR version. The ANTLR jar must have the same version as the C++ runtime
 # in third_party/antlr4-cpp-runtime.
 export ANTLR_VERSION = 4.13.2
+# The jar that "make antlr-jar" downloads into this folder
+ANTLR_JAR = antlr-$(ANTLR_VERSION)-complete.jar
 
 ifeq ($(BUILD),yes)
 
@@ -82,17 +87,41 @@ ifeq ($(BUILD),yes)
     TEMP := $(abspath $(GRAMMAR_FILE))
     override GRAMMAR_FILE := $(TEMP)
   endif
-  # Check whether the grammar file exists
-  ifeq (,$(wildcard $(GRAMMAR_FILE)))
-    $(error The grammar file does not exist: $(GRAMMAR_FILE))
+  # Check whether each grammar file exists
+  $(foreach f,$(GRAMMAR_FILE),$(if $(wildcard $(f)),,$(error The grammar file does not exist: $(f))))
+  # A JSON grammar is one .json file. An ANTLR grammar is one or more .g4
+  # files, for example a lexer grammar and a parser grammar.
+  G4_FILES := $(filter %.g4,$(GRAMMAR_FILE))
+  ifneq "$(G4_FILES)" ""
+    ifneq "$(G4_FILES)" "$(GRAMMAR_FILE)"
+      $(error Do not mix .g4 files with other grammar files: $(GRAMMAR_FILE))
+    endif
+    # g4_to_json.py writes this JSON grammar from the .g4 files
+    GRAMMAR_JSON := $(CURDIR)/grammars/g4_grammar.json
+  else
+    ifneq "$(words $(GRAMMAR_FILE))" "1"
+      $(error Give one JSON grammar file: $(GRAMMAR_FILE))
+    endif
+    ifdef GRAMMAR_START
+      $(error GRAMMAR_START works only with .g4 grammar files)
+    endif
+    GRAMMAR_JSON := $(GRAMMAR_FILE)
   endif
-  ifneq "$(shell cat .grammar 2> /dev/null)" "$(abspath $(GRAMMAR_FILE))"
+  # .grammar records the grammar files and the start rule. A change in them
+  # makes the build generate the code again.
+  GRAMMAR_STAMP := $(strip $(GRAMMAR_FILE) $(GRAMMAR_START))
+  ifneq "$(shell cat .grammar 2> /dev/null)" "$(GRAMMAR_STAMP)"
     # Create or update .grammar
     $(info Create or update .grammar)
-    $(shell echo $(abspath $(GRAMMAR_FILE)) > .grammar)
+    $(shell echo $(GRAMMAR_STAMP) > .grammar)
   endif
   ifndef GRAMMAR_FILENAME
-    GRAMMAR_FILENAME := $(shell basename $(GRAMMAR_FILE) | sed 's/[_.-].*//' | tr A-Z a-z)
+    ifneq "$(G4_FILES)" ""
+      # For example, JavaScriptLexer.g4 JavaScriptParser.g4 give "javascript"
+      GRAMMAR_FILENAME := $(shell basename $(lastword $(G4_FILES)) .g4 | sed -E 's/(Parser|Lexer)$$//' | tr A-Z a-z)
+    else
+      GRAMMAR_FILENAME := $(shell basename $(GRAMMAR_FILE) | sed 's/[_.-].*//' | tr A-Z a-z)
+    endif
     $(info Selected grammar name: $(GRAMMAR_FILENAME) (from $(GRAMMAR_FILE)))
   else
     $(info Selected grammar name: $(GRAMMAR_FILENAME))
@@ -101,6 +130,8 @@ ifeq ($(BUILD),yes)
 endif
 
 PYTHON = python3
+# The stamp of the Python tools in .venv (see "make deps")
+VENV_STAMP = .venv/.requirements.stamp
 C_FLAGS_OPT =
 CXX_FLAGS_OPT =
 export C_FLAGS_OPT
@@ -109,6 +140,8 @@ export CXX_FLAGS_OPT
 GEN_FILES = \
 	.grammar \
 	grammars/Grammar.g4 \
+	grammars/g4_grammar.json \
+	grammars/antlr4/generated \
 	src/f1_c_fuzz.c include/f1_c_fuzz.h \
 	lib/antlr4_shim/generated
 
@@ -116,20 +149,44 @@ GEN_FILES = \
 all: build
 
 # Generation
-src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar
-	$(PYTHON) grammars/f1_c_gen.py $(shell cat .grammar) $(CURDIR)
+src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar $(GRAMMAR_JSON)
+	$(PYTHON) grammars/f1_c_gen.py $(GRAMMAR_JSON) $(CURDIR)
 
-lib/antlr4_shim/generated: grammars/f1_g4_translate.py .grammar
-	$(PYTHON) grammars/f1_g4_translate.py $(shell cat .grammar) ./grammars
+# The Python parser for .g4 files, from the ANTLR 4 meta-grammar. A build
+# finds the jar (ANTLR_JAR_LOCATION). "make test-python" does not, so it uses
+# (and downloads) ANTLR_JAR.
+META_PARSER = grammars/antlr4/generated/ANTLRv4Parser.py
+META_ANTLR_JAR = $(or $(ANTLR_JAR_LOCATION),$(ANTLR_JAR))
+
+$(META_PARSER): grammars/antlr4/ANTLRv4Lexer.g4 grammars/antlr4/ANTLRv4Parser.g4 $(META_ANTLR_JAR)
+	java -jar $(META_ANTLR_JAR) -Dlanguage=Python3 \
+	     -Xexact-output-dir -o grammars/antlr4/generated $(filter %.g4,$^)
+
+ifneq "$(G4_FILES)" ""
+$(GRAMMAR_JSON): .grammar grammars/g4_to_json.py $(META_PARSER) $(VENV_STAMP) $(G4_FILES)
+	.venv/bin/python grammars/g4_to_json.py $(if $(GRAMMAR_START),--start $(GRAMMAR_START)) \
+	     -o $@ $(G4_FILES)
+
+# Parsing test cases with .g4 grammars is not supported yet. The shim gets a
+# parser that rejects all input.
+PARSER_G4 = grammars/g4_placeholder/Grammar.g4
+else
+grammars/Grammar.g4: grammars/f1_g4_translate.py .grammar $(GRAMMAR_JSON)
+	$(PYTHON) grammars/f1_g4_translate.py $(GRAMMAR_JSON) ./grammars
+
+PARSER_G4 = grammars/Grammar.g4
+endif
+
+lib/antlr4_shim/generated: $(PARSER_G4) .grammar
 	@$(MAKE) -C lib clean
 	java -jar $(ANTLR_JAR_LOCATION) \
 	     -Dlanguage=Cpp -DcontextSuperClass=antlr4::RuleContextWithAltNum \
 	     -o lib/antlr4_shim/generated \
-	     $(abspath grammars/Grammar.g4)
+	     $(abspath $(PARSER_G4))
 
 .PHONY: build
 build: src/f1_c_fuzz.c include/f1_c_fuzz.h third_party build_lib
-	@$(MAKE) -C src all GRAMMAR_FILE=$(GRAMMAR_FILE) GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
+	@$(MAKE) -C src all GRAMMAR_FILE="$(GRAMMAR_FILE)" GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
 	@ln -sf src/grammar_generator-$(GRAMMAR_FILENAME) grammar_generator-$(GRAMMAR_FILENAME)
 	@ln -sf src/libgrammarmutator-$(GRAMMAR_FILENAME).so libgrammarmutator-$(GRAMMAR_FILENAME).so
 
@@ -142,7 +199,7 @@ all: build_test
 
 .PHONY: build_test
 build_test: build third_party
-	@$(MAKE) -C tests build GRAMMAR_FILE=$(GRAMMAR_FILE) GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
+	@$(MAKE) -C tests build GRAMMAR_FILE="$(GRAMMAR_FILE)" GRAMMAR_FILENAME=$(GRAMMAR_FILENAME)
 endif
 
 .PHONY: third_party
@@ -157,11 +214,13 @@ test:
 test_memcheck:
 	@$(MAKE) -C tests memcheck
 
+# Unit tests for the Python tools (grammars/g4_to_json.py)
+.PHONY: test-python
+test-python: $(VENV_STAMP) $(META_PARSER)
+	.venv/bin/python -m unittest discover -s tests/python
+
 # Python tools in .venv. requirements.txt pins their versions. The stamp file
 # installs them again when requirements.txt changes.
-PYTHON ?= python3
-VENV_STAMP = .venv/.requirements.stamp
-
 $(VENV_STAMP): requirements.txt
 	$(PYTHON) -m venv .venv
 	.venv/bin/pip install --quiet -r requirements.txt
@@ -180,8 +239,6 @@ CLANG_FORMAT_VERSION := $(shell sed -n 's/^clang-format==\([0-9][0-9]*\)\..*/\1/
 # Download the ANTLR jar that matches ANTLR_VERSION into this folder. Build
 # scripts (for example AFL++'s build_grammar_mutator.sh) can use this target, so
 # that they do not need to know the ANTLR version.
-ANTLR_JAR = antlr-$(ANTLR_VERSION)-complete.jar
-
 .PHONY: antlr-jar
 antlr-jar: $(ANTLR_JAR)
 
@@ -217,6 +274,7 @@ help:
 	@echo "test: runs the testing framework (if ENABLE_TESTING=1)"
 	@echo "test_memcheck: runs Valgrind with all test cases to pinpoint memory leaks"
 	@echo "               (if ENABLE_TESTING=1 and have Valgrind)"
+	@echo "test-python: runs the unit tests of the Python tools"
 	@echo "clean: cleans everything compiled"
 	@echo "antlr-jar: downloads the ANTLR $(ANTLR_VERSION) jar into this folder"
 	@echo "code-format: format the code with clang-format $(CLANG_FORMAT_VERSION)"
@@ -229,7 +287,9 @@ help:
 	@echo "=========================================="
 	@echo "ENABLE_TESTING - compiles test cases"
 	@echo "ENABLE_DEBUG - compiles with '-g' option for debug purposes"
-	@echo "GRAMMAR_FILE - the path to the input grammar file"
+	@echo "GRAMMAR_FILE - the path to the input grammar file: one .json file, or one or"
+	@echo "               more ANTLR 4 .g4 files (for example \"Lexer.g4 Parser.g4\")"
+	@echo "GRAMMAR_START - the start rule of a .g4 grammar (default: the first parser rule)"
 	@echo "GRAMMAR_FILENAME - name that will be used in the naming of the generated grammar"
 	@echo "                   files, e.g. \"ruby\" => ./grammar_generator-ruby"
 	@echo "ANTLR_JAR_LOCATION - the path to ANTLR4 jar file"
