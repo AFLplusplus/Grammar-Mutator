@@ -57,6 +57,8 @@ Next you need to build the grammar mutator.
 To specify the grammar file, eg. Ruby, you can use `GRAMMAR_FILE` environment variable.
 There are several grammar files in `grammars` directory, such as `json.json`, `ruby.json` and `http.json`.
 Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about the input grammar file.
+You can also use ANTLR 4 grammars (`.g4` files), for example from [grammars-v4](https://github.com/antlr/grammars-v4): `make deps`, then `make GRAMMAR_FILE=grammars/g4/JSON.g4`.
+See [customizing-grammars.md](doc/customizing-grammars.md#antlr-4-grammars-g4) for the details and the current limits.
 Note that pull requests with new grammars are welcome! :-)
 
 ```bash

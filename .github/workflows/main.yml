@@ -39,6 +39,66 @@ jobs:
         make -f GNUmakefile code-format
         git diff --exit-code
 
+  g4-build:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [make, cmake]
+        grammar: [json, javascript]
+    env:
+      JSON_G4: grammars/g4/JSON.g4
+      JS_G4: grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version-file: .python-version
+    - name: Install dependencies
+      run: |
+        bash .github/workflows/setup-deps.sh
+    - name: Python unit tests
+      if: matrix.build == 'make' && matrix.grammar == 'json'
+      run: make -f GNUmakefile test-python
+    - name: Select the grammar files
+      run: |
+        if [ "${{ matrix.grammar }}" = json ]; then files="$JSON_G4"; else files="$JS_G4"; fi
+        echo "G4_FILES=$files" >> "$GITHUB_ENV"
+    - name: Compile with make
+      if: matrix.build == 'make'
+      run: |
+        make -f GNUmakefile GRAMMAR_FILE="$G4_FILES" -j$(nproc)
+        echo "GENERATOR=./grammar_generator-${{ matrix.grammar }}" >> "$GITHUB_ENV"
+    - name: Compile with CMake
+      if: matrix.build == 'cmake'
+      run: |
+        list=$(for f in $G4_FILES; do realpath "$f"; done | paste -sd ';')
+        cmake -S . -B build -DANTLR_JAR_LOCATION=$(realpath antlr-4.13.2-complete.jar) "-DGRAMMAR_FILE=$list"
+        cmake --build build --parallel $(nproc)
+        echo "GENERATOR=./build/src/grammar_generator-${{ matrix.grammar }}" >> "$GITHUB_ENV"
+    - name: Generate test cases
+      run: |
+        if [ "${{ matrix.grammar }}" = json ]; then count=200; else count=50; fi
+        "$GENERATOR" "$count" 1000 seeds trees
+        test "$(ls seeds | wc -l)" -eq "$count"
+        test "$(ls trees | wc -l)" -eq "$count"
+    - name: Check that the generated test cases are valid JSON
+      if: matrix.grammar == 'json'
+      run: |
+        python3 - <<'EOF'
+        import json, pathlib, sys
+        seeds = sorted(pathlib.Path("seeds").iterdir())
+        bad = []
+        for seed in seeds:
+            try:
+                json.loads(seed.read_bytes())
+            except ValueError:
+                bad.append(seed.name)
+        print(f"{len(seeds) - len(bad)} of {len(seeds)} test cases are valid JSON")
+        sys.exit(1 if bad or not seeds else 0)
+        EOF
+
   cmake-build:
     runs-on: ubuntu-24.04
 
