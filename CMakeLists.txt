@@ -185,18 +185,73 @@ if (_g4_file_count GREATER 0)
     set(_start_option --start ${GRAMMAR_START})
   endif ()
   set(GRAMMAR_JSON ${CMAKE_BINARY_DIR}/f1/grammar.json)
+  set(PARSE_MAP ${CMAKE_BINARY_DIR}/f1/parse_map.json)
   execute_process(
     COMMAND ${GRAMMAR_VENV}/bin/python ${CMAKE_SOURCE_DIR}/grammars/g4_to_json.py
             ${_start_option} --meta-dir ${CMAKE_BINARY_DIR}/antlr4_meta
-            -o ${GRAMMAR_JSON} ${G4_FILES}
+            --parse-map ${PARSE_MAP} -o ${GRAMMAR_JSON} ${G4_FILES}
     RESULT_VARIABLE result)
   if (result)
     message(FATAL_ERROR "Unable to convert the .g4 grammar: ${result}")
   endif ()
-  # Parsing test cases with .g4 grammars is not supported yet. The shim gets a
-  # parser that rejects all input.
+
+  # The Python parser for test cases. G4_SUPPORT_DIR is the folder with the
+  # base classes and the rewrite script of a grammar with action code, for
+  # example grammars-v4 javascript/javascript/Python3.
+  set(PARSER_DIR ${CMAKE_BINARY_DIR}/g4_python)
+  file(REMOVE_RECURSE ${PARSER_DIR})
+  file(MAKE_DIRECTORY ${PARSER_DIR})
+  file(COPY ${G4_FILES} DESTINATION ${PARSER_DIR})
+  if (G4_SUPPORT_DIR)
+    if (NOT IS_ABSOLUTE "${G4_SUPPORT_DIR}")
+      message(FATAL_ERROR "Please provide the full path to G4_SUPPORT_DIR: ${G4_SUPPORT_DIR}")
+    endif ()
+    if (NOT IS_DIRECTORY "${G4_SUPPORT_DIR}")
+      message(FATAL_ERROR "G4_SUPPORT_DIR is not a folder: ${G4_SUPPORT_DIR}")
+    endif ()
+    file(GLOB _support_files "${G4_SUPPORT_DIR}/*")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${_support_files})
+    if (EXISTS "${G4_SUPPORT_DIR}/transformGrammar.py")
+      execute_process(
+        COMMAND ${GRAMMAR_VENV}/bin/python ${G4_SUPPORT_DIR}/transformGrammar.py
+        WORKING_DIRECTORY ${PARSER_DIR}
+        RESULT_VARIABLE result)
+      if (result)
+        message(FATAL_ERROR "Unable to run transformGrammar.py: ${result}")
+      endif ()
+    endif ()
+    file(GLOB _support_py "${G4_SUPPORT_DIR}/*.py")
+    list(REMOVE_ITEM _support_py "${G4_SUPPORT_DIR}/transformGrammar.py")
+    if (_support_py)
+      file(COPY ${_support_py} DESTINATION ${PARSER_DIR})
+    endif ()
+  endif ()
+  file(GLOB _work_g4_files "${PARSER_DIR}/*.g4")
+  execute_process(
+    COMMAND ${Java_JAVA_EXECUTABLE} -jar ${ANTLR_JAR_LOCATION} -Dlanguage=Python3
+            -Xexact-output-dir -o ${PARSER_DIR} ${_work_g4_files}
+    RESULT_VARIABLE result)
+  if (result)
+    message(FATAL_ERROR "Unable to generate the Python parser: ${result}")
+  endif ()
+  # The launcher of the parser. It runs grammars/g4_parse.py.
+  set(VENV_PYTHON ${GRAMMAR_VENV}/bin/python)
+  set(G4_PARSE ${CMAKE_SOURCE_DIR}/grammars/g4_parse.py)
+  configure_file(${CMAKE_SOURCE_DIR}/grammars/grammar_parser.in
+                 ${CMAKE_BINARY_DIR}/src/grammar_parser-${GRAMMAR_FILENAME}
+                 @ONLY
+                 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                                  GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+               ${CMAKE_SOURCE_DIR}/grammars/grammar_parser.in)
+
+  # The shim gets a parser that rejects all input. grammar_parser-<name>
+  # parses the test cases.
   set(GRAMMAR_G4_FILE "${CMAKE_SOURCE_DIR}/grammars/g4_placeholder/Grammar.g4")
 else ()
+  if (G4_SUPPORT_DIR)
+    message(FATAL_ERROR "G4_SUPPORT_DIR works only with .g4 grammar files")
+  endif ()
   set(GRAMMAR_JSON ${GRAMMAR_FILE})
   execute_process(
     COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_g4_translate.py ${GRAMMAR_JSON} ${CMAKE_BINARY_DIR}/f1

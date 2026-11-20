@@ -1,0 +1,4 @@
+#!/bin/sh
+# Parse test cases with the ANTLR Python parser of a .g4 grammar. The build
+# fills in the @...@ values. Usage: grammar_parser-<name> SEEDS_DIR TREES_DIR
+exec "@VENV_PYTHON@" "@G4_PARSE@" --grammar "@GRAMMAR_JSON@" --parse-map "@PARSE_MAP@" --parser-dir "@PARSER_DIR@" "$@"
