@@ -54,7 +54,7 @@ class Node:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Node):
             return NotImplemented
-        stack = [(self, other)]
+        stack: list[tuple[Node, Node]] = [(self, other)]
         while stack:
             a, b = stack.pop()
             if (a.id, a.rule_id, a.val, len(a.children)) != (b.id, b.rule_id, b.val, len(b.children)):
