@@ -127,8 +127,15 @@ endif ()
 if (_g4_file_count EQUAL 0 AND _grammar_file_count GREATER 1)
   message(FATAL_ERROR "Give one JSON grammar file: ${GRAMMAR_FILE}")
 endif ()
-if (_g4_file_count EQUAL 0 AND GRAMMAR_START)
-  message(FATAL_ERROR "GRAMMAR_START works only with .g4 grammar files")
+# GRAMMAR_START and G4_SUPPORT_DIR stay in the CMake cache. So a JSON grammar
+# build in the folder of an earlier .g4 build ignores them.
+if (_g4_file_count EQUAL 0)
+  foreach (_g4_option GRAMMAR_START G4_SUPPORT_DIR)
+    if (${_g4_option})
+      message(WARNING "${_g4_option} works only with .g4 grammar files. The build ignores it. "
+                      "Remove it with -U${_g4_option}.")
+    endif ()
+  endforeach ()
 endif ()
 # Configure again when a grammar file changes
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${GRAMMAR_FILE})
@@ -256,9 +263,6 @@ if (_g4_file_count GREATER 0)
   # parses the test cases.
   set(GRAMMAR_G4_FILE "${CMAKE_SOURCE_DIR}/grammars/g4_placeholder/Grammar.g4")
 else ()
-  if (G4_SUPPORT_DIR)
-    message(FATAL_ERROR "G4_SUPPORT_DIR works only with .g4 grammar files")
-  endif ()
   set(GRAMMAR_JSON ${GRAMMAR_FILE})
   execute_process(
     COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_g4_translate.py ${GRAMMAR_JSON} ${CMAKE_BINARY_DIR}/f1
