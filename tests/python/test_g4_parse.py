@@ -21,6 +21,7 @@ import copy
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -382,6 +383,20 @@ class CommandLineTest(unittest.TestCase):
         grammar, parse_map, parser_dir = build_parser(self.dir, {"JSON.g4": JSON_G4.read_text()})
         grammar_file, map_file = self.write_maps(grammar, parse_map)
         return parser_dir, map_file, grammar_file
+
+    def test_cli_runs_in_a_new_process(self) -> None:
+        # The parser load is the first import of the ANTLR runtime here.
+        parser_dir, map_file, grammar_file = self.json_cli()
+        seeds, trees = self.dir / "seeds", self.dir / "trees"
+        seeds.mkdir()
+        (seeds / "a.json").write_text('{"a": [1]}', encoding="utf-8")
+        argv = ["--grammar", str(grammar_file), "--parse-map", str(map_file), "--parser-dir", str(parser_dir)]
+        script = ROOT / "grammars" / "g4_parse.py"
+        result = subprocess.run(
+            [sys.executable, str(script), *argv, str(seeds), str(trees)], capture_output=True, text=True, check=False
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(text(deserialize((trees / "a.json").read_bytes())), '{"a": [1]}')
 
     def test_cli_reports_parser_limit_and_no_match(self) -> None:
         parser_dir, map_file, grammar_file = self.json_cli()

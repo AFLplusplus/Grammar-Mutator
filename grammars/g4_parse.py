@@ -44,7 +44,7 @@ from g4_to_json import START_KEY, SyntaxErrorCounter
 from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, serialize, text
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
 # The ANTLR runtime parses with recursion, one level (or more) for each level
 # of the input. A thread with a large stack and a high recursion limit lets it
@@ -166,17 +166,19 @@ def check_helpers(grammar: dict[str, list[list[str]]], parse_map: dict[str, Any]
         raise GrammarError(msg)
 
 
-def load_classes(parser_dir: Path, module_names: Iterable[str]) -> list[Any]:
+def load_classes(parser_dir: Path, module_names: Sequence[str]) -> list[Any]:
     """Import the class of each module name from the module file in parser_dir.
 
     The generated modules and the base classes import each other by name. So
     during the import, parser_dir is first on sys.path and the modules are in
-    sys.modules. After the import, both are as before, so that the modules
-    of another parser folder with the same names do not mix with these.
+    sys.modules. After the import, sys.path is as before, and sys.modules
+    has no module from parser_dir. So the modules of another parser folder
+    with the same names do not mix with these. Other modules that the import
+    loads (such as the ANTLR runtime) stay.
     """
     folder = str(parser_dir.resolve())
     old_path = list(sys.path)
-    old_modules = dict(sys.modules)
+    old_modules = {name: sys.modules[name] for name in module_names if name in sys.modules}
     sys.path.insert(0, folder)
     try:
         classes = []
@@ -193,8 +195,9 @@ def load_classes(parser_dir: Path, module_names: Iterable[str]) -> list[Any]:
         return classes
     finally:
         sys.path[:] = old_path
-        for name in set(sys.modules) - set(old_modules):
-            del sys.modules[name]
+        for name, module in list(sys.modules.items()):
+            if Path(getattr(module, "__file__", None) or "/").parent == Path(folder):
+                del sys.modules[name]
         sys.modules.update(old_modules)
 
 
