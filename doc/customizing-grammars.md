@@ -101,8 +101,12 @@ afl-fuzz -i SEEDS_DIR -o out ...
   only. AFL++ changes each space in a queue file name to `_`. So the tool also
   changes each space in the tree file name to `_`. For example, the tree of
   `a b.js` is `a_b.js`.
+- `TREES_DIR` must not be `SEEDS_DIR` or a folder in it.
 - It prints one line for each skipped file and a summary with one count for
-  each reason. The exit code is 0 also when it skips files.
+  each reason. The exit code is 0 also when it skips files. If `TREES_DIR`
+  has a tree from an earlier run for a skipped file, the tool removes it.
+- The exit code is 2 if the tool cannot read a file or write a tree, or if it
+  cannot load the grammar or the parser.
 - `grammar_parser-<name>` keeps its own copy of the grammar and the parser in
   `src/grammar_parser-<name>.d`. A later build of a different grammar does not
   change it.
@@ -121,9 +125,10 @@ The tool skips a file for one of these reasons:
   one level or more. So a file with 20000 statements gives such a deep tree.
 - `duplicate name`: a file with the same tree name in a different folder
   already has a tree. For example, `a b.js` and `a_b.js` have the same tree
-  name.
+  name. Names that differ only in case also count as the same name, because
+  the macOS file systems ignore case.
 - `no match`: ANTLR accepts the file, but the parse tree does not match the
-  JSON grammar. This is usually a bug. Please report it with the file.
+  converted grammar. This is usually a bug. Please report it with the file.
 
 Many grammars from grammars-v4 have action code or predicates that call methods
 of a base class, for example `{this.IsStrictMode()}?`. For these grammars, set
@@ -135,7 +140,15 @@ files. The build then copies the `.py` files next to the Python parser.
 ```bash
 make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4" \
      G4_SUPPORT_DIR=grammars/g4/javascript/Python3
+
+# CMake: give the full path
+cmake -DGRAMMAR_FILE="/path/JavaScriptLexer.g4;/path/JavaScriptParser.g4" \
+      -DG4_SUPPORT_DIR=/path/Python3 ...
 ```
+
+CMake keeps `G4_SUPPORT_DIR` and `GRAMMAR_START` in its cache. A later JSON
+grammar build in the same build folder ignores them and prints a warning.
+Remove them with `-UG4_SUPPORT_DIR -UGRAMMAR_START`.
 
 A grammar with no action code does not need `G4_SUPPORT_DIR`. If a grammar
 needs it and you do not set it, `grammar_parser-<name>` stops with a message.

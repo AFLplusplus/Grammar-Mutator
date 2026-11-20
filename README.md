@@ -108,7 +108,7 @@ To e.g. use the test cases of the `mruby` project as input fuzzing seeds just pa
 when we run the fuzzer (if it has been checked out with `git clone https://github.com/mruby/mruby.git` in the current directory).
 
 For a `.g4` grammar, the mutator does not parse the seeds itself.
-Run `grammar_parser-$GRAMMAR` first: it parses the seeds and writes their trees, for example `./grammar_parser-javascript ./seeds ./trees`.
+Run `grammar_parser-$GRAMMAR` first. It parses the seeds and writes their trees, for example `./grammar_parser-javascript ./seeds ./trees`.
 Then copy the `trees` folder as shown in [Using Generated Seeds](#using-generated-seeds).
 Refer to the [ANTLR 4 section](doc/customizing-grammars.md#parse-existing-test-cases) for the skip reasons and for `G4_SUPPORT_DIR`.
 
