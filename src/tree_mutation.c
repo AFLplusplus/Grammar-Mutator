@@ -127,7 +127,10 @@ size_t _node_rules_mutation_count(node_t *node) {
   if (node->id == 0) return 0;
   if (unlikely(node_num_rules[node->id] <= 0)) return 0;
 
-  size_t ret = node_num_rules[node->id] - 1;
+  // An unknown rule id has no skipped alternative, so count every rule
+  size_t ret = node->rule_id >= node_num_rules[node->id]
+                   ? node_num_rules[node->id]
+                   : node_num_rules[node->id] - 1;
 
   node_t *subnode;
   for (size_t i = 0; i < node->subnode_count; ++i) {
