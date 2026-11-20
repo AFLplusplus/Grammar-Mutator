@@ -606,6 +606,18 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
   memcpy(&(node->val_len), data_buf + ser_len, sizeof(node->val_len));
   ser_len += sizeof(node->val_len);
 
+  // A corrupt length must not read past the data or allocate too much. Each
+  // subnode needs at least `min_len` bytes.
+  if (node->val_len > data_size - ser_len ||
+      node->subnode_count > (data_size - ser_len - node->val_len) / min_len) {
+
+    node->val_len = 0;
+    node->subnode_count = 0;
+    node_free(node);
+    return NULL;
+
+  }
+
   // - `val_buf`
   node_set_val(node, (data_buf + ser_len), node->val_len);
   ser_len += node->val_len;
