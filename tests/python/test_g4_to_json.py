@@ -16,6 +16,9 @@ parser and the antlr4 package in .venv.
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 import sys
 import tempfile
 import textwrap
@@ -157,6 +160,48 @@ class ConverterTest(unittest.TestCase):
         self.assertEqual(pmap["parser_rules"], {"s": "<s>", "c": "<c>"})
         for key, alternatives in pmap["kinds"].items():
             self.assertEqual([len(a) for a in alternatives], [len(a) for a in rules[key]])
+
+    def test_parse_map_token_keys_of_type_commands(self) -> None:
+        # Y has one producer (A), so the token key is <A>. Z has two producers,
+        # so the token key is <Z__type>, which the parser never looks into.
+        _, pmap = convert_with_map([
+            self.write(
+                "T.g4",
+                """
+            grammar T;
+            tokens { Y, Z }
+            s : Y Z ;
+            A : 'a' -> type(Y) ;
+            B : 'b' -> type(Z) ;
+            C : 'c' -> type(Z) ;
+        """,
+            )
+        ])
+        self.assertEqual(pmap["token_keys"], {"<A>": "Y", "<Z__type>": "Z"})
+        self.assertNotIn("<Z__type>", pmap["kinds"])
+
+    def test_parse_map_token_keys_of_token_sets(self) -> None:
+        _, pmap = convert_with_map([self.write("T.g4", "grammar T;\ns : ~A . ;\nA : 'a' ;\nB : 'b' ;\n")])
+        self.assertEqual(pmap["token_keys"], {"<A>": "A", "<B>": "B"})
+
+    def test_parse_map_token_name_is_the_token_type(self) -> None:
+        # The tokens of A have the type X, so a reference to A and the
+        # wildcard give the same name, in each order.
+        for body in ("s : A . ;", "s : . A ;"):
+            _, pmap = convert_with_map([
+                self.write("T.g4", f"grammar T;\ntokens {{ X }}\n{body}\nA : 'a' -> type(X) ;\n")
+            ])
+            self.assertEqual(pmap["token_keys"]["<A>"], "X", body)
+
+    def test_parse_map_command_line(self) -> None:
+        g4 = self.write("T.g4", "grammar T;\ns : A ;\nA : 'a' ;\n")
+        out, map_file = Path(self.tmp.name) / "t.json", Path(self.tmp.name) / "t.map.json"
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = g4_to_json.main([str(g4), "-o", str(out), "--parse-map", str(map_file)])
+        self.assertEqual(code, 0)
+        _, expected = convert_with_map([g4])
+        self.assertEqual(json.loads(map_file.read_text()), expected)
+        self.assertEqual(expected["version"], 1)
 
     def test_parse_map_split_literal(self) -> None:
         _, pmap = convert_with_map([self.write("T.g4", "grammar T;\ns : '<x>' ;\n")])

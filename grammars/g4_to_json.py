@@ -816,15 +816,21 @@ class JsonWriter:
             producers.insert(0, name)
         if len(producers) == 1:
             token_key = self.rule_key(producers[0])
-            self.token_names[token_key] = name
+            self.token_names[token_key] = self.token_type(producers[0])
             return [(token_key, "token"), (self.separator_after(producers[0]), "sep")]
         if name not in self.token_type_keys:
+            # A token key: the parser never looks into its alternatives, so
+            # the parse map does not describe them.
             helper = key(self.claim(f"{name}__type"))
             self.token_type_keys[name] = helper
-            self.parser_keys.add(helper)
             self.token_names[helper] = name
             self.out[helper] = [[(self.rule_key(p), "token")] for p in producers]  # empty if no producer
         return [(self.token_type_keys[name], "token"), (TOKEN_SEPARATOR, "sep")]
+
+    def token_type(self, token: str) -> str:
+        """Return the ANTLR token type name of the tokens of the lexer rule `token`."""
+        rule = self.grammar.rules.get(token)
+        return rule.token_types[-1] if rule is not None and rule.token_types else token
 
     def separator_after(self, token: str) -> str:
         """Return the text to put after a token of the lexer rule `token`."""
@@ -849,7 +855,7 @@ class JsonWriter:
             if fixed_text(rule.body) in node.excluded_texts:
                 continue
             token_key = self.rule_key(name)
-            self.token_names.setdefault(token_key, rule.token_types[-1] if rule.token_types else name)
+            self.token_names[token_key] = self.token_type(name)
             alternatives.append([(token_key, "token"), (self.separator_after(name), "sep")])
         self.out[helper] = alternatives
         return helper
