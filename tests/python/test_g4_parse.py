@@ -110,7 +110,7 @@ class TreeBuilderTest(unittest.TestCase):
         self.assertEqual(text(deserialize(serialize(tree))), JSON_INPUT)
 
     def test_bom_is_rejected_not_changed(self) -> None:
-        self.assert_reason(TreeBuilder(*self.json), ("﻿" + JSON_INPUT).encode("utf-8"), "syntax error")
+        self.assert_reason(TreeBuilder(*self.json), ("\ufeff" + JSON_INPUT).encode("utf-8"), "syntax error")
 
     def test_leading_text_goes_to_the_lead_leaf(self) -> None:
         builder, _ = self.builder("""

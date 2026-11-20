@@ -1,4 +1,6 @@
 #!/bin/sh
 # Parse test cases with the ANTLR Python parser of a .g4 grammar. The build
-# fills in the @...@ values. Usage: grammar_parser-<name> SEEDS_DIR TREES_DIR
+# fills in the paths. The grammar, the parse map, and the Python parser are in
+# grammar_parser-<name>.d, next to this file.
+# Usage: grammar_parser-<name> SEEDS_DIR TREES_DIR
 exec "@VENV_PYTHON@" "@G4_PARSE@" --grammar "@PARSER_DATA@/grammar.json" --parse-map "@PARSER_DATA@/parse_map.json" --parser-dir "@PARSER_DATA@/python" "$@"
