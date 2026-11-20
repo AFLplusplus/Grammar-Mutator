@@ -73,14 +73,15 @@ static char *copy_string(const char *s) {
 
 }
 
-/* Add the files under `dir` to `seeds`. Return 0 on error. */
-static int collect_seeds(const char *dir, seed_list_t *seeds) {
+/* Add the files under `dir` to `seeds`. Return 0 on error. A subfolder that
+ * cannot be opened is skipped, as grammar_parser skips it. */
+static int collect_seeds(const char *dir, seed_list_t *seeds, int is_root) {
 
   DIR *d = opendir(dir);
   if (!d) {
 
-    fprintf(stderr, "[-] Cannot open %s\n", dir);
-    return 0;
+    fprintf(stderr, "[%c] Cannot open %s\n", is_root ? '-' : '!', dir);
+    return !is_root;
 
   }
 
@@ -99,7 +100,7 @@ static int collect_seeds(const char *dir, seed_list_t *seeds) {
 
     if (S_ISDIR(st.st_mode)) {
 
-      ok = collect_seeds(path, seeds);
+      ok = collect_seeds(path, seeds, 0);
       continue;
 
     }
@@ -201,7 +202,7 @@ int main(int argc, char **argv) {
   }
 
   seed_list_t seeds = {NULL, 0, 0};
-  if (!collect_seeds(argv[1], &seeds)) return 2;
+  if (!collect_seeds(argv[1], &seeds, 1)) return 2;
   if (seeds.len) qsort(seeds.items, seeds.len, sizeof(seed_t), compare_seeds);
 
   DIR *d = opendir(argv[2]);
