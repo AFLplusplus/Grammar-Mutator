@@ -194,7 +194,7 @@ $(PARSE_MAP): $(GRAMMAR_JSON)
 # of the support folder. Without G4_SUPPORT_DIR, a grammar with action code
 # gives a clear message when grammar_parser-<name> runs.
 PARSER_STAMP = $(PARSER_DIR)/.built
-$(PARSER_STAMP): .grammar $(G4_FILES) $(wildcard $(G4_SUPPORT_DIR)/*) $(VENV_STAMP)
+$(PARSER_STAMP): .grammar $(G4_FILES) $(if $(G4_SUPPORT_DIR),$(wildcard $(G4_SUPPORT_DIR)/*)) $(VENV_STAMP)
 	rm -rf $(PARSER_DIR)
 	mkdir -p $(PARSER_DIR)
 	cp $(G4_FILES) $(PARSER_DIR)/
