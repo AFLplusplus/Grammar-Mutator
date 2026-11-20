@@ -13,6 +13,7 @@ We developed a grammar mutator to enhance AFL++ such that AFL++ can handle highl
 The grammar mutator leverages the idea of [F1 fuzzer](https://github.com/vrthra/F1) and [Nautilus](https://github.com/nautilus-fuzz/nautilus) for test case generation and mutations.
 In summary, this repository includes:
 
+- Grammars in a JSON format or in the ANTLR 4 format (`.g4`), for example from [grammars-v4](https://github.com/antlr/grammars-v4)
 - Tree-based mutation: rules mutation, random mutation, random recursive mutation, splicing mutation
 - Tree-based trimming: subtree trimming, recursive trimming
 - An ANTLR4 shim for parsing fuzzing test cases during the runtime
@@ -54,19 +55,30 @@ sudo make install
 ### Building the Grammar Mutator
 
 Next you need to build the grammar mutator.
-To specify the grammar file, eg. Ruby, you can use `GRAMMAR_FILE` environment variable.
-There are several grammar files in `grammars` directory, such as `json.json`, `ruby.json` and `http.json`.
-Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about the input grammar file.
-You can also use ANTLR 4 grammars (`.g4` files), for example from [grammars-v4](https://github.com/antlr/grammars-v4): `make deps`, then `make GRAMMAR_FILE=grammars/g4/JSON.g4`.
-See [customizing-grammars.md](doc/customizing-grammars.md#antlr-4-grammars-g4) for the details and the current limits.
+To specify the grammar, you can use the `GRAMMAR_FILE` environment variable.
+The grammar can be one of two kinds:
+
+- **A JSON grammar file.** There are several in the `grammars` directory, such as `json.json`, `ruby.json` and `http.json`.
+- **An ANTLR 4 grammar (`.g4` files).** You can use a grammar from [grammars-v4](https://github.com/antlr/grammars-v4) directly. Give all its `.g4` files, for example the lexer and the parser grammar. Samples are in `grammars/g4`. Run `make deps` once before the first `.g4` build: it installs the Python tools for the conversion into `.venv`.
+
+Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about both kinds, and to its [ANTLR 4 section](doc/customizing-grammars.md#antlr-4-grammars-g4) for the current limits of `.g4` grammars.
 Note that pull requests with new grammars are welcome! :-)
 
 ```bash
+# A JSON grammar
 make GRAMMAR_FILE=grammars/ruby.json
+
+# An ANTLR 4 grammar: one combined grammar ...
+make deps
+make GRAMMAR_FILE=grammars/g4/JSON.g4
+
+# ... or a lexer grammar and a parser grammar
+make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4"
 ```
 
 Note that the shared library and grammar generator are named after the grammar file that is specified so you can have multiple grammars generated.
 The grammar name part is based on the filename with everything cut off after a underline, dash or dot, hency `ruby.json` will result in `ruby` and hence `grammar_generator-ruby` and `libgrammarmutator-ruby.so` will be created.
+For `.g4` grammars, the name comes from the last file without `Lexer` or `Parser`, so the JavaScript example above gives `javascript`.
 You can specify your own naming by setting `GRAMMAR_FILENAME=yourname` as make option.
 
 Now, you should be able to see two symbolic files `libgrammarmutator-ruby.so` and `grammar_generator-ruby` under the root directory.
