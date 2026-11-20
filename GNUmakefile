@@ -214,10 +214,10 @@ test:
 test_memcheck:
 	@$(MAKE) -C tests memcheck
 
-# Unit tests for the Python tools (grammars/g4_to_json.py)
+# Unit tests for the Python tools (grammars/g4_*.py). Some tests run the jar.
 .PHONY: test-python
-test-python: $(VENV_STAMP) $(META_PARSER)
-	.venv/bin/python -m unittest discover -s tests/python
+test-python: $(VENV_STAMP) $(META_PARSER) $(META_ANTLR_JAR)
+	ANTLR_JAR=$(abspath $(META_ANTLR_JAR)) .venv/bin/python -m unittest discover -s tests/python
 
 # Python tools in .venv. requirements.txt pins their versions. The stamp file
 # installs them again when requirements.txt changes.
