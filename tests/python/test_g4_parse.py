@@ -210,7 +210,27 @@ class TreeBuilderTest(unittest.TestCase):
         except ParseError as e:
             self.assertEqual(e.reason, "parser limit")
 
+    def test_parser_limit_keeps_the_cause(self) -> None:
+        # 400000 levels are too deep for the ANTLR runtime on Python 3.8 and 3.14.
+        builder, _ = self.builder("e : '(' e ')' | 'x' ;")
+        data = "(" * 400000 + "x" + ")" * 400000
+        with self.assertRaises(ParseError) as caught:
+            builder.build(data.encode("utf-8"))
+        self.assertEqual(caught.exception.reason, "parser limit")
+        self.assertIsInstance(caught.exception.__cause__, RecursionError)
+
     # -- skips -------------------------------------------------------------
+
+    def test_trailing_tokens_are_a_syntax_error(self) -> None:
+        builder, _ = self.builder("s : ID ;\nID : [a-z]+ ;\nWS : [ \\t]+ -> skip ;")
+        self.round_trip(builder, "a ")
+        self.assert_reason(builder, b"a b c", "syntax error")
+
+    def test_missing_parser_dir_raises_at_construction(self) -> None:
+        grammar, parse_map, _parser_dir = self.json
+        with self.assertRaises(Exception) as caught:
+            TreeBuilder(grammar, parse_map, Path(self.tmp.name))
+        self.assertNotIsInstance(caught.exception, ParseError)
 
     def test_syntax_error(self) -> None:
         builder = TreeBuilder(*self.json)

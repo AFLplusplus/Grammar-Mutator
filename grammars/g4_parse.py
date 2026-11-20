@@ -174,6 +174,12 @@ class TreeBuilder:
         self.rule_ids = {k: {alt: i for i, alt in enumerate(order)} for k, order in self.order.items()}
         self.lexer_class = load_class(parser_dir, parse_map["lexer_module"])
         self.parser_class = load_class(parser_dir, parse_map["parser_module"])
+        # The Python target adds "_" to a rule name that Python reserves.
+        names = [n for n in (self.start_rule, self.start_rule + "_") if callable(getattr(self.parser_class, n, None))]
+        if not names:
+            msg = f"the parser has no method for the start rule {self.start_rule!r}"
+            raise AttributeError(msg)
+        self.start_method = names[0]
 
     # -- parsing -------------------------------------------------------------
 
@@ -255,23 +261,30 @@ class TreeBuilder:
         outcome = result[0] if result else None
         if isinstance(outcome, ParseError):
             raise outcome
-        if outcome is None or isinstance(outcome, Exception):
+        if isinstance(outcome, Exception):
+            raise ParseError("parser limit") from outcome
+        if outcome is None:
             raise ParseError("parser limit")
         return outcome
 
     def _parse(self, source: str) -> Any:
-        from antlr4 import CommonTokenStream, InputStream  # noqa: PLC0415
+        from antlr4 import CommonTokenStream, InputStream, Token  # noqa: PLC0415
 
         lexer = self.lexer_class(InputStream(source))
-        parser = self.parser_class(CommonTokenStream(lexer))
+        stream = CommonTokenStream(lexer)
+        parser = self.parser_class(stream)
         errors = SyntaxErrorCounter("input")
         for recognizer in (lexer, parser):
             recognizer.removeErrorListeners()
             recognizer.addErrorListener(errors)
-        # The Python target adds "_" to a rule name that Python reserves.
-        start = getattr(parser, self.start_rule, None) or getattr(parser, self.start_rule + "_")
-        tree = start()
-        if errors.errors:
+        tree = getattr(parser, self.start_method)()
+        # ANTLR stops after the start rule without an error, also if visible
+        # tokens follow it (a start rule without EOF). Reject them.
+        stream.fill()
+        last = tree.stop.tokenIndex if tree.stop is not None else -1
+        if errors.errors or any(
+            t.type != Token.EOF and t.channel == Token.DEFAULT_CHANNEL for t in stream.tokens[last + 1 :]
+        ):
             raise ParseError("syntax error")
         return tree
 
