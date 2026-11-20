@@ -121,6 +121,11 @@ test_chunk_store.o: test_chunk_store.cpp $(GTEST_INCLUDE)
 test_rxi_map.o: test_rxi_map.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
 
+.PRECIOUS: test_grammar_generator.o
+test_grammar_generator.o: test_grammar_generator.cpp $(GTEST_INCLUDE)
+	$(CXX) -DGRAMMAR_GENERATOR=\"$(abspath ../src/grammar_generator-$(GRAMMAR_FILENAME))\" \
+	       $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
+
 .PHONY: run_test
 run_test: check_test_programs $(addprefix run_,$(TARGETS))
 

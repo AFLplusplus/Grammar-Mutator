@@ -136,3 +136,15 @@ target_include_directories(test_rxi_map
 add_test(
   NAME test_rxi_map
   COMMAND test_rxi_map)
+
+# Test suite 8:
+# test the grammar_generator program (no empty and no repeated seeds)
+add_executable(test_grammar_generator test_grammar_generator.cpp)
+target_link_libraries(test_grammar_generator
+  PRIVATE gtest_main)
+target_compile_definitions(test_grammar_generator
+  PRIVATE GRAMMAR_GENERATOR="$<TARGET_FILE:grammar_generator>")
+add_dependencies(test_grammar_generator grammar_generator)
+add_test(
+  NAME test_grammar_generator
+  COMMAND test_grammar_generator)

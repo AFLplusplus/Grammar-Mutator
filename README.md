@@ -100,6 +100,8 @@ when we run the fuzzer (if it has been checked out with `git clone https://githu
 `grammar_generator` can be used to generate input fuzzing seeds and corresponding tree files, following the grammar file that you specified during the compilation of the grammar mutator (i.e., `GRAMMAR_FILE`).
 You can control the number of generated seeds and the maximal size of the corresponding trees.
 Usually, the larger the tree size is, the more complex the corresponding input seed is.
+The generator does not write empty seeds or the same seed twice.
+If 100 tries in a row give no new seed, it stops early and writes fewer than `<max_num>` seeds.
 
 ```bash
 # Usage
