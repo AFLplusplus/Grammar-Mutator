@@ -34,7 +34,10 @@ endif
 .PHONY: all
 all: $(TARGET)
 
+# "ar q" adds to an archive that exists. Remove the old archive first, so it
+# does not keep old copies of the objects.
 $(TARGET): $(OBJS)
+	rm -f $@
 	$(AR) qc $@ $^
 	ranlib $@
 

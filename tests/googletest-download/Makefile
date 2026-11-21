@@ -50,13 +50,17 @@ $(GTEST_ROOT_DIR): | $(GTEST_TAR)
 
 $(GTEST_SRC_FILES): $(GTEST_ROOT_DIR)
 
+# "ar q" adds to an archive that exists. Remove the old archive first, so it
+# does not keep old copies of the objects.
 libgtest.a: $(GTEST_DIR)/src/gtest-all.o
-	$(AR) qc libgtest.a $^
-	ranlib libgtest.a
+	rm -f $@
+	$(AR) qc $@ $^
+	ranlib $@
 
 libgtest_main.a: $(GTEST_DIR)/src/gtest_main.o
-	$(AR) qc libgtest_main.a $^
-	ranlib libgtest_main.a
+	rm -f $@
+	$(AR) qc $@ $^
+	ranlib $@
 
 %.o: %.cc
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
