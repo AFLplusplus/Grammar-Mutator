@@ -2,6 +2,42 @@
 
 Thank you for your help. This file tells you how to send a change.
 
+## Before you open a pull request
+
+1. Build with the unit tests. See
+   [building-grammar-mutator.md](doc/building-grammar-mutator.md).
+
+   ```bash
+   make ENABLE_TESTING=1 GRAMMAR_FILE=grammars/ruby.json
+   ```
+
+2. Run the unit tests and the memory check:
+
+   ```bash
+   make test
+   make test_memcheck
+   ```
+
+3. If you change the Python tools in `grammars/` (for example the `.g4`
+   tools), run their unit tests. They need java and the ANTLR jar.
+
+   ```bash
+   make test-python
+   ```
+
+4. Format the C and C++ code with clang-format 23. Other major versions give
+   different output, so the format script refuses them. `make deps` installs
+   clang-format 23 and the other Python tools into `.venv` with pip. The
+   `format-check` CI job fails if `make code-format` changes a file.
+
+   ```bash
+   make deps   # once
+   make code-format
+   ```
+
+5. Fill in the pull request template. The title must follow
+   [Conventional Commits](#commit-messages-and-pull-request-titles).
+
 ## Branches
 
 - `stable` is the only long-lived branch. All work goes into `stable`
@@ -75,41 +111,6 @@ docs: describe the TRIMMING_STEPS variable
 Use the commit messages in your branch the same way. Keep the commit body
 empty for most commits. Add one or two short sentences only when the reason
 is not clear from the subject.
-
-## Before you open a pull request
-
-1. Build with the unit tests. See
-   [building-grammar-mutator.md](doc/building-grammar-mutator.md).
-
-   ```bash
-   make ENABLE_TESTING=1 GRAMMAR_FILE=grammars/ruby.json
-   ```
-
-2. Run the unit tests and the memory check:
-
-   ```bash
-   make test
-   make test_memcheck
-   ```
-
-3. If you change the Python tools in `grammars/` (for example the `.g4`
-   tools), run their unit tests. They need java and the ANTLR jar.
-
-   ```bash
-   make test-python
-   ```
-
-4. Format the C and C++ code with clang-format 23. Other major versions give
-   different output, so the format script refuses them. `make deps` installs
-   clang-format 23 and the other Python tools into `.venv` with pip. The
-   `format-check` CI job fails if `make code-format` changes a file.
-
-   ```bash
-   make deps   # once
-   make code-format
-   ```
-
-5. Fill in the pull request template.
 
 ## Releases
 
