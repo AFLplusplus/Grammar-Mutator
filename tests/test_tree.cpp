@@ -16,8 +16,12 @@
 
  */
 
+#include <dirent.h>
+
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <string>
 
 #include "tree.h"
@@ -569,6 +573,49 @@ TEST_F(TreeTest, ParseArrayRb) {
   tree_to_buf(array_rb_tree);
   EXPECT_EQ(array_rb_tree->data_len, 4052);
   tree_free(array_rb_tree);
+
+}
+
+#endif
+
+#if defined(RUBY_CASES_DIR)
+// Each .rb file in RUBY_CASES_DIR fits grammars/ruby.json. So the
+// parser keeps every byte, and the tree gives the file again.
+TEST_F(TreeTest, RubyCasesRoundTrip) {
+
+  DIR *dir = opendir(RUBY_CASES_DIR);
+  ASSERT_NE(dir, nullptr);
+
+  int            count = 0;
+  struct dirent *entry;
+  while ((entry = readdir(dir)) != nullptr) {
+
+    std::string name = entry->d_name;
+    if (name.size() <= 3 || name.compare(name.size() - 3, 3, ".rb") != 0)
+      continue;
+
+    std::ifstream file(std::string(RUBY_CASES_DIR) + "/" + name,
+                       std::ios::binary);
+    ASSERT_TRUE(file.good()) << name;
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+
+    parse_status_t status = PARSE_THREAD_ERROR;
+    tree_t *tree = tree_parse((const uint8_t *)content.data(), content.size(),
+                              nullptr, &status);
+    ASSERT_NE(tree, nullptr) << name;
+    EXPECT_EQ(status, PARSE_OK) << name;
+    ASSERT_TRUE(tree_to_buf(tree)) << name;
+    EXPECT_EQ(std::string((const char *)tree->data_buf, tree->data_len),
+              content)
+        << name;
+    tree_free(tree);
+    ++count;
+
+  }
+
+  closedir(dir);
+  EXPECT_EQ(count, 6);
 
 }
 
