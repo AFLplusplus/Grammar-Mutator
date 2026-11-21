@@ -123,4 +123,7 @@ When a maintainer merges it, Release Please tags the release (for example
 pull request, so its workflows wait for a maintainer: click "Approve workflows
 to run" before the merge, so that the required checks run.
 
-Do not edit `CHANGELOG.md` or `version.txt` by hand.
+The release notes list every merged pull request with its author, and the
+new contributors. Release Please also writes the version into
+`include/version.h`. Do not edit `CHANGELOG.md` or the version lines in
+`include/version.h` by hand.

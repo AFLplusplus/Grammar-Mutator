@@ -1,0 +1,9 @@
+# The categories of the GitHub release notes. Release Please uses these notes
+# ("changelog-type": "github" in release-please-config.json). All pull requests
+# go into one list, with their authors and a "New Contributors" section. The
+# release pull requests of Release Please are left out.
+changelog:
+  exclude:
+    labels:
+      - "autorelease: pending"
+      - "autorelease: tagged"
