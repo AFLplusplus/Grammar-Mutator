@@ -139,6 +139,24 @@ if (_g4_file_count EQUAL 0)
 endif ()
 # Configure again when a grammar file changes
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${GRAMMAR_FILE})
+# Configure again when a script of the configure step changes. The configure
+# step runs the scripts and writes the generated files.
+set(_configure_scripts
+  ${CMAKE_SOURCE_DIR}/grammars/f1_c_gen.py
+  ${CMAKE_SOURCE_DIR}/grammars/f1_common.py
+  ${CMAKE_SOURCE_DIR}/grammars/tree_file.py)
+if (_g4_file_count GREATER 0)
+  list(APPEND _configure_scripts
+    ${CMAKE_SOURCE_DIR}/grammars/g4_to_json.py
+    ${CMAKE_SOURCE_DIR}/grammars/g4_c_gen.py
+    ${CMAKE_SOURCE_DIR}/grammars/antlr4/ANTLRv4Lexer.g4
+    ${CMAKE_SOURCE_DIR}/grammars/antlr4/ANTLRv4Parser.g4
+    ${CMAKE_SOURCE_DIR}/grammars/antlr4/LexerAdaptor.py
+    ${CMAKE_SOURCE_DIR}/requirements.txt)
+else ()
+  list(APPEND _configure_scripts ${CMAKE_SOURCE_DIR}/grammars/f1_g4_translate.py)
+endif ()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${_configure_scripts})
 
 if (NOT GRAMMAR_FILENAME)
   if (_g4_file_count GREATER 0)
