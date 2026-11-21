@@ -33,8 +33,13 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
     // error - treat the error portion as a terminal node
     // we do not want to lose test case information
     auto terminal_node = dynamic_cast<antlr4::tree::TerminalNode *>(t);
-    auto terminal_node_text = terminal_node->getText();
     node = node_create(0);
+    // ANTLR can make up a token in recovery (its text is "<missing X>"). Such
+    // a token has no start index and is not in the input. Give it no value,
+    // so that the tree bytes stay the input bytes.
+    auto symbol = terminal_node->getSymbol();
+    if (symbol && symbol->getStartIndex() == INVALID_INDEX) return node;
+    auto terminal_node_text = terminal_node->getText();
     node_set_val(node, terminal_node_text.c_str(), terminal_node_text.length());
     return node;
   }

@@ -18,6 +18,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "tree.h"
 #include "f1_c_fuzz.h"
@@ -605,6 +606,29 @@ TEST_F(TreeTest, TreeParseReportsStatus) {
 
   // The status pointer may be NULL
   EXPECT_EQ(tree_parse((const uint8_t *)bad, 1, nullptr, nullptr), nullptr);
+
+}
+
+// ANTLR can make up a token in error recovery (its text is "<missing X>").
+// That text is not in the input, so the tree must not hold it.
+TEST_F(TreeTest, RecoveredMissingTokenIsNotInTheTree) {
+
+  const char *inputs[] = {"def a.b(1", "a=[1,2", "a=(1", "a = b.c(1"};
+  for (const char *input : inputs) {
+
+    parse_status_t status = PARSE_THREAD_ERROR;
+    tree_t        *t =
+        tree_parse((const uint8_t *)input, strlen(input), nullptr, &status);
+    if (!t) continue;  // a grammar that rejects the input has nothing to check
+
+    EXPECT_EQ(status, PARSE_OK) << input;  // a recovered tree is still OK
+    tree_to_buf(t);
+    std::string bytes((const char *)t->data_buf, t->data_len);
+    EXPECT_EQ(bytes.find("<missing"), std::string::npos)
+        << input << " -> " << bytes;
+    tree_free(t);
+
+  }
 
 }
 
