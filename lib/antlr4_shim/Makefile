@@ -2,13 +2,14 @@ TARGET = libantlr4_shim.a
 
 ifdef G4_BUILD
 # A .g4 build: the matcher, the parse tables (g4_grammar.cpp), the ANTLR lexer
-# and parser, and the base classes from G4_SUPPORT_DIR. All except the matcher
-# are in generated/.
+# and parser, and the base classes from G4_SUPPORT_DIR. All except the shim and
+# the matcher are in generated/.
 ANTLR4_GENERATED_SRC_FILES = $(wildcard generated/*.cpp)
 
 ANTLR4_SHIM_SRC_FILES = \
 	g4_shim.cpp \
 	g4_matcher.cpp \
+	g4_matcher_antlr.cpp \
 	$(ANTLR4_GENERATED_SRC_FILES)
 else
 ANTLR4_GENERATED_SRC_FILES = \

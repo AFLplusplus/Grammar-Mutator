@@ -12,8 +12,8 @@
 
 /*
    The parser of a .g4 build. The build writes the tables of the grammar
-   (g4_grammar.cpp) in the namespace g4build. The matcher (g4_matcher.cpp)
-   parses with them.
+   (g4_grammar.cpp) in the namespace g4build. The matcher (g4_matcher.cpp
+   and g4_matcher_antlr.cpp) parses with them.
 
    The ANTLR lexer and parser stay in the global namespace (the build does
    not use the jar option -package). The C++ base classes of grammars-v4 use

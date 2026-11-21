@@ -52,6 +52,7 @@ if (G4_BUILD)
   add_library(antlr4_shim STATIC
     g4_shim.cpp
     g4_matcher.cpp
+    g4_matcher_antlr.cpp
     $<TARGET_OBJECTS:antlr4_shim_generated>)
   target_link_libraries(antlr4_shim
     PRIVATE ${ANTLR4_STATIC_LIB}

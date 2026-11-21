@@ -11,7 +11,7 @@
  */
 
 /*
-   The tests of the C++ matcher (lib/antlr4_shim/g4_matcher.cpp). Each test
+   The tests of the C++ matcher (lib/antlr4_shim/g4_matcher*.cpp). Each test
    grammar in tests/g4/grammars/<name> has its tables and its parser in the
    namespace t_<name>. Build and run the tests with
    tests/g4/run_matcher_tests.sh.
