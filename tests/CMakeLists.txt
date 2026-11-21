@@ -161,7 +161,7 @@ add_test(
   NAME test_utils
   COMMAND test_utils)
 
-# Test suite:
+# Test suite 10:
 # test the adaptive parse budget
 add_executable(test_parse_budget test_parse_budget.cpp)
 target_link_libraries(test_parse_budget

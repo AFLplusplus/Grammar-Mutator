@@ -18,7 +18,8 @@ extern "C" {
 // The number of recent records that the median uses
 #define PARSE_BUDGET_WINDOW 255
 
-// The record of recent parse speeds
+// The record of recent parse speeds. A budget is not thread-safe: use one
+// budget from one thread, or lock around every call.
 typedef struct parse_budget parse_budget_t;
 
 // Create an empty budget. Return NULL if the allocation fails.

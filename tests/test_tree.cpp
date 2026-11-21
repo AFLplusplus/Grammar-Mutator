@@ -615,10 +615,17 @@ TEST_F(TreeTest, EmptyTestCaseFile) {
   ASSERT_NE(f, nullptr);
   fclose(f);
 
-  // A sentinel that no parse gives proves that the parser ran
-  parse_status_t status = (parse_status_t)-1;
-  tree_t        *t = load_tree_from_test_case_ex(fn, nullptr, &status);
-  EXPECT_NE((int)status, -1);
+  // A raw value that is not a valid status proves that the parser ran. The
+  // code stores it as bytes, so the enum never holds a value out of its range.
+  static_assert(sizeof(parse_status_t) == sizeof(unsigned),
+                "the test needs a status the size of unsigned");
+  const unsigned sentinel = 99;
+  parse_status_t status;
+  memcpy(&status, &sentinel, sizeof(status));
+  tree_t  *t = load_tree_from_test_case_ex(fn, nullptr, &status);
+  unsigned after;
+  memcpy(&after, &status, sizeof(after));
+  EXPECT_NE(after, sentinel);
   if (t) tree_free(t);
   remove(fn);
 

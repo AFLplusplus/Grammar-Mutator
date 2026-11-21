@@ -92,6 +92,15 @@ TEST(ParseBudget, LimitSaturates) {
 
 }
 
+TEST(ParseBudget, LimitSaturatesOnTokenProduct) {
+
+  // The per-token limit fits in 64 bits. Its product with the tokens does not.
+  parse_budget_t *b = fill(32, 1000000000);
+  EXPECT_EQ(parse_budget_limit_ns(b, SIZE_MAX), UINT64_MAX);
+  parse_budget_free(b);
+
+}
+
 TEST(ParseBudget, ClockMovesForward) {
 
   uint64_t a = parse_budget_now_ns();
