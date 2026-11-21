@@ -80,7 +80,8 @@ The repository uses squash merges only. The squash merge uses the pull request
 title as the commit message on `stable`. So the **pull request title** must
 follow Conventional Commits. The `PR Title` workflow checks it. A pull request
 cannot merge until this check and the `make-build` and `cmake-build` CI jobs
-pass, and until it has one approving review.
+pass, and until it has one approving review. A pull request that changes only
+documentation (Markdown files, `doc/`, or the license) skips the CI jobs.
 
 Use one of these types:
 
