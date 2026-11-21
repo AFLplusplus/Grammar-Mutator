@@ -36,9 +36,13 @@ if (G4_BUILD)
   endif ()
   file(GLOB ANTLR4_GENERATED_SRC "${ANTLR4_GENERATED_DIR}/*.cpp")
 
-  # g4_compile.sh prints a hint about G4_SUPPORT_DIR if a compile fails
+  # g4_compile.sh prints a hint about G4_SUPPORT_DIR if a compile fails. It
+  # prints the hint once and makes the folder G4_HINT_MARK. Each build removes
+  # that folder first.
+  set(G4_HINT_MARK ${ANTLR4_GENERATED_DIR}/.g4_compile_hint)
+  add_custom_target(g4_hint_reset COMMAND rm -rf ${G4_HINT_MARK})
   add_library(antlr4_shim_generated OBJECT ${ANTLR4_GENERATED_SRC})
-  add_dependencies(antlr4_shim_generated antlr4-cpp-runtime)
+  add_dependencies(antlr4_shim_generated antlr4-cpp-runtime g4_hint_reset)
   target_include_directories(antlr4_shim_generated
     PRIVATE ${ANTLR4_RUNTIME_SRC_DIR}
     PRIVATE ${ANTLR4_GENERATED_DIR}
@@ -46,7 +50,7 @@ if (G4_BUILD)
     PRIVATE ${CMAKE_SOURCE_DIR}/include)
   set_target_properties(antlr4_shim_generated PROPERTIES
     COMPILE_FLAGS -fPIC
-    CXX_COMPILER_LAUNCHER "sh;${CMAKE_CURRENT_SOURCE_DIR}/g4_compile.sh")
+    CXX_COMPILER_LAUNCHER "sh;${CMAKE_CURRENT_SOURCE_DIR}/g4_compile.sh;${G4_HINT_MARK}")
   target_compile_options(antlr4_shim_generated PRIVATE -Wno-attributes)
 
   add_library(antlr4_shim STATIC

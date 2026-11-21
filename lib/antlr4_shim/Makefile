@@ -61,11 +61,18 @@ $(TARGET): $(ANTLR4_SHIM_OBJS)
 	ranlib $@
 
 ifdef G4_BUILD
-# g4_compile.sh prints a hint about G4_SUPPORT_DIR if the compile fails. This
-# rule comes before "%.o: %.cpp", because make 3.81 uses the first rule that
-# matches.
-generated/%.o: generated/%.cpp
-	sh g4_compile.sh $(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
+# g4_compile.sh prints a hint about G4_SUPPORT_DIR if the compile fails. It
+# prints the hint once and makes the folder G4_HINT_MARK. Each build removes
+# that folder first. This rule comes before "%.o: %.cpp", because make 3.81
+# uses the first rule that matches.
+G4_HINT_MARK = generated/.g4_compile_hint
+
+.PHONY: g4-hint-reset
+g4-hint-reset:
+	@rm -rf $(G4_HINT_MARK)
+
+generated/%.o: generated/%.cpp | g4-hint-reset
+	sh g4_compile.sh $(G4_HINT_MARK) $(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 else
 generated/GrammarParser.o: generated/GrammarParser.cpp
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -Wno-unused-parameter -o $@ -c $<
