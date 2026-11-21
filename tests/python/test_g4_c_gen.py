@@ -374,9 +374,14 @@ class CommandLineTest(unittest.TestCase):
         )
         result = self.run_script(grammar, parse_map, "--namespace", "t_json", "-o", str(out))
         self.assertEqual(result.returncode, 0, result.stderr)
+        # The namespace of the generated code declares its own g4 first. Then an
+        # unqualified g4:: in the generated code finds t_json::g4 and does not
+        # compile. Only ::g4:: finds the matcher library.
+        prelude = self.tmp / "hide_g4.h"
+        prelude.write_text("namespace t_json {\nstruct g4 {};\n}  // namespace t_json\n")
         compile_command = [compiler, "-std=gnu++17", "-fsyntax-only", "-Wall", "-Wextra", "-Wno-attributes"]
         compile_command += ["-I", str(headers), "-I", str(ROOT / "lib" / "antlr4_shim"), "-I", str(ROOT / "include")]
-        compile_command += ["-I", str(out)]
+        compile_command += ["-I", str(out), "-include", str(prelude)]
         result = subprocess.run(
             [*compile_command, str(out / "g4_grammar.cpp")], capture_output=True, text=True, check=False
         )

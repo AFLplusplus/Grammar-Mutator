@@ -102,14 +102,27 @@ for f in "$python" "$runtime_lib" "$runtime_src/antlr4-runtime.h" "$jar"; do
 done
 jobs=${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}
 common_flags="-O1 -g -fPIC -pthread ${MATCHER_FLAGS:-}"
-case " ${MATCHER_FLAGS:-} " in
-  *" -fsanitize="*address*)
-    if [ -z "${ASAN_OPTIONS:-}" ]; then
-      ASAN_OPTIONS=detect_container_overflow=0
-      export ASAN_OPTIONS
-    fi
-    ;;
-esac
+# Find out if the flags turn on the address sanitizer: "address" in the list of
+# a -fsanitize= flag, and no later -fno-sanitize= flag that turns it off
+asan=0
+for flag in ${MATCHER_FLAGS:-}; do
+  case $flag in
+    -fsanitize=*)
+      case ",${flag#-fsanitize=}," in
+        *,address,*) asan=1 ;;
+      esac
+      ;;
+    -fno-sanitize=*)
+      case ",${flag#-fno-sanitize=}," in
+        *,address,* | *,all,*) asan=0 ;;
+      esac
+      ;;
+  esac
+done
+if [ "$asan" = 1 ] && [ -z "${ASAN_OPTIONS:-}" ]; then
+  ASAN_OPTIONS=detect_container_overflow=0
+  export ASAN_OPTIONS
+fi
 cxx_flags="-std=gnu++17 -Wno-attributes $common_flags -I$runtime_src"
 
 if [ "${1:-}" = --generate ]; then

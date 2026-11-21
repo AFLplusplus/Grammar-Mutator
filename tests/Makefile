@@ -106,6 +106,9 @@ test_rxi_map: test_rxi_map.o $(LIBS) $(RXI_MAP_LIB)
 test_%.o: test_%.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
+# test_tree checks some cases only for one grammar, so it needs the name
+test_tree.o: CXX_DEFINES += -DGRAMMAR_NAME=\"$(GRAMMAR_FILENAME)\"
+
 ifeq "$(realpath $(GRAMMAR_FILE))" "$(realpath ../grammars/ruby_grammar.json)"
 test_tree.o: test_tree.cpp $(GTEST_INCLUDE)
 	$(CXX) -DENABLE_PARSING_ARRAY_RB -DARRAY_RB_PATH=\"`realpath testcases/array.rb`\" \

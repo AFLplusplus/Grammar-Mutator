@@ -25,6 +25,14 @@
 
 #include "g4_matcher.h"
 
+// The ANTLR classes that this header uses. The users include the runtime.
+namespace antlr4 {
+
+class Parser;
+class ParserRuleContext;
+
+}  // namespace antlr4
+
 namespace g4 {
 
 namespace detail {

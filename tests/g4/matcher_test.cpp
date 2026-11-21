@@ -972,6 +972,8 @@ void allocation_failure() {
   // and it must free all nodes. LeakSanitizer or the macOS tool "leaks"
   // finds a node that the matcher does not free. The test does not make the
   // ANTLR runtime fail, because the runtime can leak a parse tree node then.
+  // Note: the CI has no LeakSanitizer run and no "leaks". There, the test
+  // checks only that the parse does not crash and gives PARSE_LIMIT.
   const g4::Grammar     &grammar = counting_json();
   const std::string_view data = "{\"a\": [1, {\"b\": null}], \"c\": \"d\"}";
   const uint8_t         *buf = reinterpret_cast<const uint8_t *>(data.data());

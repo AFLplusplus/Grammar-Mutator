@@ -72,6 +72,8 @@ add_executable(test_tree test_tree.cpp)
 target_link_libraries(test_tree
   PRIVATE gtest_main
   PRIVATE grammarmutator)
+# test_tree checks some cases only for one grammar, so it needs the name
+target_compile_definitions(test_tree PRIVATE GRAMMAR_NAME="${GRAMMAR_FILENAME}")
 add_test(
   NAME test_tree
   COMMAND test_tree)

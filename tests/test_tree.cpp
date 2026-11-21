@@ -609,11 +609,25 @@ TEST_F(TreeTest, TreeParseReportsStatus) {
 
 }
 
+// Return true if the subtree has a terminal node without a value. A token
+// from the lexer has at least one character. So for the JSON shim, such a node
+// is a token that ANTLR made up in recovery.
+static bool has_empty_terminal(const node_t *node) {
+
+  if (!node) return false;
+  if (node->id == 0 && node->subnode_count == 0) return node->val_len == 0;
+  for (uint32_t i = 0; i < node->subnode_count; ++i)
+    if (has_empty_terminal(node->subnodes[i])) return true;
+  return false;
+
+}
+
 // ANTLR can make up a token in error recovery (its text is "<missing X>").
 // That text is not in the input, so the tree must not hold it.
 TEST_F(TreeTest, RecoveredMissingTokenIsNotInTheTree) {
 
   const char *inputs[] = {"def a.b(1", "a=[1,2", "a=(1", "a = b.c(1"};
+  int         made_up = 0;
   for (const char *input : inputs) {
 
     parse_status_t status = PARSE_THREAD_ERROR;
@@ -626,9 +640,14 @@ TEST_F(TreeTest, RecoveredMissingTokenIsNotInTheTree) {
     std::string bytes((const char *)t->data_buf, t->data_len);
     EXPECT_EQ(bytes.find("<missing"), std::string::npos)
         << input << " -> " << bytes;
+    if (has_empty_terminal(t->root)) ++made_up;
     tree_free(t);
 
   }
+
+  // The CI runs the unit tests with the Ruby grammar. There, at least one
+  // input must make ANTLR make up a token, so that the test checks something.
+  if (strcmp(GRAMMAR_NAME, "ruby") == 0) EXPECT_GT(made_up, 0);
 
 }
 
