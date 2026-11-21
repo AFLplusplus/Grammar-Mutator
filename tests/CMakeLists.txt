@@ -77,7 +77,7 @@ target_compile_definitions(test_tree PRIVATE GRAMMAR_NAME="${GRAMMAR_FILENAME}")
 add_test(
   NAME test_tree
   COMMAND test_tree)
-if ("${GRAMMAR_FILE}" STREQUAL "${CMAKE_SOURCE_DIR}/grammars/ruby_grammar.json")
+if ("${GRAMMAR_FILE}" STREQUAL "${CMAKE_SOURCE_DIR}/grammars/ruby.json")
   message(STATUS "Enable testing on parsing 'testcases/array.rb'")
   target_compile_definitions(test_tree
     PRIVATE ENABLE_PARSING_ARRAY_RB
