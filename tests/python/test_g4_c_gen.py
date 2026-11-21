@@ -346,14 +346,20 @@ class CommandLineTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, namespace)
             self.assertIn("namespace", result.stderr)
 
+    def skip_or_fail(self, reason: str) -> None:
+        """Skip the test. With REQUIRE_CPP_COMPILE_TEST=1 (the CI), fail it."""
+        if os.environ.get("REQUIRE_CPP_COMPILE_TEST") == "1":
+            self.fail(f"{reason}, and REQUIRE_CPP_COMPILE_TEST=1")
+        self.skipTest(reason)
+
     def test_generated_cpp_compiles(self) -> None:
         jar = Path(os.environ.get("ANTLR_JAR") or DEFAULT_ANTLR_JAR)
         compiler = shutil.which("c++")
         if shutil.which("java") is None or not jar.is_file() or compiler is None:
-            self.skipTest("java, the ANTLR jar, or a C++ compiler is missing")
+            self.skip_or_fail("java, the ANTLR jar, or a C++ compiler is missing")
         headers = runtime_headers(self.tmp)
         if headers is None:
-            self.skipTest("the ANTLR C++ runtime source is missing")
+            self.skip_or_fail("the ANTLR C++ runtime source is missing")
         grammar, parse_map = convert_with_map([JSON_G4])
         out = self.tmp / "gen"
         subprocess.run(
@@ -379,8 +385,12 @@ class CommandLineTest(unittest.TestCase):
         # compile. Only ::g4:: finds the matcher library.
         prelude = self.tmp / "hide_g4.h"
         prelude.write_text("namespace t_json {\nstruct g4 {};\n}  // namespace t_json\n")
+        # The runtime headers are system headers: some compilers warn in them
+        # (for example gcc -Woverloaded-virtual). The test checks only the
+        # warnings in the generated code and in the matcher header.
         compile_command = [compiler, "-std=gnu++17", "-fsyntax-only", "-Wall", "-Wextra", "-Wno-attributes"]
-        compile_command += ["-I", str(headers), "-I", str(ROOT / "lib" / "antlr4_shim"), "-I", str(ROOT / "include")]
+        compile_command += ["-isystem", str(headers)]
+        compile_command += ["-I", str(ROOT / "lib" / "antlr4_shim"), "-I", str(ROOT / "include")]
         compile_command += ["-I", str(out), "-include", str(prelude)]
         result = subprocess.run(
             [*compile_command, str(out / "g4_grammar.cpp")], capture_output=True, text=True, check=False

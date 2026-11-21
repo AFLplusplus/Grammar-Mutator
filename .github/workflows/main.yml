@@ -95,9 +95,6 @@ jobs:
     - name: Install dependencies
       run: |
         bash .github/workflows/setup-deps.sh
-    - name: Python unit tests
-      if: matrix.build == 'make' && matrix.grammar == 'json'
-      run: make -f GNUmakefile test-python
     - name: Select the grammar files
       run: |
         if [ "${{ matrix.grammar }}" = json ]; then
@@ -111,6 +108,14 @@ jobs:
       run: |
         make -f GNUmakefile GRAMMAR_FILE="$G4_FILES" G4_SUPPORT_DIR="${G4_SUPPORT_DIR:-}" -j$(nproc)
         echo "GENERATOR=./grammar_generator-${{ matrix.grammar }}" >> "$GITHUB_ENV"
+    - name: Python unit tests
+      # After the make build: the C++ compile test needs the ANTLR C++ runtime
+      # source of the build. The variable makes the test fail, not skip, if
+      # the runtime is missing.
+      if: matrix.build == 'make' && matrix.grammar == 'json'
+      env:
+        REQUIRE_CPP_COMPILE_TEST: 1
+      run: make -f GNUmakefile test-python
     - name: Compile with CMake
       if: matrix.build == 'cmake'
       run: |
