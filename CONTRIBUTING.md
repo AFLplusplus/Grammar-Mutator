@@ -42,7 +42,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 
 The repository uses squash merges only. The squash merge uses the pull request
 title as the commit message on `stable`. So the **pull request title** must
-follow Conventional Commits. The `PR Title` workflow checks it.
+follow Conventional Commits. The `PR Title` workflow checks it, and a pull
+request cannot merge until the check passes.
 
 Use one of these types:
 
@@ -116,6 +117,8 @@ is not clear from the subject.
 releases. Each merge into `stable` updates a release pull request. The release
 pull request contains the next version and the changes for `CHANGELOG.md`.
 When a maintainer merges it, Release Please tags the release (for example
-`v1.1.0`) and publishes a GitHub release.
+`v1.1.0`) and publishes a GitHub release. GitHub Actions opens the release
+pull request, so its workflows wait for a maintainer: click "Approve workflows
+to run" before the merge, so that the required title check runs.
 
 Do not edit `CHANGELOG.md` or `version.txt` by hand.
