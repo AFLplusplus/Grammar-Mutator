@@ -49,7 +49,9 @@ add_subdirectory(
   ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
   EXCLUDE_FROM_ALL)
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
+# The generated headers come before include/. A make build in the source
+# folder writes include/f1_c_fuzz.h, maybe for another grammar.
+include_directories(${CMAKE_BINARY_DIR}/f1/include ${CMAKE_SOURCE_DIR}/include)
 
 # Test suite 1:
 # run a custom mutator library, which generates test cases for a specific

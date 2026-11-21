@@ -30,9 +30,11 @@ target_link_libraries(grammarmutator
   PRIVATE rxi_map
   PRIVATE xxhash
   PRIVATE antlr4_shim)
+# The generated headers come first. A make build in the source folder writes
+# include/f1_c_fuzz.h, maybe for another grammar.
 target_include_directories(grammarmutator
-  PUBLIC ${CMAKE_SOURCE_DIR}/include
   PUBLIC ${CMAKE_BINARY_DIR}/f1/include  # Generated headers
+  PUBLIC ${CMAKE_SOURCE_DIR}/include
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map
   PRIVATE ${CMAKE_SOURCE_DIR}/third_party/Cyan4973_xxHash)
 set_target_properties(grammarmutator
@@ -43,9 +45,9 @@ add_executable(grammar_generator
   grammar_generator.c)
 target_link_libraries(grammar_generator
   PRIVATE grammarmutator)
-target_include_directories(grammarmutator
-  PUBLIC ${CMAKE_SOURCE_DIR}/include
-  PUBLIC ${CMAKE_BINARY_DIR}/f1/include)
+target_include_directories(grammar_generator
+  PRIVATE ${CMAKE_BINARY_DIR}/f1/include
+  PRIVATE ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(grammar_generator
   PROPERTIES OUTPUT_NAME "grammar_generator-${GRAMMAR_FILENAME}")
 
