@@ -339,7 +339,8 @@ class CommandLineTest(unittest.TestCase):
         result = self.run_script(grammar, parse_map, "--namespace", "t_json", "-o", str(out))
         self.assertEqual(result.returncode, 0, result.stderr)
         compile_command = [compiler, "-std=gnu++17", "-fsyntax-only", "-Wall", "-Wextra", "-Wno-attributes"]
-        compile_command += ["-I", str(headers), "-I", str(ROOT / "lib" / "antlr4_shim"), "-I", str(out)]
+        compile_command += ["-I", str(headers), "-I", str(ROOT / "lib" / "antlr4_shim"), "-I", str(ROOT / "include")]
+        compile_command += ["-I", str(out)]
         result = subprocess.run(
             [*compile_command, str(out / "g4_grammar.cpp")], capture_output=True, text=True, check=False
         )

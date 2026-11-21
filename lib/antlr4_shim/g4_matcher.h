@@ -26,14 +26,20 @@
 
    All tables have static storage and constant initialization. The tables do
    not change, so many threads can read them at the same time.
+
+   g4::parse parses one input with the ANTLR parser of a grammar and changes
+   the parse tree into a tree of the JSON grammar.
  */
 
 #ifndef __G4_MATCHER_H__
 #define __G4_MATCHER_H__
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string_view>
+
+#include "tree.h"
 
 namespace antlr4 {
 
@@ -144,6 +150,37 @@ struct Grammar {
   antlr4::ParserRuleContext *(*parse_start)(antlr4::Parser &parser);
 
 };
+
+/* The guards of one parse */
+struct Limits {
+
+  /* The maximum depth of parser rules. A deeper parse gives PARSE_LIMIT. */
+  size_t max_rule_depth = 200000;
+  /* The stack size of the parse thread, in bytes */
+  size_t stack_size = 512u << 20;
+  /* The time budget, or nullptr for no time limit. After lexing, the parse
+     gets the time limit from the budget. A parse that gives a tree records
+     its time in the budget. */
+  parse_budget_t *budget = nullptr;
+
+};
+
+/* Parse buf (len bytes) with the parser of grammar, in a new thread with a
+   stack of limits.stack_size bytes. Return the tree, or nullptr. status (if
+   not nullptr) receives the result:
+
+   - PARSE_OK: the tree. Its leaves give the bytes of buf exactly.
+   - PARSE_NOT_UTF8: buf is not valid UTF-8.
+   - PARSE_SYNTAX_ERROR: a lexer error, a parser error, or visible tokens
+     after the end of the start rule.
+   - PARSE_LIMIT: the rule depth or the time budget stopped the parse, or a
+     different exception occurred (for example in a base class).
+   - PARSE_NO_MATCH: the parse tree does not match the JSON grammar.
+   - PARSE_THREAD_ERROR: the parse thread does not start.
+
+   Many threads can call parse at the same time, each with its own budget. */
+tree_t *parse(const Grammar &grammar, const uint8_t *buf, size_t len,
+              const Limits &limits, parse_status_t *status);
 
 }  // namespace g4
 
