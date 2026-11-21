@@ -23,6 +23,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 #include "helpers.h"
 #include "tree.h"
@@ -165,6 +168,32 @@ static tree_t *parse_entry(my_mutator_t *data, const char *fn) {
   if (status != PARSE_OK && status != PARSE_THREAD_ERROR)
     map_set(&data->rejected, fn, 1);
   return NULL;
+
+}
+
+/* Return true if the file "fn" holds exactly the "len" bytes of "buf" */
+static bool file_has_bytes(const char *fn, const uint8_t *buf, size_t len) {
+
+  int fd = open(fn, O_RDONLY);
+  if (fd < 0) return false;
+
+  struct stat info;
+  bool        same = !fstat(fd, &info) && (uint64_t)info.st_size == len;
+  uint8_t     chunk[4096];
+  size_t      done = 0;
+  while (same && done < len) {
+
+    size_t  want = len - done < sizeof(chunk) ? len - done : sizeof(chunk);
+    ssize_t got = read(fd, chunk, want);
+    if (got <= 0 || memcmp(chunk, buf + done, (size_t)got))
+      same = false;
+    else
+      done += (size_t)got;
+
+  }
+
+  close(fd);
+  return same;
 
 }
 
@@ -820,7 +849,24 @@ uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
   // Replace "queue" with "trees"
   memcpy(found, "/trees", 6);
 
+  /* `data->mutated_tree` is the last output of `afl_custom_fuzz`. It is the
+    tree of the new entry only if it gives the bytes of the queued file.
+    Another AFL++ stage (for example cmplog or havoc) can find the entry, and
+    `max_size` can cut the output. */
   tree_t *tree = data->mutated_tree;
+  if (tree) {
+
+    tree_to_buf(tree);
+    if (!file_has_bytes(fn, tree->data_buf, tree->data_len)) {
+
+      tree_free(tree);
+      tree = NULL;
+      data->mutated_tree = NULL;
+
+    }
+
+  }
+
   if (unlikely(!tree)) {
 
     /* The test case does not come from `afl_custom_fuzz`. For example, AFL++

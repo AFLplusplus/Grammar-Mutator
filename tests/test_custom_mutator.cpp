@@ -114,10 +114,22 @@ class CustomMutatorTest : public ::testing::Test {
 
 };
 
+// Write a test case file, as AFL++ does before it calls
+// `afl_custom_queue_new_entry`
+static void write_test_case(const string &fn, const uint8_t *buf,
+                            size_t buf_size) {
+
+  FILE *f = fopen(fn.c_str(), "wb");
+  ASSERT_NE(f, nullptr);
+  ASSERT_EQ(fwrite(buf, 1, buf_size, f), buf_size);
+  fclose(f);
+
+}
+
 TEST_F(CustomMutatorTest, Fuzzing) {
 
-  uint8_t                       *buf = nullptr;
-  __attribute__((unused)) size_t buf_size;
+  uint8_t *buf = nullptr;
+  size_t   buf_size;
 
   // prepare a tree
   auto tree = gen_init__(0);
@@ -144,6 +156,7 @@ TEST_F(CustomMutatorTest, Fuzzing) {
                                &buf, nullptr, 0, 4096);
     EXPECT_NE(buf, nullptr);
     string fn_new = "afl_test_fuzz_out/queue/fuzz_0_" + to_string(i);
+    write_test_case(fn_new, buf, buf_size);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
         (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_0");
@@ -207,8 +220,8 @@ TEST_F(CustomMutatorTest, FuzzingUnknownRuleIds) {
 
 TEST_F(CustomMutatorTest, FuzzingParsingError) {
 
-  uint8_t                       *buf = nullptr;
-  __attribute__((unused)) size_t buf_size;
+  uint8_t *buf = nullptr;
+  size_t   buf_size;
 
   // prepare a tree that does not follow the grammar
   auto tree = tree_create();
@@ -244,6 +257,7 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
     EXPECT_NE(buf, nullptr);
     string fn_new =
         "afl_test_fuzz_out/queue/fuzz_parsing_error_0_" + to_string(i);
+    write_test_case(fn_new, buf, buf_size);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
         (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_parsing_error_0");
@@ -261,8 +275,8 @@ TEST_F(CustomMutatorTest, FuzzingParsingError) {
 
 TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
 
-  uint8_t                       *buf = nullptr;
-  __attribute__((unused)) size_t buf_size;
+  uint8_t *buf = nullptr;
+  size_t   buf_size;
 
   // prepare a tree that does not follow the grammar
   auto tree = tree_create();
@@ -297,6 +311,7 @@ TEST_F(CustomMutatorTest, FuzzingNoRulesMutation) {
     EXPECT_NE(buf, nullptr);
     string fn_new =
         "afl_test_fuzz_out/queue/fuzz_no_rules_mut_0_" + to_string(i);
+    write_test_case(fn_new, buf, buf_size);
     afl_custom_queue_new_entry(
         mutator->data, (const uint8_t *)fn_new.c_str(),
         (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_no_rules_mut_0");
@@ -316,11 +331,11 @@ TEST_F(CustomMutatorTest, Trimming) {
 
   random_set_seed(1234);
 
-  uint8_t                       *buf = nullptr;
-  __attribute__((unused)) size_t buf_size;
-  uint8_t                        ret;
-  int32_t                        stage_cur;
-  int32_t                        stage_max;
+  uint8_t *buf = nullptr;
+  size_t   buf_size;
+  uint8_t  ret;
+  int32_t  stage_cur;
+  int32_t  stage_max;
 
   // prepare a tree
   auto tree = gen_init__(20);
@@ -366,16 +381,6 @@ TEST_F(CustomMutatorTest, Trimming) {
   }
 
   tree_free(tree);
-
-}
-
-static void write_test_case(const string &fn, const uint8_t *buf,
-                            size_t buf_size) {
-
-  FILE *f = fopen(fn.c_str(), "wb");
-  ASSERT_NE(f, nullptr);
-  ASSERT_EQ(fwrite(buf, 1, buf_size, f), buf_size);
-  fclose(f);
 
 }
 
@@ -560,6 +565,152 @@ TEST_F(CustomMutatorTest, RejectedEntryOutsideQueue) {
   EXPECT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
             1);
   EXPECT_EQ(mutator->data->tree_cur, nullptr);
+
+}
+
+// Read the tree file of a queue entry and give its bytes
+static string tree_file_text(const string &fn) {
+
+  tree_t *saved = read_tree_from_file(fn.c_str());
+  if (!saved) return "<no tree file>";
+  tree_to_buf(saved);
+  string text((const char *)saved->data_buf, saved->data_len);
+  tree_free(saved);
+  return text;
+
+}
+
+// Another AFL++ stage (for example havoc or cmplog) can find a new entry after
+// the custom stage. Then the last mutated tree is not the tree of the entry.
+TEST_F(CustomMutatorTest, QueueNewEntryFromAnotherStage) {
+
+  random_set_seed(1234);
+
+  uint8_t *buf = nullptr;
+  size_t   buf_size;
+
+  auto tree = gen_init__(20);
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/other_stage");
+  write_tree_to_file(tree, "afl_test_fuzz_out/trees/other_stage");
+  ASSERT_EQ(afl_custom_queue_get(
+                mutator->data,
+                (const uint8_t *)"afl_test_fuzz_out/queue/other_stage"),
+            1);
+
+  // The last custom fuzz output is not interesting
+  ASSERT_GT(afl_custom_fuzz_count(mutator->data, nullptr, 0), 0u);
+  buf_size = afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
+  ASSERT_NE(buf, nullptr);
+  string mutated((const char *)buf, buf_size);
+
+  // Another stage finds a different valid test case
+  string valid = valid_test_case();
+  ASSERT_NE(valid, mutated);
+  const string fn_new = queue_dir + "/other_stage_new";
+  write_test_case(fn_new, (const uint8_t *)valid.data(), valid.size());
+  afl_custom_queue_new_entry(
+      mutator->data, (const uint8_t *)fn_new.c_str(),
+      (const uint8_t *)"afl_test_fuzz_out/queue/other_stage");
+
+  EXPECT_EQ(tree_file_text(tree_out_dir + "/other_stage_new"), valid);
+
+  tree_free(tree);
+
+}
+
+// AFL++ queues the custom fuzz output, which max_size can cut. The tree file
+// must be the parse result of the queued file, not the uncut mutated tree.
+TEST_F(CustomMutatorTest, QueueNewEntryOfACutOutput) {
+
+  random_set_seed(1234);
+
+  uint8_t *buf = nullptr;
+  size_t   buf_size = 0;
+
+  auto tree = gen_init__(20);
+  tree_to_buf(tree);
+  ASSERT_GT(tree->data_len, 2u);
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/cut_output");
+  write_tree_to_file(tree, "afl_test_fuzz_out/trees/cut_output");
+  ASSERT_EQ(
+      afl_custom_queue_get(
+          mutator->data, (const uint8_t *)"afl_test_fuzz_out/queue/cut_output"),
+      1);
+
+  // Find a mutation that max_size cuts
+  uint32_t count = afl_custom_fuzz_count(mutator->data, nullptr, 0);
+  size_t   max_size = tree->data_len / 2;
+  bool     cut = false;
+  for (uint32_t i = 0; i < count && !cut; ++i) {
+
+    buf_size =
+        afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, max_size);
+    ASSERT_NE(buf, nullptr);
+    cut = mutator->data->mutated_tree->data_len > buf_size;
+
+  }
+
+  ASSERT_TRUE(cut);
+  tree_t *mutated_tree = mutator->data->mutated_tree;
+  string  uncut((const char *)mutated_tree->data_buf, mutated_tree->data_len);
+  string  queued((const char *)buf, buf_size);
+
+  // The parse result of the queued bytes
+  string  expected = "<no tree file>";
+  tree_t *parsed = tree_from_buf((const uint8_t *)queued.data(), queued.size());
+  if (parsed) {
+
+    tree_to_buf(parsed);
+    expected = string((const char *)parsed->data_buf, parsed->data_len);
+    tree_free(parsed);
+
+  }
+
+  const string fn_new = queue_dir + "/cut_output_new";
+  write_test_case(fn_new, (const uint8_t *)queued.data(), queued.size());
+  afl_custom_queue_new_entry(
+      mutator->data, (const uint8_t *)fn_new.c_str(),
+      (const uint8_t *)"afl_test_fuzz_out/queue/cut_output");
+
+  string text = tree_file_text(tree_out_dir + "/cut_output_new");
+  EXPECT_NE(text, uncut);
+  EXPECT_EQ(text, expected);
+
+  tree_free(tree);
+
+}
+
+// The usual case: AFL++ queues the custom fuzz output as it is
+TEST_F(CustomMutatorTest, QueueNewEntryOfTheFuzzOutput) {
+
+  random_set_seed(1234);
+
+  uint8_t *buf = nullptr;
+  size_t   buf_size;
+
+  auto tree = gen_init__(20);
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/fuzz_output");
+  write_tree_to_file(tree, "afl_test_fuzz_out/trees/fuzz_output");
+  ASSERT_EQ(afl_custom_queue_get(
+                mutator->data,
+                (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_output"),
+            1);
+
+  ASSERT_GT(afl_custom_fuzz_count(mutator->data, nullptr, 0), 0u);
+  buf_size = afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
+  ASSERT_NE(buf, nullptr);
+  string mutated((const char *)buf, buf_size);
+
+  const string fn_new = queue_dir + "/fuzz_output_new";
+  write_test_case(fn_new, (const uint8_t *)mutated.data(), mutated.size());
+  afl_custom_queue_new_entry(
+      mutator->data, (const uint8_t *)fn_new.c_str(),
+      (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_output");
+
+  EXPECT_EQ(tree_file_text(tree_out_dir + "/fuzz_output_new"), mutated);
+  EXPECT_EQ(mutator->data->mutated_tree, nullptr);
+
+  tree_free(tree);
 
 }
 
