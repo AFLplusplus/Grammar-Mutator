@@ -107,10 +107,13 @@ For any parsing errors, the grammar mutator will not terminate but save the erro
 To e.g. use the test cases of the `mruby` project as input fuzzing seeds just pass the `-i mruby/test/t` to afl-fuzz
 when we run the fuzzer (if it has been checked out with `git clone https://github.com/mruby/mruby.git` in the current directory).
 
-For a `.g4` grammar, the mutator does not parse the seeds itself.
-Run `grammar_parser-$GRAMMAR` first. It parses the seeds and writes their trees, for example `./grammar_parser-javascript ./seeds ./trees`.
+For a `.g4` grammar, the mutator also parses each seed when AFL++ loads it.
+But a seed with a syntax error gets no tree.
+The AFL++ mutators still change it, but the grammar mutator does not.
+To parse the seeds before you fuzz, run `grammar_parser-$GRAMMAR`.
+It parses the seeds and writes their trees, for example `./grammar_parser-javascript ./seeds ./trees`.
 Then copy the `trees` folder as shown in [Using Generated Seeds](#using-generated-seeds).
-Refer to the [ANTLR 4 section](doc/customizing-grammars.md#parse-existing-test-cases) for the skip reasons and for `G4_SUPPORT_DIR`.
+Refer to the [ANTLR 4 section](doc/customizing-grammars.md#parse-existing-test-cases) for the skip reasons, the parse time limit, and `G4_SUPPORT_DIR`.
 
 #### Using Generated Seeds
 
@@ -165,13 +168,14 @@ The large `max_size` passed into `grammar_generator-$GRAMMAR` does help us gener
 
 ### Changing the Default Configurations
 
-Users can set the number of mutations per queue entry with these environment variables:
+Users can set the number of mutations per queue entry, and the parse time limit, with these environment variables:
 
 - `RANDOM_MUTATION_STEPS`: the number of random mutations
 - `RANDOM_RECURSIVE_MUTATION_STEPS`: the number of random recursive mutations
 - `SPLICING_MUTATION_STEPS`: the number of splicing mutations
 - `RULES_MUTATION_STEPS`: the maximum number of rules mutations
 - `TRIMMING_STEPS`: the maximum number of trimming steps
+- `PARSE_TIME_BUDGET`: `0` removes the time limit for the parse of a test case with a `.g4` grammar. Any other value keeps the limit.
 
 By default, each of the first three mutation types runs 1000 times, and the
 rules mutation tries every other rule at every nonterminal node of the tree.
