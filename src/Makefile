@@ -54,6 +54,9 @@ BENCHMARK_OBJS = $(BENCHMARK_SRC_FILES:.c=.o)
 OBJS = $(LIB_OBJS) $(GEN_OBJS) $(PARSER_OBJS) $(BENCHMARK_OBJS)
 
 C_FLAGS = $(C_FLAGS_OPT)
+# Each compile also writes a .d file with the headers of the object. So a
+# change in a header makes the objects that include it again.
+DEP_FLAGS = -MMD -MP
 C_DEFINES =
 C_INCLUDES = -I../include -I../third_party/rxi_map -I../third_party/Cyan4973_xxHash
 
@@ -92,27 +95,29 @@ $(GRAMMAR_MUTATOR_LIB): $(LIB_OBJS) $(ANTLR4_SHIM_LIB)
 	$(CXX) -fPIC $(C_FLAGS) -shared $(SONAME_FLAG) -o $@ $(LIB_OBJS) $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $(C_DEFINES) $(C_INCLUDES) -fPIC $(C_FLAGS) -o $@ -c $<
+	$(CC) $(C_DEFINES) $(C_INCLUDES) -fPIC $(C_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
 grammar_generator.o: grammar_generator.c
-	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) -o $@ -c $<
+	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
 $(GRAMMAR_GENERATOR_PROM): $(GEN_OBJS) $(GRAMMAR_MUTATOR_LIB)
 	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB)
 
 grammar_parser.o: grammar_parser.c
-	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) -pthread -o $@ -c $<
+	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) $(DEP_FLAGS) -pthread -o $@ -c $<
 
 $(GRAMMAR_PARSER_PROM): $(PARSER_OBJS) $(GRAMMAR_MUTATOR_LIB)
 	$(CXX) $(C_FLAGS) -pthread $< -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB)
 
 benchmark/benchmark.o: benchmark/benchmark.c
-	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) -o $@ -c $<
+	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
 $(BENCH_PROM): $(BENCHMARK_OBJS) $(GRAMMAR_MUTATOR_LIB)
 	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB) -lm
 
+-include $(OBJS:.o=.d)
+
 .PHONY: clean
 clean:
-	@rm -f $(OBJS)
+	@rm -f $(OBJS) $(OBJS:.o=.d)
 	@rm -f libgrammarmutator-*.so grammar_generator-* benchmark/benchmark-*

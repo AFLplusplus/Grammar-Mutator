@@ -30,6 +30,9 @@ ANTLR4_CXX_RUNTIME_DIR = $(realpath ../../third_party/antlr4-cpp-runtime/antlr4-
 
 # "-Wno-attributes" is only for generated codes, we cannot do more about it
 CXX_FLAGS = -std=gnu++17 -fPIC -Wno-attributes $(CXX_FLAGS_OPT)
+# Each compile also writes a .d file with the headers of the object. So a
+# change in a header makes the objects that include it again.
+DEP_FLAGS = -MMD -MP
 CXX_DEFINES =
 CXX_INCLUDES = \
 	-I$(ANTLR4_CXX_RUNTIME_DIR)/runtime/src \
@@ -62,17 +65,19 @@ ifdef G4_BUILD
 # rule comes before "%.o: %.cpp", because make 3.81 uses the first rule that
 # matches.
 generated/%.o: generated/%.cpp
-	sh g4_compile.sh $(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
+	sh g4_compile.sh $(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 else
 generated/GrammarParser.o: generated/GrammarParser.cpp
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -Wno-unused-parameter -o $@ -c $<
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -Wno-unused-parameter -o $@ -c $<
 endif
 
 %.o: %.cpp
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
+
+-include $(ANTLR4_SHIM_OBJS:.o=.d)
 
 .PHONY: clean
 clean:
 	@rm -rf generated
-	@rm -f *.o
+	@rm -f *.o *.d
 	@rm -f $(TARGET)
