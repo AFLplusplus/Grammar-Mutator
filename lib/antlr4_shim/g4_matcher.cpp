@@ -745,6 +745,24 @@ tree_t *make_tree(const Grammar &grammar, const Names &names,
 
   }
 
+  // A lexer base class can make tokens with any positions. The tokens must
+  // be in input order, must not overlap, and must be in the input.
+  const size_t code_points = offsets.size() - 1;
+  size_t       previous_end = 0;
+  for (antlr4::Token *token : tokens) {
+
+    size_t start = token->getStartIndex();
+    size_t end = token->getStopIndex() + 1;  // 0 for an empty token at 0
+    if (start < previous_end || end < start || end > code_points) {
+
+      return nullptr;
+
+    }
+
+    previous_end = end;
+
+  }
+
   Span leading{0, tokens.empty() ? len : offsets[tokens[0]->getStartIndex()]};
   // The text after each token, by token index
   std::vector<Span> hidden(token_count, Span{0, 0});

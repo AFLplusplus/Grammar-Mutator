@@ -59,6 +59,8 @@ DECLARE_GRAMMAR(trailing)
 DECLARE_GRAMMAR(nomatch)
 DECLARE_GRAMMAR(reserved)
 DECLARE_GRAMMAR(superclass)
+DECLARE_GRAMMAR(spin)
+DECLARE_GRAMMAR(handmade)
 
 // The tree code in src/tree.c calls tree_parse. Here it parses with the JSON
 // test grammar.
@@ -622,41 +624,73 @@ double seconds_since(std::chrono::steady_clock::time_point start) {
 
 }
 
-void budget_stops_a_slow_parse() {
+// "mode x x ... x" with n words "x"
+std::string spin_input(std::string_view mode, size_t n) {
 
-  // 1,000,001 tokens. The clock check runs at each rule entry, and the rule
-  // entries come before the ")" tokens. So the lexing and the first half of
-  // the parse must take more than 50 ms. The 512 MB stack holds this depth,
-  // also with AddressSanitizer.
-  const std::string data = nest_input(500000);
-  g4::Limits        limits;
-  limits.max_rule_depth = 1000000;
+  return std::string(mode) + repeat(" x", n);
 
-  // Without a budget, the parse takes more than 50 ms.
-  auto   start = std::chrono::steady_clock::now();
-  Result result = parse(t_nest::grammar, data, limits);
-  double unlimited = seconds_since(start);
-  CHECK_STATUS(result, PARSE_OK);
-  CHECK(unlimited > 0.05);
+}
 
-  // After the warm-up, the limit is max(50 ms, 50 ns * tokens) = 50 ms.
+// Parse a "spin" input of 20,000 words with a budget. Each word calls spin()
+// at least once, and spin() waits 100 us of wall-clock time. So without a
+// budget, the parse takes at least 2 s on any machine.
+void check_spin_budget(std::string_view mode) {
+
+  round_trip(t_spin::grammar, spin_input(mode, 3));
+
+  // After the warm-up at 200 ns per token, the limit is
+  // max(50 ms, 50 * 200 ns * 20,002 tokens) = about 200 ms.
   Budget budget(parse_budget_create());
   CHECK(budget != nullptr);
   if (!budget) return;
   for (int i = 0; i < PARSE_BUDGET_WARMUP; ++i) {
 
-    parse_budget_record(budget.get(), 1000, 1000);
+    parse_budget_record(budget.get(), 200000, 1000);
 
   }
 
+  g4::Limits limits;
   limits.budget = budget.get();
-  start = std::chrono::steady_clock::now();
-  result = parse(t_nest::grammar, data, limits);
+  auto   start = std::chrono::steady_clock::now();
+  Result result = parse(t_spin::grammar, spin_input(mode, 20000), limits);
   double limited = seconds_since(start);
   CHECK_STATUS(result, PARSE_LIMIT);
   CHECK(!result.tree);
-  CHECK(limited < 5.0);
-  std::printf("    unlimited %.3f s, limited %.3f s\n", unlimited, limited);
+  // The parse does not stop before the deadline, and it stops long before
+  // the 2 s of a full parse.
+  CHECK(limited >= 0.19);
+  CHECK(limited < 1.0);
+  std::printf("    %.*s: limited %.3f s\n", static_cast<int>(mode.size()),
+              mode.data(), limited);
+
+}
+
+void budget_stops_a_slow_parse() {
+
+  // "rules": each word is a rule "a", so the clock check at each rule entry
+  // can stop the parse.
+  check_spin_budget("rules");
+
+}
+
+void budget_checks_the_clock_in_prediction() {
+
+  // "loop": the parse enters one rule (s) at the start, long before the
+  // deadline. Then all spin() calls come from one loop in s, and the
+  // prediction of each loop step calls spin() (the two alternatives
+  // conflict, so the prediction evaluates the predicate). No rule entry
+  // follows, so only the clock check in LA() can stop the parse.
+  check_spin_budget("loop");
+
+}
+
+void tokens_outside_the_input() {
+
+  // The lexer base class gives a token at the positions 0 to 0 before the
+  // real tokens. For an empty input, the token ends after the input. For
+  // "ab", it overlaps the real token "ab".
+  check_status(t_handmade::grammar, "", PARSE_NO_MATCH);
+  check_status(t_handmade::grammar, "ab", PARSE_NO_MATCH);
 
 }
 
@@ -766,9 +800,12 @@ const Test TESTS[] = {
     {"nul_bytes", nul_bytes},
     {"reserved_start_rule", reserved_start_rule},
     {"base_class_exception", base_class_exception},
+    {"tokens_outside_the_input", tokens_outside_the_input},
     {"depth_limit", depth_limit},
     {"thread_error", thread_error},
     {"budget_stops_a_slow_parse", budget_stops_a_slow_parse},
+    {"budget_checks_the_clock_in_prediction",
+     budget_checks_the_clock_in_prediction},
     {"budget_records_success", budget_records_success},
     {"random_bytes", random_bytes},
 

@@ -16,6 +16,9 @@
 # - MATCHER_FLAGS: more compiler and linker flags, for example
 #   "-fsanitize=address".
 # - JOBS: the number of parallel jobs (default: the number of CPUs).
+# With MATCHER_FLAGS=-fsanitize=address, also set
+# ASAN_OPTIONS=detect_container_overflow=0. The runtime library has no ASan
+# code, so the container check gives false reports for its vectors.
 # The paths of the repository and the build must not have spaces.
 set -eu
 
