@@ -327,7 +327,9 @@ bool node_get_size(node_t *node) {
 
   if (!ok) {
 
-    // Make the stale sizes harmless: the picks find no node.
+    // Set the sizes of the top node to 0. Then the picks find no node, and the
+    // random and splicing mutations return NULL. afl_custom_fuzz_count calls
+    // this function again and plans no mutation if it fails.
     top->non_term_size = 0;
     top->recursion_edge_size = 0;
     node_stack_free(&stack);
@@ -563,12 +565,13 @@ bool _node_to_buf(tree_t *tree, node_t *node) {
 
 }
 
-void _node_get_recursion_edges(tree_t *tree, node_t *node) {
+bool _node_get_recursion_edges(tree_t *tree, node_t *node) {
 
-  if (!tree || !node) return;
+  if (!tree || !node) return true;
 
   // Visit the nodes in pre-order; the edge of a node comes with the node.
-  // If a push fails, the walk stops. The list is then shorter, which is safe.
+  // If an allocation fails, the walk stops and returns false. The list is then
+  // short, and the caller must not use it.
   node_stack_t stack = {0};
   bool         ok = node_stack_push(&stack, node, 0, 0);
   node_t      *root = node;
@@ -581,10 +584,17 @@ void _node_get_recursion_edges(tree_t *tree, node_t *node) {
     if (node != root && node->parent && node->parent->id == node->id) {
 
       edge_t *edge = malloc(sizeof(edge_t));
+      if (!edge || !list_append(tree->recursion_edge_list, edge)) {
+
+        free(edge);
+        ok = false;
+        break;
+
+      }
+
       edge->parent = node->parent;
       edge->subnode = node;
       edge->subnode_offset = f.idx;
-      list_append(tree->recursion_edge_list, edge);
 
     }
 
@@ -593,14 +603,16 @@ void _node_get_recursion_edges(tree_t *tree, node_t *node) {
   }
 
   node_stack_free(&stack);
+  return ok;
 
 }
 
-void _node_get_non_terminal_nodes(tree_t *tree, node_t *node) {
+bool _node_get_non_terminal_nodes(tree_t *tree, node_t *node) {
 
-  if (!tree || !node) return;
+  if (!tree || !node) return true;
 
-  // If a push fails, the walk stops. The list is then shorter, which is safe.
+  // If an allocation fails, the walk stops and returns false. The list is then
+  // short, and the caller must not use it.
   node_stack_t stack = {0};
   bool         ok = node_stack_push(&stack, node, 0, 0);
 
@@ -609,12 +621,13 @@ void _node_get_non_terminal_nodes(tree_t *tree, node_t *node) {
     node = node_stack_pop(&stack).node;
     if (node->id == 0) continue;
 
-    list_append(tree->non_terminal_node_list, node);
-    ok = node_stack_push_children(&stack, node, 0);
+    ok = list_append(tree->non_terminal_node_list, node) != NULL &&
+         node_stack_push_children(&stack, node, 0);
 
   }
 
   node_stack_free(&stack);
+  return ok;
 
 }
 
@@ -906,26 +919,38 @@ inline size_t tree_get_size(tree_t *tree) {
 
 }
 
-void tree_get_recursion_edges(tree_t *tree) {
+bool tree_get_recursion_edges(tree_t *tree) {
 
-  if (!tree) return;
+  if (!tree) return false;
 
   if (tree->recursion_edge_list)
     list_free_with_data_free_func(tree->recursion_edge_list, free);
   tree->recursion_edge_list = list_create();
+  if (!tree->recursion_edge_list) return false;
 
-  _node_get_recursion_edges(tree, tree->root);
+  if (_node_get_recursion_edges(tree, tree->root)) return true;
+
+  // Leave an empty list, so that no caller uses a short one
+  list_free_with_data_free_func(tree->recursion_edge_list, free);
+  tree->recursion_edge_list = list_create();
+  return false;
 
 }
 
-void tree_get_non_terminal_nodes(tree_t *tree) {
+bool tree_get_non_terminal_nodes(tree_t *tree) {
 
-  if (!tree) return;
+  if (!tree) return false;
 
   if (tree->non_terminal_node_list) list_free(tree->non_terminal_node_list);
   tree->non_terminal_node_list = list_create();
+  if (!tree->non_terminal_node_list) return false;
 
-  _node_get_non_terminal_nodes(tree, tree->root);
+  if (_node_get_non_terminal_nodes(tree, tree->root)) return true;
+
+  // Leave an empty list, so that no caller uses a short one
+  list_free(tree->non_terminal_node_list);
+  tree->non_terminal_node_list = list_create();
+  return false;
 
 }
 

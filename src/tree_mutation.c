@@ -40,9 +40,10 @@ tree_t *random_mutation(tree_t *tree) {
   node_t *node = node_pick_non_term_subnode(mutated_tree->root);
   if (unlikely(node == NULL)) {
 
-    // By design, _pick_non_term_node should not return NULL
-    perror("_pick_non_term_node returns NULL");
-    exit(EXIT_FAILURE);
+    // The sizes of the tree are 0, for example after a failed size walk
+    fprintf(stderr, "The tree has no node to pick (%s)\n", __func__);
+    tree_free(mutated_tree);
+    return NULL;
 
   }
 
@@ -281,9 +282,10 @@ tree_t *splicing_mutation(tree_t *tree) {
   node_t *node = node_pick_non_term_subnode(mutated_tree->root);
   if (unlikely(node == NULL)) {
 
-    // By design, _pick_non_term_node should not return NULL
-    perror("_pick_non_term_node returns NULL");
-    exit(EXIT_FAILURE);
+    // The sizes of the tree are 0, for example after a failed size walk
+    fprintf(stderr, "The tree has no node to pick (%s)\n", __func__);
+    tree_free(mutated_tree);
+    return NULL;
 
   }
 

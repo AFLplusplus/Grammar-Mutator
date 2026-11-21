@@ -23,7 +23,8 @@ void tree_set_max_len(size_t max_len);
  * Pick a random node of a tree and replace it with a randomly-generated new
  * subtree rooted in the same type.
  * @param  tree A parsing tree
- * @return      A mutated parsing tree
+ * @return      A mutated parsing tree, or NULL if the tree has no node to pick
+ *              (its sizes are 0) or if there is not sufficient memory
  */
 tree_t *random_mutation(tree_t *tree);
 
@@ -63,7 +64,8 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n, size_t max_growth);
  * replaced. Then it picks from a tree in the queue a random subtree that is
  * rooted in the same nonterminal to replace the old subtree.
  * @param  tree A parsing tree
- * @return      A mutated parsing tree
+ * @return      A mutated parsing tree, or NULL if the tree has no node to pick
+ *              (its sizes are 0) or if there is not sufficient memory
  */
 tree_t *splicing_mutation(tree_t *tree);
 

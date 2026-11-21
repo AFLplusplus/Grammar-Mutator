@@ -22,6 +22,7 @@
 tree_t *subtree_trimming(tree_t *tree, node_t *node) {
 
   tree_t *trimmed_tree = NULL;
+  if (unlikely(!node)) return NULL;
 
   // generate the minimal subtree
   gen_func_t gen_func = gen_funcs[node->id];

@@ -114,7 +114,10 @@ void bench_parsing() {
   for (int max_len = 0; max_len < MAX_TREE_LEN; max_len += 10) {
     for (int i = 0; i < BENCH_NUM; ++i) {
       tree = gen_init__(max_len);
-      tree_to_buf(tree);
+      if (!tree_to_buf(tree)) {
+        fprintf(stderr, "Unable to unparse the tree: out of memory\n");
+        exit(EXIT_FAILURE);
+      }
 
       start = current_time();
       recovered_tree = tree_from_buf(tree->data_buf, tree->data_len);

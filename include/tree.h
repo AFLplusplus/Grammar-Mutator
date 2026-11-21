@@ -288,21 +288,26 @@ bool tree_equal(tree_t *tree_a, tree_t *tree_b);
  * Calculate the size of a given tree (i.e., the total number of non-terminal
  * nodes in a tree).
  * @param  tree A given tree
- * @return      The total number of non-terminal nodes in this tree
+ * @return      The total number of non-terminal nodes in this tree. 0 if the
+ *              root is a terminal node or if the walk ran out of memory.
  */
 size_t tree_get_size(tree_t *tree);
 
 /**
  * Get all recursion edges in the tree, and store them in a linked list
  * @param tree A given tree
+ * @return     True on success. False if the walk ran out of memory. The list is
+ *             then empty or NULL, and the caller must not take steps from it.
  */
-void tree_get_recursion_edges(tree_t *tree);
+bool tree_get_recursion_edges(tree_t *tree);
 
 /**
  * Get all non-terminal nodes in the tree, and store them in a linked list
  * @param tree A given tree
+ * @return     True on success. False if the walk ran out of memory. The list is
+ *             then empty or NULL, and the caller must not take steps from it.
  */
-void tree_get_non_terminal_nodes(tree_t *tree);
+bool tree_get_non_terminal_nodes(tree_t *tree);
 
 /**
  * Read/Deserialize a tree from a file

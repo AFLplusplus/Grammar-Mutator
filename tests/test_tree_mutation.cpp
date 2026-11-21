@@ -48,6 +48,21 @@ TEST(TreeMutationTest, RandomMutation) {
 
 }
 
+// A failed size walk sets the root sizes to 0. Then the picks find no node.
+// The random and splicing mutations return NULL and do not stop the program.
+TEST(TreeMutationTest, MutationOfATreeWithoutSizesReturnsNull) {
+
+  auto tree = tree_create();
+  tree->root = node_create(1);
+  tree->root->non_term_size = 0;
+
+  EXPECT_EQ(random_mutation(tree), nullptr);
+  EXPECT_EQ(splicing_mutation(tree), nullptr);
+
+  tree_free(tree);
+
+}
+
 TEST(TreeMutationTest, RandomRecursiveMutation) {
 
   random_set_seed(0);  // Fix the random seed

@@ -384,6 +384,93 @@ TEST_F(CustomMutatorTest, Trimming) {
 
 }
 
+// The sizes of a node can be larger than its node and edge lists. For example,
+// a list walk that runs out of memory gives a short list. The trim stages take
+// their step counts from the lists, so each step has a node or an edge.
+TEST_F(CustomMutatorTest, TrimmingWithSizesLargerThanTheLists) {
+
+  for (int success = 0; success <= 1; ++success) {
+
+    random_set_seed(1234);
+    auto         tree = gen_init__(20);
+    const string fn = queue_dir + "/trim_sizes_" + to_string(success);
+    dump_tree_to_test_case(tree, fn.c_str());
+    ASSERT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+              1);
+
+    tree_t *cur = mutator->data->tree_cur;
+    ASSERT_NE(cur, nullptr);
+    cur->root->non_term_size += 5;
+    cur->root->recursion_edge_size += 5;
+
+    int32_t stage_max = afl_custom_init_trim(mutator->data, nullptr, 0);
+    EXPECT_EQ((size_t)stage_max, cur->non_terminal_node_list->size +
+                                     cur->recursion_edge_list->size);
+
+    int32_t stage_cur = 0;
+    while (stage_cur < stage_max) {
+
+      uint8_t *buf = nullptr;
+      afl_custom_trim(mutator->data, &buf);
+      stage_cur = afl_custom_post_trim(mutator->data, success);
+
+    }
+
+    tree_free(tree);
+
+  }
+
+}
+
+// A failed size walk sets the root sizes to 0. The fuzz stages compute the
+// sizes again, so the random and splicing stages find a node.
+TEST_F(CustomMutatorTest, FuzzingWithStaleRootSizes) {
+
+  random_set_seed(1234);
+  auto         tree = gen_init__(20);
+  const string fn = queue_dir + "/fuzz_stale_sizes";
+  dump_tree_to_test_case(tree, fn.c_str());
+  ASSERT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  ASSERT_NE(mutator->data->tree_cur, nullptr);
+  mutator->data->tree_cur->root->non_term_size = 0;
+  mutator->data->tree_cur->root->recursion_edge_size = 0;
+
+  uint32_t num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
+  ASSERT_GT(num, 0u);
+  for (uint32_t i = 0; i < num; ++i) {
+
+    uint8_t *buf = nullptr;
+    afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
+    ASSERT_NE(buf, nullptr) << i;
+
+  }
+
+  tree_free(tree);
+
+}
+
+// A tree with a terminal root has no node to mutate or trim
+TEST_F(CustomMutatorTest, TerminalRootHasNoFuzzOrTrimSteps) {
+
+  auto tree = tree_create();
+  tree->root = node_create_with_val(0, "x", 1);
+  const string fn = queue_dir + "/terminal_root";
+  const string tree_fn = tree_out_dir + "/terminal_root";
+  dump_tree_to_test_case(tree, fn.c_str());
+  write_tree_to_file(tree, tree_fn.c_str());
+  ASSERT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  ASSERT_NE(mutator->data->tree_cur, nullptr);
+  ASSERT_EQ(mutator->data->tree_cur->root->id, 0u);
+
+  EXPECT_EQ(afl_custom_fuzz_count(mutator->data, nullptr, 0), 0u);
+  EXPECT_EQ(afl_custom_init_trim(mutator->data, nullptr, 0), 0);
+
+  tree_free(tree);
+
+}
+
 // AFL++ 5.03c and later can add a trimmed case to the queue during the trim
 // loop. Then AFL++ calls `afl_custom_queue_new_entry` before the next
 // `afl_custom_trim` call. See issue #57.

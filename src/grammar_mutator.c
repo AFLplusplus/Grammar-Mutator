@@ -239,7 +239,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   if (unlikely(!slash_basename)) {
 
     // Should not reach here
-    perror("No folder in filename (afl_custom_queue_get)");
+    fprintf(stderr, "No folder in filename (afl_custom_queue_get)\n");
     return 0;
 
   }
@@ -271,7 +271,8 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   if (unlikely(!last_dir)) {
 
     // Should not reach here
-    perror("No parent folder in filename (afl_custom_queue_get)");
+    fprintf(stderr, "No parent folder in filename (afl_custom_queue_get)\n");
+    free(tree_out_dir);
     return 0;
 
   }
@@ -365,21 +366,26 @@ int32_t afl_custom_init_trim(my_mutator_t                    *data,
 
   if (!data->tree_cur || !default_trimming_steps) return 0;
 
-  tree_get_non_terminal_nodes(data->tree_cur);
-  tree_get_recursion_edges(data->tree_cur);
+  // Without the full lists, do no trimming
+  if (!tree_get_non_terminal_nodes(data->tree_cur) ||
+      !tree_get_recursion_edges(data->tree_cur))
+    return 0;
 
   data->cur_trimming_stage = 0;
   data->trim_was_effective = false;
   data->trimming_steps = 0;
 
+  // Take the step counts from the lists, not from the node sizes. Then each
+  // step has a node or an edge, also if the sizes are stale.
   data->cur_subtree_trimming_step = 0;
   data->finished_subtree_trimming_nodes = 0;
-  data->total_subtree_trimming_steps = data->tree_cur->root->non_term_size;
+  data->total_subtree_trimming_steps =
+      data->tree_cur->non_terminal_node_list->size;
 
   data->cur_recursive_trimming_step = 0;
   data->finished_recursive_trimming_edges = 0;
   data->total_recursive_trimming_steps =
-      data->tree_cur->root->recursion_edge_size;
+      data->tree_cur->recursion_edge_list->size;
 
   return data->total_subtree_trimming_steps +
          data->total_recursive_trimming_steps;
@@ -404,12 +410,30 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
 
     // subtree trimming
     node_t *node = (node_t *)list_pop_front(tree_cur->non_terminal_node_list);
+    if (unlikely(!node)) {
+
+      // should not reach here: the step count is the list size
+      *out_buf = NULL;
+      fprintf(stderr, "no node left to trim (afl_custom_trim)\n");
+      return 0;
+
+    }
+
     trimmed_tree = subtree_trimming(tree_cur, node);
 
   } else if (data->cur_trimming_stage == 1) {
 
     // recursive trimming
     edge_t *edge = (edge_t *)list_pop_front(tree_cur->recursion_edge_list);
+    if (unlikely(!edge)) {
+
+      // should not reach here: the step count is the list size
+      *out_buf = NULL;
+      fprintf(stderr, "no edge left to trim (afl_custom_trim)\n");
+      return 0;
+
+    }
+
     trimmed_tree = recursive_trimming(tree_cur, *edge);
     free(edge);
 
@@ -417,7 +441,7 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
 
     // should not reach here
     *out_buf = NULL;
-    perror("wrong trimming stage (afl_custom_trim)");
+    fprintf(stderr, "wrong trimming stage (afl_custom_trim)\n");
     return 0;
 
   }
@@ -425,7 +449,7 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
   if (unlikely(!trimmed_tree)) {
 
     *out_buf = NULL;
-    perror("trimming error, empty tree (afl_custom_trim)");
+    fprintf(stderr, "trimming error, empty tree (afl_custom_trim)\n");
     return 0;
 
   }
@@ -448,7 +472,7 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
   if (!trimmed_out) {
 
     *out_buf = NULL;
-    perror("custom mutator allocation (maybe_grow)");
+    fprintf(stderr, "custom mutator allocation (maybe_grow)\n");
     return 0;            /* afl-fuzz will very likely error out after this. */
 
   }
@@ -457,6 +481,55 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
   *out_buf = trimmed_out;
 
   return trimmed_size;
+
+}
+
+// After a successful trim, remove the tried nodes and edges from the new lists
+// and set the progress to match the lists
+static void skip_tried_trimming_steps(my_mutator_t *data) {
+
+  // The idea here is that the results that we've already tried are always at
+  // the start of the non_terminal_node_list, because whenever we get a "yes"
+  // result the nodes get trimmed out and they are always the last thing we've
+  // popped off the list.
+  //
+  // So to avoid repeating the previous attempts, just pop them out of the
+  // list right away:
+  for (uint32_t i = 0; i < data->finished_subtree_trimming_nodes; ++i)
+    list_pop_front(data->tree_cur->non_terminal_node_list);
+
+  // We are now pointing *at* the node we just replaced.
+  // So we want to skip it and its children!
+  node_t *node = list_pop_front(data->tree_cur->non_terminal_node_list);
+  if (node) {
+
+    // Remember to skip these next time as well:
+    data->finished_subtree_trimming_nodes += 1 + node->non_term_size;
+
+    for (uint32_t i = 0; i < node->non_term_size; ++i)
+      list_pop_front(data->tree_cur->non_terminal_node_list);
+
+  }
+
+  size_t new_node_size = data->tree_cur->non_terminal_node_list->size;
+
+  // Set our progress equal to the remaining un-tested nodes in the list. The
+  // remaining steps must not be more than the list size.
+  data->cur_subtree_trimming_step =
+      new_node_size < data->total_subtree_trimming_steps
+          ? data->total_subtree_trimming_steps - new_node_size
+          : 0;
+
+  // Avoid repeating work by skipping edges that we have already tried.
+  for (uint32_t i = 0; i < data->finished_recursive_trimming_edges; ++i)
+    list_pop_front(data->tree_cur->recursion_edge_list);
+  size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
+
+  // Set our progress equal to the remaining un-tested edges in the list:
+  data->cur_recursive_trimming_step =
+      new_edge_size < data->total_recursive_trimming_steps
+          ? data->total_recursive_trimming_steps - new_edge_size
+          : 0;
 
 }
 
@@ -473,48 +546,12 @@ int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
     tree_free(data->tree_cur);
     data->tree_cur = data->trimmed_tree;
 
-    // Update the non-terminal node list
-    tree_get_non_terminal_nodes(data->tree_cur);
-
-    // The idea here is that the results that we've already tried are always at
-    // the start of the non_terminal_node_list, because whenever we get a "yes"
-    // result the nodes get trimmed out and they are always the last thing we've
-    // popped off the list.
-    //
-    // So to avoid repeating the previous attempts, just pop them out of the
-    // list right away:
-    for (uint32_t i = 0; i < data->finished_subtree_trimming_nodes; ++i)
-      list_pop_front(data->tree_cur->non_terminal_node_list);
-
-    // We are now pointing *at* the node we just replaced.
-    // So we want to skip it and its children!
-    node_t *node = list_pop_front(data->tree_cur->non_terminal_node_list);
-    if (node) {
-
-      // Remember to skip these next time as well:
-      data->finished_subtree_trimming_nodes += 1 + node->non_term_size;
-
-      for (uint32_t i = 0; i < node->non_term_size; ++i)
-        list_pop_front(data->tree_cur->non_terminal_node_list);
-
-    }
-
-    size_t new_node_size = data->tree_cur->non_terminal_node_list->size;
-
-    // Set our progress equal to the remaining un-tested nodes in the list:
-    data->cur_subtree_trimming_step =
-        data->total_subtree_trimming_steps - new_node_size;
-
-    // update the recursion edge list
-    tree_get_recursion_edges(data->tree_cur);
-    // Avoid repeating work by skipping edges that we have already tried.
-    for (uint32_t i = 0; i < data->finished_recursive_trimming_edges; ++i)
-      list_pop_front(data->tree_cur->recursion_edge_list);
-    size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
-
-    // Set our progress equal to the remaining un-tested edges in the list:
-    data->cur_recursive_trimming_step =
-        data->total_recursive_trimming_steps - new_edge_size;
+    // Update the lists. Without the full lists, stop the trimming.
+    if (tree_get_non_terminal_nodes(data->tree_cur) &&
+        tree_get_recursion_edges(data->tree_cur))
+      skip_tried_trimming_steps(data);
+    else
+      data->cur_trimming_stage = 2;
 
   } else {
 
@@ -588,14 +625,50 @@ static bool select_rules_mutation_pair(my_mutator_t *data) {
 
 }
 
+/* Move to the next node and rule id of the rules mutation stage, from the
+  current rule id on. Return false if the node list has no next pair. The
+  caller then ends the stage. */
+static bool next_rules_mutation_pair(my_mutator_t *data) {
+
+  while (true) {
+
+    node_t *node = data->cur_rules_mutation_node;
+    if (!node || data->cur_rules_mutation_rule_id >= node_num_rules[node->id]) {
+
+      // next node
+      node = (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
+      if (unlikely(!node)) return false;
+      data->cur_rules_mutation_node = node;
+      // next rule id
+      data->cur_rules_mutation_rule_id = 0;
+
+    }
+
+    if (data->cur_rules_mutation_rule_id != node->rule_id &&
+        select_rules_mutation_pair(data))
+      return true;
+
+    // skip the current rule id
+    ++data->cur_rules_mutation_rule_id;
+
+  }
+
+}
+
 uint32_t afl_custom_fuzz_count(my_mutator_t                          *data,
                                __attribute__((unused)) const uint8_t *buf,
                                __attribute__((unused)) size_t buf_size) {
 
   if (!data->tree_cur) return 0;
 
-  tree_get_non_terminal_nodes(data->tree_cur);
-  tree_get_recursion_edges(data->tree_cur);
+  /* Compute the sizes again: the random and splicing stages pick a node with
+    them. A terminal root has no node to mutate. If a walk runs out of memory,
+    the sizes or the lists are not complete. In these cases, plan no mutation.
+  */
+  if (!tree_get_size(data->tree_cur) ||
+      !tree_get_non_terminal_nodes(data->tree_cur) ||
+      !tree_get_recursion_edges(data->tree_cur))
+    return 0;
 
   data->cur_fuzzing_stage = 0;
   data->cur_fuzzing_step = 0;
@@ -617,38 +690,13 @@ uint32_t afl_custom_fuzz_count(my_mutator_t                          *data,
 
   data->total_splicing_mutation_steps = default_splicing_mutation_steps;
 
-  if (data->total_rules_mutation_steps > 0) {
+  // find `node` and `rule_id`
+  data->cur_rules_mutation_node = NULL;
+  data->cur_rules_mutation_rule_id = 0;
+  if (data->total_rules_mutation_steps > 0 && !next_rules_mutation_pair(data))
+    data->total_rules_mutation_steps = 0;
 
-    // find `node` and `rule_id`
-    data->cur_rules_mutation_node =
-        (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
-    data->cur_rules_mutation_rule_id = 0;
-
-    size_t num_rules = 0;
-    while (true) {
-
-      num_rules = node_num_rules[data->cur_rules_mutation_node->id];
-      if (data->cur_rules_mutation_rule_id >= num_rules) {
-
-        // next node
-        data->cur_rules_mutation_node =
-            (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
-        // next rule id
-        data->cur_rules_mutation_rule_id = 0;
-
-      }
-
-      if (data->cur_rules_mutation_rule_id !=
-              data->cur_rules_mutation_node->rule_id &&
-          select_rules_mutation_pair(data))
-        break;
-
-      // skip the current rule id
-      ++data->cur_rules_mutation_rule_id;
-
-    }
-
-  } else {
+  if (data->total_rules_mutation_steps == 0) {
 
     // no rules mutation stage
     // move to next stage
@@ -736,14 +784,18 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
       tree = splicing_mutation(tree);
       break;
     default:
-      perror("mutation error, invalid choice (afl_custom_fuzz)");
+      // All stages are done. AFL++ calls no more than the planned steps, so
+      // this occurs only if the rules mutation stage ended early.
+      *out_buf = NULL;
+      fprintf(stderr, "mutation error, invalid choice (afl_custom_fuzz)\n");
       return 0;
 
   }
 
   if (!tree) {
 
-    perror("mutation error, empty tree (afl_custom_fuzz)");
+    *out_buf = NULL;
+    fprintf(stderr, "mutation error, empty tree (afl_custom_fuzz)\n");
     return 0;
 
   }
@@ -760,29 +812,12 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
 
     } else {
 
-      // update node and rule id
+      // update node and rule id. Without a next pair, end the stage.
       ++data->cur_rules_mutation_rule_id;  // next rule id
-      size_t num_rules = 0;
-      while (true) {
+      if (!next_rules_mutation_pair(data)) {
 
-        num_rules = node_num_rules[data->cur_rules_mutation_node->id];
-        if (data->cur_rules_mutation_rule_id >= num_rules) {
-
-          // next node
-          data->cur_rules_mutation_node =
-              (node_t *)list_pop_front(data->tree_cur->non_terminal_node_list);
-          // next rule id
-          data->cur_rules_mutation_rule_id = 0;
-
-        }
-
-        if (data->cur_rules_mutation_rule_id !=
-                data->cur_rules_mutation_node->rule_id &&
-            select_rules_mutation_pair(data))
-          break;
-
-        // skip the current rule id
-        ++data->cur_rules_mutation_rule_id;
+        ++data->cur_fuzzing_stage;
+        data->cur_fuzzing_step = 0;
 
       }
 
@@ -900,8 +935,9 @@ uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
   tree_t *tree = data->mutated_tree;
   if (tree) {
 
-    tree_to_buf(tree);
-    if (!file_has_bytes(fn, tree->data_buf, tree->data_len)) {
+    // Without the bytes of the tree, parse the test case
+    if (!tree_to_buf(tree) ||
+        !file_has_bytes(fn, tree->data_buf, tree->data_len)) {
 
       tree_free(tree);
       tree = NULL;

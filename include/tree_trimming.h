@@ -19,7 +19,7 @@ extern "C" {
  * smallest possible subtree at this position
  * @param  tree A tree
  * @param  node The non-terminal node that needs to be trimmed
- * @return      A tree with smaller size
+ * @return      A tree with smaller size, or NULL if `node` is NULL
  */
 tree_t *subtree_trimming(tree_t *tree, node_t *node);
 
