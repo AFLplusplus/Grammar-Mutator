@@ -25,6 +25,17 @@ Thank you for your help. This file tells you how to send a change.
    make test-python
    ```
 
+   If you change the C++ matcher (`lib/antlr4_shim/g4_*`), build a `.g4`
+   grammar and run the matcher tests. Run them with AddressSanitizer too. The
+   ANTLR runtime has no ASan code, so ASan needs
+   `ASAN_OPTIONS=detect_container_overflow=0` on Linux and macOS. The script
+   sets it if `ASAN_OPTIONS` is empty. CI has no ASan job.
+
+   ```bash
+   tests/g4/run_matcher_tests.sh
+   MATCHER_FLAGS=-fsanitize=address tests/g4/run_matcher_tests.sh
+   ```
+
 4. Format the C and C++ code with clang-format 23. Other major versions give
    different output, so the format script refuses them. `make deps` installs
    clang-format 23 and the other Python tools into `.venv` with pip. The

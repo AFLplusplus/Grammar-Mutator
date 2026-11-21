@@ -25,7 +25,7 @@ class SpinBase : public antlr4::Parser {
 
  public:
   // The time that one call of spin() waits, in microseconds
-  static constexpr int SPIN_US = 100;
+  static constexpr int SPIN_US = 250;
 
   explicit SpinBase(antlr4::TokenStream *input);
 

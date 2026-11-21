@@ -16,9 +16,11 @@
 # - MATCHER_FLAGS: more compiler and linker flags, for example
 #   "-fsanitize=address".
 # - JOBS: the number of parallel jobs (default: the number of CPUs).
-# With MATCHER_FLAGS=-fsanitize=address, also set
-# ASAN_OPTIONS=detect_container_overflow=0. The runtime library has no ASan
-# code, so the container check gives false reports for its vectors.
+# - ASAN_OPTIONS: the AddressSanitizer options. If MATCHER_FLAGS has
+#   -fsanitize=address and ASAN_OPTIONS is empty, the script sets
+#   ASAN_OPTIONS=detect_container_overflow=0. The runtime library has no ASan
+#   code, so the container check gives false reports for its vectors (on Linux
+#   and macOS). If you set ASAN_OPTIONS, add detect_container_overflow=0 to it.
 # The paths of the repository and the build must not have spaces.
 set -eu
 
@@ -100,6 +102,14 @@ for f in "$python" "$runtime_lib" "$runtime_src/antlr4-runtime.h" "$jar"; do
 done
 jobs=${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}
 common_flags="-O1 -g -fPIC -pthread ${MATCHER_FLAGS:-}"
+case " ${MATCHER_FLAGS:-} " in
+  *" -fsanitize="*address*)
+    if [ -z "${ASAN_OPTIONS:-}" ]; then
+      ASAN_OPTIONS=detect_container_overflow=0
+      export ASAN_OPTIONS
+    fi
+    ;;
+esac
 cxx_flags="-std=gnu++17 -Wno-attributes $common_flags -I$runtime_src"
 
 if [ "${1:-}" = --generate ]; then

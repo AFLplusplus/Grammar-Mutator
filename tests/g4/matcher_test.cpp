@@ -662,8 +662,8 @@ std::string spin_input(std::string_view mode, size_t n) {
 }
 
 // Parse a "spin" input of 20,000 words with a budget. Each word calls spin()
-// at least once, and spin() waits 100 us of wall-clock time. So without a
-// budget, the parse takes at least 2 s on any machine.
+// at least once, and spin() waits 250 us of wall-clock time. So without a
+// budget, the parse takes at least 5 s on any machine.
 void check_spin_budget(std::string_view mode) {
 
   round_trip(t_spin::grammar, spin_input(mode, 3));
@@ -687,9 +687,11 @@ void check_spin_budget(std::string_view mode) {
   CHECK_STATUS(result, PARSE_LIMIT);
   CHECK(!result.tree);
   // The parse does not stop before the deadline, and it stops long before
-  // the 2 s of a full parse.
+  // the 5 s of a full parse. The upper bound is half of a full parse. It
+  // leaves time for a slow machine, a stalled CI runner, and Valgrind (a
+  // limited parse takes about 1.3 s under Valgrind).
   CHECK(limited >= 0.19);
-  CHECK(limited < 1.0);
+  CHECK(limited < 2.5);
   std::printf("    %.*s: limited %.3f s\n", static_cast<int>(mode.size()),
               mode.data(), limited);
 
