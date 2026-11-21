@@ -196,3 +196,15 @@ afl-fuzz -m 128 -i seeds -o out -- /path/to/target @@
 ## Contact & Contributions
 
 We welcome any questions and contributions! Feel free to open an issue or submit a pull request!
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
+
+### Branches and Releases
+
+`stable` is the only long-lived branch.
+Send all pull requests to `stable`.
+
+The `dev` branch is abandoned.
+It stays in the repository for history, but it does not get new changes.
+
+[Release Please](https://github.com/googleapis/release-please) makes the releases from `stable`.
+See [CHANGELOG.md](CHANGELOG.md) and the [GitHub releases](https://github.com/AFLplusplus/Grammar-Mutator/releases) for the changes in each version.
