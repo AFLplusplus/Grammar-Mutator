@@ -24,8 +24,8 @@ as little-endian u32 values, and then its value bytes:
 
 The functions in this file use a loop, not recursion, so a deep tree works.
 The format is the format of src/tree.c. f1_c_gen.py writes the trees of
-the F1 generator with it, and g4_parse.py writes the trees of
-grammar_parser with it.
+the F1 generator with it. The C code of grammar_parser writes the
+same format.
 """
 
 from __future__ import annotations
