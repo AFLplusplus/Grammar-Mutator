@@ -586,6 +586,54 @@ TEST_F(TreeTest, ParseSpecialCharacter) {
 
 }
 
+TEST_F(TreeTest, TreeParseReportsStatus) {
+
+  parse_status_t status = PARSE_THREAD_ERROR;
+  char           bad[] = "\xFD";
+  EXPECT_EQ(tree_parse((const uint8_t *)bad, 1, nullptr, &status), nullptr);
+  EXPECT_EQ(status, PARSE_SYNTAX_ERROR);
+
+  // A generated tree gives a valid test case for any grammar
+  tree_t *gen = gen_init__(0);
+  tree_to_buf(gen);
+  status = PARSE_THREAD_ERROR;
+  tree_t *parsed = tree_parse(gen->data_buf, gen->data_len, nullptr, &status);
+  EXPECT_NE(parsed, nullptr);
+  EXPECT_EQ(status, PARSE_OK);
+  tree_free(parsed);
+  tree_free(gen);
+
+  // The status pointer may be NULL
+  EXPECT_EQ(tree_parse((const uint8_t *)bad, 1, nullptr, nullptr), nullptr);
+
+}
+
+TEST_F(TreeTest, EmptyTestCaseFile) {
+
+  const char *fn = "empty_test_case_file";
+  FILE       *f = fopen(fn, "wb");
+  ASSERT_NE(f, nullptr);
+  fclose(f);
+
+  // A sentinel that no parse gives proves that the parser ran
+  parse_status_t status = (parse_status_t)-1;
+  tree_t        *t = load_tree_from_test_case_ex(fn, nullptr, &status);
+  EXPECT_NE((int)status, -1);
+  if (t) tree_free(t);
+  remove(fn);
+
+}
+
+TEST_F(TreeTest, MissingTestCaseFileKeepsStatus) {
+
+  parse_status_t status = PARSE_OK;
+  EXPECT_EQ(
+      load_tree_from_test_case_ex("no_such_test_case_file", nullptr, &status),
+      nullptr);
+  EXPECT_EQ(status, PARSE_OK);
+
+}
+
 int main(int argc, char **argv) {
 
   ::testing::InitGoogleTest(&argc, argv);

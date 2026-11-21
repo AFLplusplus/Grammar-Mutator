@@ -18,6 +18,8 @@
 #include "helpers.h"
 #include "tree.h"
 #include "list.h"
+#include "parse_budget.h"
+#include "map.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +40,12 @@ typedef struct my_mutator {
   afl_t *afl;
 
   bool tree_out_dir_exist;
+
+  // The parse time budget. NULL if PARSE_TIME_BUDGET=0.
+  parse_budget_t *budget;
+  // The entries that the parser rejected in this run. The keys are the entry
+  // file names.
+  map_int_t rejected;
 
   const uint8_t *filename_cur;
   tree_t        *tree_cur;

@@ -47,6 +47,10 @@ size_t default_rules_mutation_steps = SIZE_MAX;
 // env: TRIMMING_STEPS
 size_t default_trimming_steps = SIZE_MAX;
 
+// Use the parse time budget unless PARSE_TIME_BUDGET is exactly "0".
+// env: PARSE_TIME_BUDGET
+static bool parse_time_budget_on = true;
+
 static void load_env_configs() {
 
   char *ptr;
@@ -71,6 +75,9 @@ static void load_env_configs() {
 
   }
 
+  ptr = getenv("PARSE_TIME_BUDGET");
+  parse_time_budget_on = !(ptr && strcmp(ptr, "0") == 0);
+
 }
 
 my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
@@ -90,6 +97,16 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   }
 
   data->afl = afl;
+  map_init(&data->rejected);
+
+  if (parse_time_budget_on) {
+
+    data->budget = parse_budget_create();
+    // Without a budget, the parser runs without a time limit
+    if (!data->budget)
+      perror("Cannot create the parse budget (afl_custom_init)");
+
+  }
 
   return data;
 
@@ -120,10 +137,34 @@ void afl_custom_deinit(my_mutator_t *data) {
   data->finished_recursive_trimming_edges = 0;
   data->total_recursive_trimming_steps = 0;
 
+  parse_budget_free(data->budget);
+  map_deinit(&data->rejected);
+
   free(data->fuzz_buf);
   free(data);
 
   chunk_store_clear();
+
+}
+
+/* Parse the test case file "fn". Return NULL if the parser rejected the entry
+  before, or if the parse fails.
+
+  The load function leaves the status as PARSE_OK when it cannot read the file.
+  So NULL with PARSE_OK means "not read". The code does not remember such an
+  entry. It does not remember PARSE_THREAD_ERROR either, because a retry can
+  work. Any other failure goes into the rejected set for the rest of the run. */
+static tree_t *parse_entry(my_mutator_t *data, const char *fn) {
+
+  if (map_get(&data->rejected, fn)) return NULL;
+
+  parse_status_t status = PARSE_OK;
+  tree_t        *tree = load_tree_from_test_case_ex(fn, data->budget, &status);
+  if (tree) return tree;
+
+  if (status != PARSE_OK && status != PARSE_THREAD_ERROR)
+    map_set(&data->rejected, fn, 1);
+  return NULL;
 
 }
 
@@ -235,7 +276,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   }
 
   // try to parse the test case
-  data->tree_cur = load_tree_from_test_case(fn);
+  data->tree_cur = parse_entry(data, fn);
   if (data->tree_cur) {
 
     // Now that we've parsed it, cache the info from this test case in
@@ -248,9 +289,10 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   }
 
-  // parsing error, skip the current test case
+  // The parser rejected the entry. Keep it in the queue without a tree, so
+  // that the other AFL++ stages still fuzz it.
 
-  return 0;
+  return 1;
 
 }
 
@@ -299,6 +341,14 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
   size_t  trimmed_size = 0;
   tree_t *tree_cur = data->tree_cur;
 
+  if (unlikely(!tree_cur)) {
+
+    // No tree, so there is nothing to trim
+    *out_buf = NULL;
+    return 0;
+
+  }
+
   if (data->cur_trimming_stage == 0) {
 
     // subtree trimming
@@ -345,6 +395,8 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
 }
 
 int32_t afl_custom_post_trim(my_mutator_t *data, int success) {
+
+  if (unlikely(!data->tree_cur)) return 0;
 
   if (success) {
 
@@ -570,10 +622,9 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
   tree = data->tree_cur;
   if (unlikely(!tree)) {
 
-    // Randomly generate a test case
-    tree = gen_init__(500);
-    tree_get_non_terminal_nodes(tree);
-    tree_get_size(tree);
+    // The entry has no tree, and the mutation stages need one
+    *out_buf = NULL;
+    return 0;
 
   }
 
@@ -777,7 +828,7 @@ uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
       `afl_custom_queue_get`, because it replaces `data->tree_cur` while the
       trimming loop still uses it (issue #57). Parse the test case into a
       separate tree. */
-    tree = load_tree_from_test_case(fn);
+    tree = parse_entry(data, fn);
     if (unlikely(!tree)) return 0;
     tree_get_size(tree);
 

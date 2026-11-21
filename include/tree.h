@@ -10,6 +10,7 @@
 
 #include "helpers.h"
 #include "list.h"
+#include "parse_budget.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -214,6 +215,33 @@ void tree_free(tree_t *tree);
 void tree_to_buf(tree_t *tree);
 
 /**
+ * The result of one parse. A parser that returns a tree sets PARSE_OK.
+ * A parser that returns NULL sets another value.
+ */
+typedef enum {
+
+  PARSE_OK,
+  PARSE_NOT_UTF8,
+  PARSE_SYNTAX_ERROR,
+  PARSE_LIMIT,
+  PARSE_NO_MATCH,
+  PARSE_THREAD_ERROR
+
+} parse_status_t;
+
+/**
+ * Parse the given buffer to construct a parsing tree. Each ANTLR shim
+ * defines this function.
+ * @param  buf    The buffer of a test case
+ * @param  len    The size of the buffer
+ * @param  budget The parse time budget, or NULL for no budget
+ * @param  status Receives the result of the parse, or NULL
+ * @return        A newly created tree, or NULL if the parse fails
+ */
+tree_t *tree_parse(const uint8_t *buf, size_t len, parse_budget_t *budget,
+                   parse_status_t *status);
+
+/**
  * Parse the given buffer to construct a parsing tree
  * @param  data_buf  The buffer of a test case
  * @param  data_size The size of the buffer
@@ -284,6 +312,20 @@ tree_t *read_tree_from_file(const char *filename);
  * @return         The parsed tree
  */
 tree_t *load_tree_from_test_case(const char *filename);
+
+/**
+ * Load/Parse a tree from a test case file, with a budget and a status.
+ * If the code cannot open or read the file, it returns NULL and does not
+ * change "status". The caller sets "status" to PARSE_OK before the call.
+ * So NULL with PARSE_OK means that the code did not read the file.
+ * @param filename The path to the fuzzing test case
+ * @param budget   The parse time budget, or NULL
+ * @param status   Receives the result of the parse, or NULL
+ * @return         The parsed tree, or NULL
+ */
+tree_t *load_tree_from_test_case_ex(const char     *filename,
+                                    parse_budget_t *budget,
+                                    parse_status_t *status);
 
 /**
  * Write/Serialize a tree to a file

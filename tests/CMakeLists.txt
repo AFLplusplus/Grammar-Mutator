@@ -58,6 +58,8 @@ add_executable(test_custom_mutator test_custom_mutator.cpp)
 target_link_libraries(test_custom_mutator
   PRIVATE gtest_main
   PRIVATE grammarmutator)
+target_include_directories(test_custom_mutator
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)
 add_test(
   NAME test_custom_mutator
   COMMAND test_custom_mutator)

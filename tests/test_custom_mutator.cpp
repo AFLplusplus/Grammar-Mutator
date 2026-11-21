@@ -489,6 +489,115 @@ TEST_F(CustomMutatorTest, QueueNewEntryDuringTrimAfterFuzzing) {
 
 }
 
+static void expect_no_tree_file(const string &fn) {
+
+  FILE *f = fopen(fn.c_str(), "rb");
+  EXPECT_EQ(f, nullptr) << fn;
+  if (f) fclose(f);
+
+}
+
+static string valid_test_case() {
+
+  tree_t *gen = gen_init__(0);
+  tree_to_buf(gen);
+  string content((const char *)gen->data_buf, gen->data_len);
+  tree_free(gen);
+  return content;
+
+}
+
+TEST_F(CustomMutatorTest, RejectedEntryReturnsOne) {
+
+  const string fn = queue_dir + "/rejected_0";
+  write_test_case(fn, (const uint8_t *)"\xFD", 1);
+
+  EXPECT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  EXPECT_EQ(mutator->data->tree_cur, nullptr);
+  EXPECT_EQ(afl_custom_fuzz_count(mutator->data, nullptr, 0), 0u);
+  EXPECT_EQ(afl_custom_init_trim(mutator->data, nullptr, 0), 0);
+  expect_no_tree_file(tree_out_dir + "/rejected_0");
+
+}
+
+TEST_F(CustomMutatorTest, RejectedEntryIsNotParsedAgain) {
+
+  const string fn = queue_dir + "/rejected_1";
+  write_test_case(fn, (const uint8_t *)"\xFD", 1);
+  EXPECT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  EXPECT_EQ(mutator->data->tree_cur, nullptr);
+
+  // The file is valid now, but the set answers
+  string valid = valid_test_case();
+  write_test_case(fn, (const uint8_t *)valid.data(), valid.size());
+  EXPECT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  EXPECT_EQ(mutator->data->tree_cur, nullptr);
+
+  // Another entry name is a new key
+  const string fn2 = queue_dir + "/accepted_1";
+  write_test_case(fn2, (const uint8_t *)valid.data(), valid.size());
+  EXPECT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn2.c_str()),
+            1);
+  EXPECT_NE(mutator->data->tree_cur, nullptr);
+
+}
+
+TEST_F(CustomMutatorTest, RejectedEntryOutsideQueue) {
+
+  const string dir = out_dir + "/other";
+  ASSERT_TRUE(create_directory(dir.c_str()));
+  const string fn = dir + "/rejected_2";
+  write_test_case(fn, (const uint8_t *)"\xFD", 1);
+  EXPECT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  EXPECT_EQ(mutator->data->tree_cur, nullptr);
+
+  string valid = valid_test_case();
+  write_test_case(fn, (const uint8_t *)valid.data(), valid.size());
+  EXPECT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  EXPECT_EQ(mutator->data->tree_cur, nullptr);
+
+}
+
+TEST(CustomMutatorEnv, ParseTimeBudgetOff) {
+
+  const char *old = getenv("PARSE_TIME_BUDGET");
+  string      saved = old ? old : "";
+
+  setenv("PARSE_TIME_BUDGET", "0", 1);
+  my_mutator_t *data = afl_custom_init(nullptr, 0);
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->budget, nullptr);
+  afl_custom_deinit(data);
+
+  setenv("PARSE_TIME_BUDGET", "1", 1);
+  data = afl_custom_init(nullptr, 0);
+  ASSERT_NE(data, nullptr);
+  EXPECT_NE(data->budget, nullptr);
+  afl_custom_deinit(data);
+
+  unsetenv("PARSE_TIME_BUDGET");
+  data = afl_custom_init(nullptr, 0);
+  ASSERT_NE(data, nullptr);
+  EXPECT_NE(data->budget, nullptr);
+  afl_custom_deinit(data);
+
+  if (old) {
+
+    setenv("PARSE_TIME_BUDGET", saved.c_str(), 1);
+
+  } else {
+
+    unsetenv("PARSE_TIME_BUDGET");
+
+  }
+
+}
+
 int main(int argc, char **argv) {
 
   ::testing::InitGoogleTest(&argc, argv);

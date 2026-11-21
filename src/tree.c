@@ -899,7 +899,25 @@ tree_t *read_tree_from_file(const char *filename) {
 
 }
 
+tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
+
+  return tree_parse(data_buf, data_size, NULL, NULL);
+
+}
+
 tree_t *load_tree_from_test_case(const char *filename) {
+
+  return load_tree_from_test_case_ex(filename, NULL, NULL);
+
+}
+
+/* If the code cannot open or read the file, it returns NULL and leaves
+  "*status" as it is. The caller sets "*status" to PARSE_OK before the call.
+  So NULL with PARSE_OK means "not read". The caller must not remember such
+  an entry as rejected. */
+tree_t *load_tree_from_test_case_ex(const char     *filename,
+                                    parse_budget_t *budget,
+                                    parse_status_t *status) {
 
   tree_t *tree = NULL;
 
@@ -912,32 +930,36 @@ tree_t *load_tree_from_test_case(const char *filename) {
 
     // error, no file info
     perror("Cannot get file information");
+    close(fd);
     return NULL;
 
   }
 
-  size_t   file_size = info.st_size;
+  size_t file_size = info.st_size;
+  if (file_size == 0) {
+
+    // Do not map an empty file. Parse an empty buffer.
+    close(fd);
+    static const uint8_t empty = 0;
+    return tree_parse(&empty, 0, budget, status);
+
+  }
+
   uint8_t *buf =
       (uint8_t *)mmap(0, file_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
   if (unlikely(buf == MAP_FAILED)) {
 
     perror("Cannot map the test case file to the memory");
+    close(fd);
     return NULL;
 
   }
 
   close(fd);
 
-  // Deserialize the data to recover the tree
-  tree = tree_from_buf(buf, file_size);
+  // Parse the data to build the tree
+  tree = tree_parse(buf, file_size, budget, status);
   munmap(buf, file_size);
-  if (unlikely(!tree)) {
-
-    // error, cannot parse the data
-    return NULL;
-
-  }
-
   return tree;
 
 }

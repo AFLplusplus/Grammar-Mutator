@@ -113,6 +113,10 @@ endif
 test_tree_mutation.o: test_tree_mutation.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
 
+.PRECIOUS: test_custom_mutator.o
+test_custom_mutator.o: test_custom_mutator.cpp $(GTEST_INCLUDE)
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
+
 .PRECIOUS: test_chunk_store.o
 test_chunk_store.o: test_chunk_store.cpp $(GTEST_INCLUDE)
 	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<

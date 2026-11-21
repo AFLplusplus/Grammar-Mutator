@@ -69,8 +69,14 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
   return node;
 }
 
-tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
+tree_t *tree_parse(const uint8_t *data_buf, size_t data_size,
+                   parse_budget_t * /* budget: the JSON shim ignores it */,
+                   parse_status_t *status) {
   node_t *root;
+
+  // A returned tree means PARSE_OK, even if ANTLR recovered from errors.
+  // NULL means PARSE_SYNTAX_ERROR.
+  if (status) *status = PARSE_SYNTAX_ERROR;
 
   /**
    * Use try/catch to handle exceptions from ANTLR4 runtime library. If any
@@ -120,5 +126,6 @@ tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size) {
 
   tree_t *tree = tree_create();
   tree->root = root;
+  if (status) *status = PARSE_OK;
   return tree;
 }
