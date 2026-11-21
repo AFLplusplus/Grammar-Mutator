@@ -1041,8 +1041,15 @@ void write_tree_to_file(tree_t *tree, const char *filename) {
 
   int fd, ret;
 
-  // Serialize the tree
-  tree_serialize(tree);
+  // Serialize the tree. Without memory for it, write no tree file.
+  if (!tree_serialize(tree)) {
+
+    fprintf(
+        stderr,
+        "Unable to serialize the tree: out of memory (write_tree_to_file)\n");
+    return;
+
+  }
 
   // Open the file
   fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
@@ -1077,8 +1084,15 @@ void dump_tree_to_test_case(tree_t *tree, const char *filename) {
 
   int fd, ret;
 
-  // Unparse the tree
-  tree_to_buf(tree);
+  // Unparse the tree. Without memory for it, write no test case file.
+  if (!tree_to_buf(tree)) {
+
+    fprintf(stderr,
+            "Unable to unparse the tree: out of memory "
+            "(dump_tree_to_test_case)\n");
+    return;
+
+  }
 
   // Open the file
   fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);

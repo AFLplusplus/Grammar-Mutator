@@ -32,13 +32,23 @@
 #define MAX_TRIES 100
 
 // Generate a test case that is not empty and is not in `seen`. Return NULL if
-// MAX_TRIES tries do not give one.
-static tree_t *generate_new_tree(int max_len, hash_set_t *seen) {
+// MAX_TRIES tries do not give one, or if there is not sufficient memory. The
+// second case sets `*out_of_memory`.
+static tree_t *generate_new_tree(int max_len, hash_set_t *seen,
+                                 bool *out_of_memory) {
 
+  *out_of_memory = false;
   for (int i = 0; i < MAX_TRIES; ++i) {
 
     tree_t *tree = gen_init__(max_len);
-    tree_to_buf(tree);
+    if (!tree_to_buf(tree)) {
+
+      tree_free(tree);
+      *out_of_memory = true;
+      return NULL;
+
+    }
+
     if (tree->data_len &&
         hash_set_add(seen, hash_bytes(tree->data_buf, tree->data_len)))
       return tree;
@@ -106,7 +116,16 @@ int main(int argc, const char *argv[]) {
 
   for (; num < max_num; ++num) {
 
-    tree = generate_new_tree(max_len, seen);
+    bool out_of_memory;
+    tree = generate_new_tree(max_len, seen, &out_of_memory);
+    if (out_of_memory) {
+
+      fprintf(stderr, "Unable to allocate memory for a test case\n");
+      hash_set_free(seen);
+      return EXIT_FAILURE;
+
+    }
+
     if (!tree) {
 
       printf("No new test case after %d tries; stop at %d test cases\n",

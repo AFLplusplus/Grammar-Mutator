@@ -333,14 +333,16 @@ tree_t *load_tree_from_test_case_ex(const char     *filename,
                                     parse_status_t *status);
 
 /**
- * Write/Serialize a tree to a file
+ * Write/Serialize a tree to a file. If there is not sufficient memory to
+ * serialize the tree, the function prints a message and writes no file.
  * @param tree     The tree to be written to the file
  * @param filename The path to the tree file
  */
 void write_tree_to_file(tree_t *tree, const char *filename);
 
 /**
- * Dump a tree to a test case file
+ * Dump a tree to a test case file. If there is not sufficient memory to
+ * unparse the tree, the function prints a message and writes no file.
  * @param tree     The tree to be written to the file
  * @param filename The path to the test case file
  */

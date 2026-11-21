@@ -222,6 +222,45 @@ test_read_error_exits_2() {
   expect_in_file stderr "[-] Cannot read b.json: "
 }
 
+test_read_error_on_a_duplicate_name_exits_2() {
+  if [ "$(id -u)" -eq 0 ]; then
+    echo "    skipped: root can read any file"
+    return
+  fi
+  # A read error wins over the duplicate name
+  mkdir -p seeds/sub
+  printf '[]' > seeds/a.json
+  printf '[1]' > seeds/sub/a.json
+  chmod 0 seeds/sub/a.json
+  run seeds trees
+  chmod 644 seeds/sub/a.json
+  expect_code 2
+  expect_in_file stderr "[-] Cannot read sub/a.json: "
+}
+
+test_readdir_error_exits_2() {
+  # readdir_error.c makes each readdir call fail
+  if ! ${CC:-cc} -shared -fPIC -o readdir_error.so "$root/tests/g4/readdir_error.c" 2> cc_errors; then
+    echo "    skipped: cannot compile readdir_error.c"
+    sed 's/^/      /' cc_errors
+    return
+  fi
+  mkdir seeds
+  printf '[]' > seeds/a.json
+  code=0
+  (
+    LD_PRELOAD=$dir/readdir_error.so
+    DYLD_INSERT_LIBRARIES=$dir/readdir_error.so
+    export LD_PRELOAD DYLD_INSERT_LIBRARIES
+    "$parser" seeds trees
+  ) > stdout 2> stderr || code=$?
+  expect_code 2
+  expect_in_file stderr "[-] Cannot read the folder seeds: "
+  if [ -e trees ]; then
+    fail "a readdir error made the folder trees"
+  fi
+}
+
 test_write_error_exits_2() {
   if [ "$(id -u)" -eq 0 ]; then
     echo "    skipped: root can write in a folder with mode 555"
@@ -380,6 +419,8 @@ test_reports_parser_limit
 test_jobs_give_the_same_output
 test_bad_options_exit_2
 test_read_error_exits_2
+test_read_error_on_a_duplicate_name_exits_2
+test_readdir_error_exits_2
 test_write_error_exits_2
 test_mkdir_error_exits_2
 test_empty_folder_argument_exits_2

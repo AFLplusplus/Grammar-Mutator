@@ -54,7 +54,8 @@ typedef enum {
   RESULT_TREE,
   RESULT_SKIP,
   RESULT_READ_ERROR,
-  RESULT_THREAD_ERROR
+  RESULT_THREAD_ERROR,
+  RESULT_MEMORY_ERROR
 
 } result_kind_t;
 
@@ -278,8 +279,19 @@ static int find_files(const char *seeds_dir, job_t **jobs_out,
 
     }
 
+    // readdir gives NULL at the end and on an error. Only an error sets errno.
     struct dirent *entry;
-    while ((entry = readdir(dir))) {
+    int            read_error = 0;
+    for (;;) {
+
+      errno = 0;
+      entry = readdir(dir);
+      if (!entry) {
+
+        read_error = errno;
+        break;
+
+      }
 
       if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) continue;
       char       *relative = join(folder, entry->d_name);
@@ -333,8 +345,17 @@ static int find_files(const char *seeds_dir, job_t **jobs_out,
     }
 
     closedir(dir);
+    if (read_error)
+      report("[-] Cannot read the folder ", *folder ? folder : seeds_dir, "",
+             read_error);
     free(folder_path);
     free(folder);
+    if (read_error) {
+
+      ret = -1;
+      break;
+
+    }
 
   }
 
@@ -439,7 +460,14 @@ static void parse_job(job_t *job) {
   }
 
   // Keep the serialized tree, and free the rest
-  tree_serialize(tree);
+  if (!tree_serialize(tree)) {
+
+    tree_free(tree);
+    job->kind = RESULT_MEMORY_ERROR;
+    return;
+
+  }
+
   job->kind = RESULT_TREE;
   job->tree_buf = tree->ser_buf;
   job->tree_len = tree->ser_len;
@@ -542,10 +570,12 @@ static int use_result(job_t *job, const char *trees_dir, void **written,
   free(name);
 
   // Two tree names are the same name if the file system gives them one file,
-  // for example A.json and a.json on macOS
+  // for example A.json and a.json on macOS. An error wins over a duplicate
+  // name, so only a tree or a skip can become a duplicate name.
   struct stat st;
   int         ret = 0;
-  if (!stat(tree_path, &st)) {
+  if ((job->kind == RESULT_TREE || job->kind == RESULT_SKIP) &&
+      !stat(tree_path, &st)) {
 
     job->tree_dev = st.st_dev;
     job->tree_ino = st.st_ino;
@@ -567,6 +597,11 @@ static int use_result(job_t *job, const char *trees_dir, void **written,
 
     case RESULT_THREAD_ERROR:
       report("[-] Cannot start the parser thread for ", job->relative, "", 0);
+      ret = -1;
+      break;
+
+    case RESULT_MEMORY_ERROR:
+      report("[-] Out of memory for the tree of ", job->relative, "", 0);
       ret = -1;
       break;
 
