@@ -29,6 +29,7 @@
 
 #include <pthread.h>
 
+#include <cstdio>
 #include <cstring>
 #include <exception>
 #include <memory>
@@ -70,8 +71,37 @@ struct Names {
 
 };
 
+// Print one message about the names of the tables that the parser does not
+// have. Without them, an input that uses such a name gives PARSE_NO_MATCH.
+void report_missing_names(const std::vector<std::string> &missing) {
+
+  constexpr size_t SHOWN = 5;
+  std::string      list;
+  for (size_t i = 0; i < missing.size() && i < SHOWN; ++i) {
+
+    if (i) list += ", ";
+    list += missing[i];
+
+  }
+
+  if (missing.size() > SHOWN) {
+
+    list += ", and " + std::to_string(missing.size() - SHOWN) + " more";
+
+  }
+
+  std::fprintf(stderr,
+               "[-] The .g4 parse tables do not agree with the ANTLR parser. "
+               "The parser does not have these names: %s. An input that uses "
+               "them gives PARSE_NO_MATCH. Make the tables and the parser "
+               "from the same .g4 files.\n",
+               list.c_str());
+
+}
+
 // Find the token type names (symbolic names) and the rule names of the tables
-// in the parser. Do this once for each grammar.
+// in the parser. Do this once for each grammar. Report the names that the
+// parser does not have, also once for each grammar.
 const Names &names_of(const Grammar &grammar, const antlr4::Parser &parser) {
 
   static std::mutex                                                  mutex;
@@ -82,6 +112,7 @@ const Names &names_of(const Grammar &grammar, const antlr4::Parser &parser) {
   if (names) return *names;
 
   auto                                     made = std::make_unique<Names>();
+  std::vector<std::string>                 missing;
   const antlr4::dfa::Vocabulary           &vocabulary = parser.getVocabulary();
   std::unordered_map<std::string, int64_t> types;
   for (size_t type = 0; type <= vocabulary.getMaxTokenType(); ++type) {
@@ -97,7 +128,15 @@ const Names &names_of(const Grammar &grammar, const antlr4::Parser &parser) {
     const std::string_view name = grammar.keys[k].token_type;
     if (name.empty()) continue;
     auto found = types.find(std::string(name));
-    if (found != types.end()) made->token_type[k] = found->second;
+    if (found != types.end()) {
+
+      made->token_type[k] = found->second;
+
+    } else {
+
+      missing.push_back("token type " + std::string(name));
+
+    }
 
   }
 
@@ -106,14 +145,23 @@ const Names &names_of(const Grammar &grammar, const antlr4::Parser &parser) {
   for (uint32_t r = 0; r < grammar.parser_rule_count; ++r) {
 
     const ParserRule &rule = grammar.parser_rules[r];
+    bool              found = false;
     for (size_t index = 0; index < rules.size(); ++index) {
 
-      if (rules[index] == rule.name) made->rule_key[index] = rule.key;
+      if (rules[index] == rule.name) {
+
+        made->rule_key[index] = rule.key;
+        found = true;
+
+      }
 
     }
 
+    if (!found) missing.push_back("rule " + std::string(rule.name));
+
   }
 
+  if (!missing.empty()) report_missing_names(missing);
   names = std::move(made);
   return *names;
 
@@ -587,6 +635,14 @@ void set_children(OpenNode &open) {
 
 }
 
+// Add a child to an open node. If the add fails, the child is freed.
+node_t *add_child(OpenNode &open, NodePtr child) {
+
+  open.children.push_back(child.get());
+  return child.release();
+
+}
+
 void build_nodes(const std::vector<Event> &events, node_t *target,
                  const std::vector<Kid> &kids, const uint8_t *buf,
                  std::vector<Todo> &todo) {
@@ -608,8 +664,9 @@ void build_nodes(const std::vector<Event> &events, node_t *target,
 
           } else {
 
-            node = checked(node_create_with_rule_id(event.key + 1, rule_id));
-            stack.back().children.push_back(node);
+            node = add_child(stack.back(),
+                             NodePtr(checked(node_create_with_rule_id(
+                                 event.key + 1, rule_id))));
 
           }
 
@@ -629,8 +686,9 @@ void build_nodes(const std::vector<Event> &events, node_t *target,
           break;
 
         case Tag::Leaf:
-          stack.back().children.push_back(
-              checked(node_create_with_val(0, event.text, event.n)));
+          add_child(
+              stack.back(),
+              NodePtr(checked(node_create_with_val(0, event.text, event.n))));
           break;
 
         case Tag::Token: {
@@ -643,8 +701,7 @@ void build_nodes(const std::vector<Event> &events, node_t *target,
           node_init_subnodes(token.get(), 1);
           if (!token->subnodes) throw std::bad_alloc();
           node_set_subnode(token.get(), 0, leaf.release());
-          stack.back().children.push_back(token.get());
-          token.release();
+          add_child(stack.back(), std::move(token));
           break;
 
         }
@@ -652,9 +709,9 @@ void build_nodes(const std::vector<Event> &events, node_t *target,
         case Tag::Ctx: {
 
           const Kid &kid = kids[event.n];
-          node_t    *node =
-              checked(node_create(static_cast<uint32_t>(kid.key) + 1));
-          stack.back().children.push_back(node);
+          node_t *node = add_child(stack.back(),
+                                   NodePtr(checked(node_create(
+                                       static_cast<uint32_t>(kid.key) + 1))));
           todo.push_back(Todo{static_cast<uint32_t>(kid.key), kid.ctx, node});
           break;
 

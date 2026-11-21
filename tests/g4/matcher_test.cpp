@@ -17,22 +17,52 @@
    tests/g4/run_matcher_tests.sh.
  */
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <memory>
+#include <new>
 #include <random>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <unistd.h>
+
 #include "g4_matcher.h"
 #include "tree.h"
+
+// The number of operator new calls, and the call that throws std::bad_alloc
+// (0: no call throws). The test allocation_failure sets them.
+static std::atomic<size_t> new_calls{0};
+static std::atomic<size_t> new_fail_at{0};
+
+void *operator new(std::size_t size) {
+
+  if (++new_calls == new_fail_at.load()) throw std::bad_alloc();
+  if (void *memory = std::malloc(size ? size : 1)) return memory;
+  throw std::bad_alloc();
+
+}
+
+void operator delete(void *memory) noexcept {
+
+  std::free(memory);
+
+}
+
+void operator delete(void *memory, std::size_t) noexcept {
+
+  std::free(memory);
+
+}
 
 #define DECLARE_GRAMMAR(name)         \
   namespace t_##name {                \
@@ -769,6 +799,173 @@ void random_bytes() {
 
 }
 
+// -- tables and parser -------------------------------------------------------
+
+// Run a function, and return the text that it writes to stderr
+template <typename Function>
+std::string stderr_of(Function function) {
+
+  std::fflush(stderr);
+  std::FILE *capture = std::tmpfile();
+  int        saved = dup(fileno(stderr));
+  CHECK(capture != nullptr);
+  CHECK(saved >= 0);
+  if (!capture || saved < 0) return "";
+  dup2(fileno(capture), fileno(stderr));
+  function();
+  std::fflush(stderr);
+  dup2(saved, fileno(stderr));
+  close(saved);
+  std::string written;
+  std::rewind(capture);
+  for (int c; (c = std::fgetc(capture)) != EOF;) {
+
+    written += static_cast<char>(c);
+
+  }
+
+  std::fclose(capture);
+  return written;
+
+}
+
+size_t count_of(const std::string &text, std::string_view part) {
+
+  size_t count = 0;
+  for (size_t pos = text.find(part); pos != std::string::npos;
+       pos = text.find(part, pos + 1)) {
+
+    ++count;
+
+  }
+
+  return count;
+
+}
+
+// A copy of the JSON test grammar. With wrong_names, one token type name and
+// one rule name of the tables are not in the ANTLR parser.
+struct GrammarCopy {
+
+  std::vector<g4::Key>        keys;
+  std::vector<g4::ParserRule> rules;
+  g4::Grammar                 grammar;
+
+  explicit GrammarCopy(bool wrong_names)
+      : keys(t_json::grammar.keys,
+             t_json::grammar.keys + t_json::grammar.key_count),
+        rules(t_json::grammar.parser_rules,
+              t_json::grammar.parser_rules + t_json::grammar.parser_rule_count),
+        grammar(t_json::grammar) {
+
+    if (wrong_names) {
+
+      for (g4::Key &key : keys) {
+
+        if (key.token_type == "STRING") key.token_type = "NO_SUCH_TOKEN";
+
+      }
+
+      for (g4::ParserRule &rule : rules) {
+
+        if (rule.name == "pair") rule.name = "no_such_rule";
+
+      }
+
+    }
+
+    grammar.keys = keys.data();
+    grammar.parser_rules = rules.data();
+
+  }
+
+};
+
+void tables_without_parser_names() {
+
+  // The names stay wrong for the life of the program, so the copies are
+  // static. The matcher keeps the names of each grammar address.
+  static const GrammarCopy wrong(true), right(false);
+  std::string              written = stderr_of([] {
+
+    check_status(wrong.grammar, JSON_INPUT, PARSE_NO_MATCH);
+    check_status(wrong.grammar, "[\"a\"]", PARSE_NO_MATCH);
+
+  });
+
+  // One message for the grammar, not one for each parse
+  CHECK_EQ(count_of(written, "do not agree"), 1u);
+  CHECK(written.find("token type NO_SUCH_TOKEN") != std::string::npos);
+  CHECK(written.find("rule no_such_rule") != std::string::npos);
+  CHECK_EQ(stderr_of([] { round_trip(right.grammar, JSON_INPUT); }), "");
+
+}
+
+// -- allocation failures -----------------------------------------------------
+
+// The value of new_calls when the ANTLR parser of counting_json returns
+std::atomic<size_t> calls_after_parse{0};
+
+antlr4::ParserRuleContext *parse_and_count(antlr4::Parser &parser) {
+
+  antlr4::ParserRuleContext *root = t_json::grammar.parse_start(parser);
+  calls_after_parse = new_calls.load();
+  return root;
+
+}
+
+// The JSON test grammar, with a start function that sets calls_after_parse
+const g4::Grammar &counting_json() {
+
+  static const g4::Grammar grammar = [] {
+
+    g4::Grammar copy = t_json::grammar;
+    copy.parse_start = parse_and_count;
+    return copy;
+
+  }();
+
+  return grammar;
+
+}
+
+void allocation_failure() {
+
+  // Each parse makes one operator new call of the matcher throw
+  // std::bad_alloc: the call k for each k after the ANTLR parse, up to the
+  // number of calls of a full parse. The parse must stop with PARSE_LIMIT,
+  // and it must free all nodes. LeakSanitizer or the macOS tool "leaks"
+  // finds a node that the matcher does not free. The test does not make the
+  // ANTLR runtime fail, because the runtime can leak a parse tree node then.
+  const g4::Grammar     &grammar = counting_json();
+  const std::string_view data = "{\"a\": [1, {\"b\": null}], \"c\": \"d\"}";
+  const uint8_t         *buf = reinterpret_cast<const uint8_t *>(data.data());
+  // The first parse fills the DFA cache of the parser. So the next parses
+  // make the same allocations.
+  round_trip(grammar, data);
+  parse_status_t status = PARSE_THREAD_ERROR;
+  new_calls = 0;
+  Tree full(g4::parse(grammar, buf, data.size(), g4::Limits(), &status));
+  const size_t last = new_calls;
+  const size_t first = calls_after_parse + 1;
+  CHECK_EQ(status, PARSE_OK);
+  CHECK(first < last);
+  for (size_t k = first; k <= last; ++k) {
+
+    status = PARSE_THREAD_ERROR;
+    new_calls = 0;
+    new_fail_at = k;
+    Tree tree(g4::parse(grammar, buf, data.size(), g4::Limits(), &status));
+    new_fail_at = 0;
+    CHECK_EQ(status, PARSE_LIMIT);
+    CHECK(!tree);
+
+  }
+
+  round_trip(grammar, data);
+
+}
+
 struct Test {
 
   const char *name;
@@ -808,6 +1005,8 @@ const Test TESTS[] = {
      budget_checks_the_clock_in_prediction},
     {"budget_records_success", budget_records_success},
     {"random_bytes", random_bytes},
+    {"tables_without_parser_names", tables_without_parser_names},
+    {"allocation_failure", allocation_failure},
 
 };
 
