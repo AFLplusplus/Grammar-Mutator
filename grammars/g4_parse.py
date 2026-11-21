@@ -45,6 +45,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple
 
 from f1_common import LimitFuzzer
+from g4_c_gen import GrammarError, check_helpers
 from g4_to_json import START_KEY, SyntaxErrorCounter
 from tree_file import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
 
@@ -84,10 +85,6 @@ class ParseError(Exception):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
-
-
-class GrammarError(ValueError):
-    """A JSON grammar or a parse map that the parser cannot use."""
 
 
 class ParserThreadError(RuntimeError):
@@ -133,42 +130,6 @@ def alternative_order(grammar: dict[str, list[list[str]]]) -> dict[str, list[int
         index = {tuple(alternative): i for i, alternative in enumerate(alternatives)}
         order[k] = [index[tuple(rule)] for _cost, rule in cost[k]]
     return order
-
-
-def check_helpers(grammar: dict[str, list[list[str]]], parse_map: dict[str, Any]) -> None:
-    """Make sure that the helper keys give a regular language for each key.
-
-    The matcher needs this to stop. A key can refer to itself only as the last
-    symbol of an alternative (the helper of `*` or `+`). The other references
-    between helper keys must not make a cycle.
-    """
-    kinds = parse_map["kinds"]
-    edges: dict[str, set[str]] = {k: set() for k in kinds}
-    for k, alternatives in kinds.items():
-        for alternative, symbol_kinds in zip(grammar[k], alternatives):
-            for i, (symbol, kind) in enumerate(zip(alternative, symbol_kinds)):
-                if kind != "helper":
-                    continue
-                if symbol != k:
-                    edges[k].add(symbol)
-                elif i != len(alternative) - 1:
-                    msg = f"the helper key {k} refers to itself before the end of an alternative"
-                    raise GrammarError(msg)
-    # Remove the keys without references until no key is left (Kahn).
-    refs = dict.fromkeys(edges, 0)
-    for targets in edges.values():
-        for target in targets:
-            refs[target] = refs.get(target, 0) + 1
-    todo = [k for k, count in refs.items() if count == 0]
-    while todo:
-        for target in edges.get(todo.pop(), ()):
-            refs[target] -= 1
-            if refs[target] == 0:
-                todo.append(target)
-    cycle = sorted(k for k, count in refs.items() if count > 0)
-    if cycle:
-        msg = f"the helper keys make a cycle: {', '.join(cycle)}"
-        raise GrammarError(msg)
 
 
 # The folder of the parser that load_classes loaded last

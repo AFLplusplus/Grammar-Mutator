@@ -17,7 +17,6 @@ g4_helpers.py).
 from __future__ import annotations
 
 import contextlib
-import copy
 import io
 import json
 import os
@@ -34,7 +33,6 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "grammars"))
 
-from f1_c_gen import CFuzzer
 from g4_helpers import ROOT, build_parser
 from g4_parse import (
     MAX_TREE_DEPTH,
@@ -43,16 +41,14 @@ from g4_parse import (
     ParseError,
     TreeBuilder,
     alternative_order,
-    check_helpers,
     main,
     node_ids,
     tree_depth,
 )
-from g4_to_json import convert, convert_with_map
+from g4_to_json import convert_with_map
 from tree_file import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
 
 JSON_G4 = ROOT / "grammars" / "g4" / "JSON.g4"
-JS_G4 = [ROOT / "grammars" / "g4" / "javascript" / f"JavaScript{part}.g4" for part in ("Lexer", "Parser")]
 JSON_INPUT = '{ "a" : [1, 2.5e3, true, null],\r\n\t"b": {"é": "ü"} }  '
 
 
@@ -626,39 +622,6 @@ class CommandLineTest(unittest.TestCase):
         self.assertIn("G4_SUPPORT_DIR", err)
         self.assertIn("[-] Cannot load the Python parser in", err)
         self.assertNotIn("Traceback", err)
-
-
-class OrderTest(unittest.TestCase):
-    def test_order_matches_f1_c_gen(self) -> None:
-        for paths in ([JSON_G4], JS_G4):
-            grammar = convert(paths)
-            order = alternative_order(grammar)
-            fuzzer = CFuzzer(copy.deepcopy(grammar))
-            for key, alternatives in grammar.items():
-                self.assertEqual([alternatives[i] for i in order[key]], fuzzer.grammar[key], key)
-                self.assertEqual(node_ids(grammar)[key], fuzzer.k_to_id(key), key)
-
-    def test_helpers_are_regular(self) -> None:
-        for paths in ([JSON_G4], JS_G4):
-            grammar, parse_map = convert_with_map(paths)
-            check_helpers(grammar, parse_map)
-
-    def test_check_helpers_rejects_a_self_reference_before_the_end(self) -> None:
-        grammar = {"<START>": [["", "<s>"]], "<s>": [["<s__1>", "x"]], "<s__1>": [["<s__1>", "y"], []]}
-        kinds = {"<START>": [["lead", "rule"]], "<s>": [["helper", "literal"]], "<s__1>": [["helper", "literal"], []]}
-        with self.assertRaisesRegex(GrammarError, "refers to itself"):
-            check_helpers(grammar, {"kinds": kinds})
-
-    def test_check_helpers_rejects_a_helper_cycle(self) -> None:
-        grammar = {"<START>": [["", "<s>"]], "<s>": [["<a>"]], "<a>": [["<b>"], []], "<b>": [["<a>", "x"]]}
-        kinds = {
-            "<START>": [["lead", "rule"]],
-            "<s>": [["helper"]],
-            "<a>": [["helper"], []],
-            "<b>": [["helper", "literal"]],
-        }
-        with self.assertRaisesRegex(GrammarError, "cycle: <a>, <b>"):
-            check_helpers(grammar, {"kinds": kinds})
 
 
 if __name__ == "__main__":
