@@ -168,7 +168,7 @@ GEN_FILES = \
 all: build
 
 # Generation
-src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py .grammar $(GRAMMAR_JSON)
+src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py grammars/f1_common.py grammars/tree_file.py .grammar $(GRAMMAR_JSON)
 	$(PYTHON) grammars/f1_c_gen.py $(GRAMMAR_JSON) $(CURDIR)
 
 # The launcher of the parser for .g4 files. It runs grammars/g4_parse.py with

@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Tuple
 
 from f1_common import LimitFuzzer
 from g4_to_json import START_KEY, SyntaxErrorCounter
-from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
+from tree_file import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Sequence

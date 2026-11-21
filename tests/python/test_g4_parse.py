@@ -49,7 +49,7 @@ from g4_parse import (
     tree_depth,
 )
 from g4_to_json import convert, convert_with_map
-from g4_tree import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
+from tree_file import RULE_ID_UNKNOWN, TERM_ID, Node, deserialize, serialize, text
 
 JSON_G4 = ROOT / "grammars" / "g4" / "JSON.g4"
 JS_G4 = [ROOT / "grammars" / "g4" / "javascript" / f"JavaScript{part}.g4" for part in ("Lexer", "Parser")]
