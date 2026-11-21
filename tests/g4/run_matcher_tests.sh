@@ -8,8 +8,9 @@
 # For each folder in tests/g4/grammars, the script makes the JSON grammar
 # (g4_to_json.py), the parse tables (g4_c_gen.py), and the C++ lexer and parser
 # (the jar), all in the C++ namespace t_<folder>. The .h and .cpp files of the
-# folder go with them. Then it compiles the test program with the matcher, the
-# tree code in src/, and the runtime library, and runs it.
+# folder go with them. The test grammar "json" is grammars/g4/JSON.g4. Then
+# the script compiles the test program with the matcher, the tree code in
+# src/, and the runtime library, and runs it.
 #
 # Optional environment variables:
 # - ANTLR_JAR_LOCATION: the ANTLR jar.
@@ -32,13 +33,20 @@ generate() {
   src=$root/tests/g4/grammars/$name
   out=$work/t_$name
   mkdir -p "$out"
+  # The json test uses the JSON grammar in grammars/g4, so that the
+  # repository keeps only one copy of it
+  if [ "$name" = json ]; then
+    set -- "$root/grammars/g4/JSON.g4"
+  else
+    set -- "$src"/*.g4
+  fi
   # shellcheck disable=SC2086 # $meta_option is empty or two words
   "$python" "$root/grammars/g4_to_json.py" $meta_option \
-    --parse-map "$out/parse_map.json" -o "$out/grammar.json" "$src"/*.g4 > "$out/log" 2>&1
+    --parse-map "$out/parse_map.json" -o "$out/grammar.json" "$@" > "$out/log" 2>&1
   "$python" "$root/grammars/g4_c_gen.py" --grammar "$out/grammar.json" \
     --parse-map "$out/parse_map.json" --namespace "t_$name" -o "$out" >> "$out/log" 2>&1
   java -jar "$jar" -Dlanguage=Cpp -package "t_$name" -no-listener -Xexact-output-dir \
-    -o "$out" "$src"/*.g4 >> "$out/log" 2>&1
+    -o "$out" "$@" >> "$out/log" 2>&1
   for f in "$src"/*.h "$src"/*.cpp; do
     if [ -f "$f" ]; then
       cp "$f" "$out/"
@@ -140,7 +148,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 export work
 
-names=$(cd tests/g4/grammars && ls)
+names=$( (cd tests/g4/grammars && ls; echo json) | sort)
 echo "[*] Generating the test grammars: $(echo "$names" | tr '\n' ' ')"
 if ! printf '%s\n' "$names" | xargs -P "$jobs" -n 1 sh "$0" --generate; then
   for name in $names; do
