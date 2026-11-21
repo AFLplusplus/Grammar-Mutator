@@ -135,8 +135,10 @@ bool node_equal(node_t *node_a, node_t *node_b);
  * Calculate the total number of non-terminal subnodes and the total number of
  * recursive edges in the tree
  * @param  node The root node of a tree
+ * @return      True on success. False if the walk ran out of memory. The sizes
+ *              of `node` are then 0.
  */
-void node_get_size(node_t *node);
+bool node_get_size(node_t *node);
 
 /**
  * Replace `subnode` in a stree (`root`) with `new_subnode`. Note that, this
@@ -211,8 +213,9 @@ void tree_free(tree_t *tree);
 /**
  * Convert a parsing tree into a concrete test case stored in the data buffer
  * @param  tree The parsing tree
+ * @return      True on success. False if memory ran out. `data_len` is then 0.
  */
-void tree_to_buf(tree_t *tree);
+bool tree_to_buf(tree_t *tree);
 
 /**
  * The result of one parse. A parser that returns a tree sets PARSE_OK.
@@ -252,8 +255,9 @@ tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size);
 /**
  * Serialize a given tree into binary data
  * @param tree    A given tree
+ * @return        True on success. False if memory ran out. `ser_len` is then 0.
  */
-void tree_serialize(tree_t *tree);
+bool tree_serialize(tree_t *tree);
 
 /**
  * Deserialize the data to recover a tree
@@ -266,7 +270,8 @@ tree_t *tree_deserialize(const uint8_t *data_buf, size_t data_size);
 /**
  * Clone a parsing tree
  * @param  tree The parsing tree
- * @return      A newly created tree with the same data as `tree`
+ * @return      A newly created tree with the same data as `tree`, or NULL if
+ *              memory ran out
  */
 tree_t *tree_clone(tree_t *tree);
 

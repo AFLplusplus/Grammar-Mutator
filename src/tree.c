@@ -111,8 +111,19 @@ void node_free(node_t *node) {
 
   if (!node) return;
 
+  // This function cannot report an error. If the stack cannot grow, the
+  // function leaks the subtrees that it cannot push. A leak is better than a
+  // crash here.
   node_stack_t stack = {0};
-  node_stack_push(&stack, node, 0, 0);
+  if (!node_stack_push(&stack, node, 0, 0)) {
+
+    node->subnode_count = 0;
+    if (node->val_buf) free(node->val_buf);
+    if (node->subnodes) free(node->subnodes);
+    free(node);
+    return;
+
+  }
 
   while (stack.len) {
 
@@ -121,8 +132,9 @@ void node_free(node_t *node) {
     // `subnode` may be NULL due to parsing errors
     for (uint32_t i = 0; i < node->subnode_count; ++i) {
 
+      // On a push failure, the subtree of `subnode` leaks.
       if (likely(node->subnodes[i]))
-        node_stack_push(&stack, node->subnodes[i], i, 0);
+        (void)node_stack_push(&stack, node->subnodes[i], i, 0);
 
     }
 
@@ -144,8 +156,8 @@ void node_free(node_t *node) {
 
 void node_free_only_self(node_t *node) {
 
-  // Pretend we don't have any subnodes so that node_free() won't
-  // call itself recursively
+  // Pretend we don't have any subnodes so that node_free() frees only
+  // this node and does not walk into its subtree
   node->subnode_count = 0;
   node_free(node);
 
@@ -192,9 +204,15 @@ node_t *node_clone(node_t *node) {
 
   if (!node) return NULL;
 
-  node_t      *root = node_create(node->id);
+  node_t *root = node_create(node->id);
+  if (!root) return NULL;
   node_stack_t stack = {0};
-  node_stack_push(&stack, node, 0, (size_t)root);
+  if (!node_stack_push(&stack, node, 0, (size_t)root)) {
+
+    node_free(root);
+    return NULL;
+
+  }
 
   while (stack.len) {
 
@@ -217,8 +235,10 @@ node_t *node_clone(node_t *node) {
 
         if (!src->subnodes[i]) continue;
         node_t *child = node_create(src->subnodes[i]->id);
+        if (!child) goto fail;
         node_set_subnode(dst, i, child);
-        node_stack_push(&stack, src->subnodes[i], i, (size_t)child);
+        if (!node_stack_push(&stack, src->subnodes[i], i, (size_t)child))
+          goto fail;
 
       }
 
@@ -229,6 +249,12 @@ node_t *node_clone(node_t *node) {
   node_stack_free(&stack);
   return root;
 
+fail:
+  // Free the partial copy. Its children are linked, so it is a valid tree.
+  node_stack_free(&stack);
+  node_free(root);
+  return NULL;
+
 }
 
 bool node_equal(node_t *node_a, node_t *node_b) {
@@ -237,8 +263,9 @@ bool node_equal(node_t *node_a, node_t *node_b) {
   if (!node_a || !node_b) return false;
 
   // frames hold the first node; `aux` holds the second
+  // If a push fails, the function answers "not equal".
   node_stack_t stack = {0};
-  node_stack_push(&stack, node_a, 0, (size_t)node_b);
+  if (!node_stack_push(&stack, node_a, 0, (size_t)node_b)) return false;
   bool equal = true;
 
   while (equal && stack.len) {
@@ -261,7 +288,12 @@ bool node_equal(node_t *node_a, node_t *node_b) {
     // Do not consider the parent node while comparing two nodes
     for (uint32_t i = 0; i < a->subnode_count; ++i) {
 
-      node_stack_push(&stack, a->subnodes[i], i, (size_t)b->subnodes[i]);
+      if (!node_stack_push(&stack, a->subnodes[i], i, (size_t)b->subnodes[i])) {
+
+        equal = false;
+        break;
+
+      }
 
     }
 
@@ -272,22 +304,35 @@ bool node_equal(node_t *node_a, node_t *node_b) {
 
 }
 
-void node_get_size(node_t *node) {
+bool node_get_size(node_t *node) {
 
-  if (node == NULL) return;
+  if (node == NULL) return true;
 
   // Collect the nodes in pre-order. Their reverse has every child before its
   // parent. A terminal node (id 0) is a boundary.
   node_stack_t stack = {0};
   node_stack_t order = {0};
-  node_stack_push(&stack, node, 0, 0);
+  node_t      *top = node;
+  bool         ok = node_stack_push(&stack, node, 0, 0);
 
-  while (stack.len) {
+  while (ok && stack.len) {
 
     node_frame_t f = node_stack_pop(&stack);
-    node_stack_push(&order, f.node, 0, 0);
+    ok = node_stack_push(&order, f.node, 0, 0);
+    if (!ok) break;
     if (f.node->id == 0) continue;
-    node_stack_push_children(&stack, f.node, 0);
+    ok = node_stack_push_children(&stack, f.node, 0);
+
+  }
+
+  if (!ok) {
+
+    // Make the stale sizes harmless: the picks find no node.
+    top->non_term_size = 0;
+    top->recursion_edge_size = 0;
+    node_stack_free(&stack);
+    node_stack_free(&order);
+    return false;
 
   }
 
@@ -320,6 +365,7 @@ void node_get_size(node_t *node) {
 
   node_stack_free(&stack);
   node_stack_free(&order);
+  return true;
 
 }
 
@@ -475,14 +521,14 @@ edge_t node_get_parent_edge(node_t *node) {
 
 }
 
-void _node_to_buf(tree_t *tree, node_t *node) {
+bool _node_to_buf(tree_t *tree, node_t *node) {
 
-  if (!tree || !node) return;
+  if (!tree || !node) return true;
 
   node_stack_t stack = {0};
-  node_stack_push(&stack, node, 0, 0);
+  bool         ok = node_stack_push(&stack, node, 0, 0);
 
-  while (stack.len) {
+  while (ok && stack.len) {
 
     node = node_stack_pop(&stack).node;
 
@@ -497,6 +543,7 @@ void _node_to_buf(tree_t *tree, node_t *node) {
       if (!data_buf) {
 
         perror("tree output buffer allocation (maybe_grow)");
+        ok = false;
         break;
 
       }
@@ -507,11 +554,12 @@ void _node_to_buf(tree_t *tree, node_t *node) {
 
     }
 
-    node_stack_push_children(&stack, node, 0);
+    ok = node_stack_push_children(&stack, node, 0);
 
   }
 
   node_stack_free(&stack);
+  return ok;
 
 }
 
@@ -520,11 +568,12 @@ void _node_get_recursion_edges(tree_t *tree, node_t *node) {
   if (!tree || !node) return;
 
   // Visit the nodes in pre-order; the edge of a node comes with the node.
+  // If a push fails, the walk stops. The list is then shorter, which is safe.
   node_stack_t stack = {0};
-  node_stack_push(&stack, node, 0, 0);
-  node_t *root = node;
+  bool         ok = node_stack_push(&stack, node, 0, 0);
+  node_t      *root = node;
 
-  while (stack.len) {
+  while (ok && stack.len) {
 
     node_frame_t f = node_stack_pop(&stack);
     node = f.node;
@@ -539,7 +588,7 @@ void _node_get_recursion_edges(tree_t *tree, node_t *node) {
 
     }
 
-    node_stack_push_children(&stack, node, 0);
+    ok = node_stack_push_children(&stack, node, 0);
 
   }
 
@@ -551,16 +600,17 @@ void _node_get_non_terminal_nodes(tree_t *tree, node_t *node) {
 
   if (!tree || !node) return;
 
+  // If a push fails, the walk stops. The list is then shorter, which is safe.
   node_stack_t stack = {0};
-  node_stack_push(&stack, node, 0, 0);
+  bool         ok = node_stack_push(&stack, node, 0, 0);
 
-  while (stack.len) {
+  while (ok && stack.len) {
 
     node = node_stack_pop(&stack).node;
     if (node->id == 0) continue;
 
     list_append(tree->non_terminal_node_list, node);
-    node_stack_push_children(&stack, node, 0);
+    ok = node_stack_push_children(&stack, node, 0);
 
   }
 
@@ -568,14 +618,14 @@ void _node_get_non_terminal_nodes(tree_t *tree, node_t *node) {
 
 }
 
-void _node_serialize(tree_t *tree, node_t *node) {
+bool _node_serialize(tree_t *tree, node_t *node) {
 
-  if (!tree || !node) return;
+  if (!tree || !node) return true;
 
   node_stack_t stack = {0};
-  node_stack_push(&stack, node, 0, 0);
+  bool         ok = node_stack_push(&stack, node, 0, 0);
 
-  while (stack.len) {
+  while (ok && stack.len) {
 
     node = node_stack_pop(&stack).node;
 
@@ -588,6 +638,7 @@ void _node_serialize(tree_t *tree, node_t *node) {
     if (!ser_buf) {
 
       perror("tree serialization buffer allocation (maybe_grow)");
+      ok = false;
       break;
 
     }
@@ -606,11 +657,12 @@ void _node_serialize(tree_t *tree, node_t *node) {
 
     tree->ser_len = ser_len;
 
-    node_stack_push_children(&stack, node, 0);
+    ok = node_stack_push_children(&stack, node, 0);
 
   }
 
   node_stack_free(&stack);
+  return ok;
 
 }
 
@@ -763,25 +815,40 @@ void tree_free(tree_t *tree) {
 
 }
 
-void tree_to_buf(tree_t *tree) {
+bool tree_to_buf(tree_t *tree) {
 
-  if (!tree) return;
+  if (!tree) return false;
 
   maybe_grow(BUF_PARAMS(tree, data), TREE_BUF_PREALLOC_SIZE);
   tree->data_len = 0;
 
-  _node_to_buf(tree, tree->root);
+  if (!_node_to_buf(tree, tree->root)) {
+
+    // Do not leave a short buffer that looks complete.
+    tree->data_len = 0;
+    return false;
+
+  }
+
+  return true;
 
 }
 
-void tree_serialize(tree_t *tree) {
+bool tree_serialize(tree_t *tree) {
 
-  if (!tree) return;
+  if (!tree) return false;
 
   maybe_grow(BUF_PARAMS(tree, ser), TREE_BUF_PREALLOC_SIZE);
   tree->ser_len = 0;
 
-  _node_serialize(tree, tree->root);
+  if (!_node_serialize(tree, tree->root)) {
+
+    tree->ser_len = 0;
+    return false;
+
+  }
+
+  return true;
 
 }
 
@@ -807,6 +874,12 @@ tree_t *tree_clone(tree_t *tree) {
 
   tree_t *new_tree = tree_create();
   new_tree->root = node_clone(tree->root);
+  if (tree->root && !new_tree->root) {
+
+    tree_free(new_tree);
+    return NULL;
+
+  }
 
   // Do not clone the data buffer, as the cloned tree is likely for mutations
   new_tree->data_buf = NULL;
@@ -828,7 +901,7 @@ inline bool tree_equal(tree_t *tree_a, tree_t *tree_b) {
 inline size_t tree_get_size(tree_t *tree) {
 
   if (tree->root->id == 0) return 0;
-  node_get_size(tree->root);
+  if (!node_get_size(tree->root)) return 0;
   return tree->root->non_term_size;
 
 }

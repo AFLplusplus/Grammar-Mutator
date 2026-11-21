@@ -1,6 +1,8 @@
 #ifndef __NODE_STACK_H__
 #define __NODE_STACK_H__
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -24,7 +26,9 @@ typedef struct {
 
 } node_stack_t;
 
-static inline void node_stack_push(node_stack_t *s, node_t *node, uint32_t idx,
+// Push one frame. Return false, and leave the stack as it was, if the stack
+// cannot grow. The caller must stop its walk and report the failure.
+static inline bool node_stack_push(node_stack_t *s, node_t *node, uint32_t idx,
                                    size_t aux) {
 
   if (s->len == s->cap) {
@@ -34,7 +38,7 @@ static inline void node_stack_push(node_stack_t *s, node_t *node, uint32_t idx,
     if (!items) {
 
       perror("node_stack_push (realloc)");
-      exit(EXIT_FAILURE);
+      return false;
 
     }
 
@@ -47,6 +51,7 @@ static inline void node_stack_push(node_stack_t *s, node_t *node, uint32_t idx,
   s->items[s->len].idx = idx;
   s->items[s->len].aux = aux;
   ++s->len;
+  return true;
 
 }
 
@@ -57,14 +62,18 @@ static inline node_frame_t node_stack_pop(node_stack_t *s) {
 }
 
 // Push the non-NULL children of `node` so that the first child pops first.
-static inline void node_stack_push_children(node_stack_t *s, node_t *node,
+// Return false if a push fails. Some children are then on the stack.
+static inline bool node_stack_push_children(node_stack_t *s, node_t *node,
                                             size_t aux) {
 
   for (uint32_t i = node->subnode_count; i-- > 0;) {
 
-    if (node->subnodes[i]) node_stack_push(s, node->subnodes[i], i, aux);
+    if (node->subnodes[i] && !node_stack_push(s, node->subnodes[i], i, aux))
+      return false;
 
   }
+
+  return true;
 
 }
 

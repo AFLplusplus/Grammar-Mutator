@@ -400,7 +400,22 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
 
   }
 
-  tree_to_buf(trimmed_tree);
+  if (unlikely(!trimmed_tree)) {
+
+    *out_buf = NULL;
+    perror("trimming error, empty tree (afl_custom_trim)");
+    return 0;
+
+  }
+
+  if (unlikely(!tree_to_buf(trimmed_tree))) {
+
+    tree_free(trimmed_tree);
+    *out_buf = NULL;
+    return 0;
+
+  }
+
   tree_get_size(trimmed_tree);
   data->trimmed_tree = trimmed_tree;
 
@@ -789,7 +804,14 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
 
   }
 
-  tree_to_buf(tree);
+  if (unlikely(!tree_to_buf(tree))) {
+
+    tree_free(tree);
+    *out_buf = NULL;
+    return 0;
+
+  }
+
   tree_get_size(tree);
   data->mutated_tree = tree;
   mutated_size = tree->data_len <= max_size ? tree->data_len : max_size;

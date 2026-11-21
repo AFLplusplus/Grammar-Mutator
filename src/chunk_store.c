@@ -64,34 +64,40 @@ typedef struct {
 
 // Hash every node of the subtree in one post-order pass. The hash of a node
 // covers the same fields that `node_equal()` uses and the hashes of its
-// children. The caller frees the result.
+// children. The caller frees the result. Return NULL, and set `*count` to 0,
+// if memory runs out.
 static hash_entry_t *hash_subtree(node_t *root, size_t *count) {
 
   hash_entry_t *entries = NULL;
   size_t        n = 0, cap = 0, slots = 0;
   node_stack_t  stack = {0};
 
-  node_stack_push(&stack, root, 0, (size_t)-1);
+  *count = 0;
+  if (!node_stack_push(&stack, root, 0, (size_t)-1)) return NULL;
   while (stack.len) {
 
     node_frame_t f = node_stack_pop(&stack);
     if (n == cap) {
 
-      cap = cap ? cap * 2 : 64;
-      entries = realloc(entries, cap * sizeof(hash_entry_t));
-      if (!entries) {
+      size_t        new_cap = cap ? cap * 2 : 64;
+      hash_entry_t *new_entries =
+          realloc(entries, new_cap * sizeof(hash_entry_t));
+      if (!new_entries) {
 
         perror("hash_subtree (realloc)");
-        exit(EXIT_FAILURE);
+        goto fail;
 
       }
+
+      entries = new_entries;
+      cap = new_cap;
 
     }
 
     entries[n] = (hash_entry_t){f.node, f.aux, f.idx, slots, 1, 0};
     slots += f.node->subnode_count;
-    node_stack_push_children(&stack, f.node, n);
     ++n;
+    if (!node_stack_push_children(&stack, f.node, n - 1)) goto fail;
 
   }
 
@@ -102,11 +108,15 @@ static hash_entry_t *hash_subtree(node_t *root, size_t *count) {
   if (!child_hash) {
 
     perror("hash_subtree (calloc)");
-    exit(EXIT_FAILURE);
+    free(entries);
+    return NULL;
 
   }
 
   chunk_store_hashed_nodes += n;
+
+  // One hash state serves every node; the reset below makes it fresh.
+  XXH3_state_t hash;
 
   // The reverse pre-order has every child before its parent
   for (size_t i = n; i-- > 0;) {
@@ -117,7 +127,6 @@ static hash_entry_t *hash_subtree(node_t *root, size_t *count) {
     // that we can be reasonably certain that if the hashes
     // are equal than `node_equal()` will return true.
     // Do not consider the parent node while comparing two nodes.
-    XXH3_state_t hash;
     XXH3_64bits_reset(&hash);
     XXH3_64bits_update(&hash, &node->id, sizeof(node->id));
     XXH3_64bits_update(&hash, &node->rule_id, sizeof(node->rule_id));
@@ -141,6 +150,11 @@ static hash_entry_t *hash_subtree(node_t *root, size_t *count) {
   *count = n;
   return entries;
 
+fail:
+  node_stack_free(&stack);
+  free(entries);
+  return NULL;
+
 }
 
 // Create a hash of the node and its subnodes
@@ -151,6 +165,14 @@ void hash_node(node_t *node, char dest[16 + 1]) {
 
   size_t        count;
   hash_entry_t *entries = hash_subtree(node, &count);
+  if (!entries) {
+
+    // Out of memory. Give an all-zero hash.
+    memset(dest, '0', 16);
+    dest[16] = '\0';
+    return;
+
+  }
 
   // Need to convert the hash to text so that 0-values in the hash don't cause
   // an inordinant amount of collisions. If we just put the 8-byte integer in as
@@ -173,6 +195,20 @@ void chunk_store_take_node(node_t *node) {
 
   size_t        count;
   hash_entry_t *entries = hash_subtree(node, &count);
+  if (!entries) {
+
+    // Out of memory: the store cannot keep the node. Detach and free it.
+    if (node->parent) {
+
+      for (uint32_t i = 0; i < node->parent->subnode_count; ++i)
+        if (node->parent->subnodes[i] == node) node->parent->subnodes[i] = NULL;
+
+    }
+
+    node_free(node);
+    return;
+
+  }
 
   // Walk the entries in pre-order. A duplicate subtree is freed, so skip its
   // entries.
