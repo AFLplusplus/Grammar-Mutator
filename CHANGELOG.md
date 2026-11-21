@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.1 (2026-11-21)
+
+<!-- Release notes generated using configuration in .github/release.yml at stable -->
+
+## What's Changed
+* ci: use GitHub release notes and add version.h by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/70
+* ci: skip the build jobs for documentation-only pull requests by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/72
+* docs: give the release effect of each commit type by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/73
+
+
+**Full Changelog**: https://github.com/AFLplusplus/Grammar-Mutator/compare/v1.0.0...v1.0.1
+
 ## 1.0.0 (2026-11-21)
 
 
