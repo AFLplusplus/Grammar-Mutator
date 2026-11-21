@@ -25,6 +25,7 @@
 
 #include "f1_c_fuzz.h"
 #include "utils.h"
+#include "version.h"
 
 // The number of tries to find a new test case. If all tries give an empty test
 // case or a test case that the generator already wrote, the generator stops.
@@ -56,6 +57,7 @@ int main(int argc, const char *argv[]) {
 
   if (argc < 4) {
 
+    printf("Grammar Mutator %s\n", GRAMMAR_MUTATOR_VERSION);
     printf(
         "%s <max_num> <max_size> <output_dir> <tree_output_dir> [<random "
         "seed>]\n",
