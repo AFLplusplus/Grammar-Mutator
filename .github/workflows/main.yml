@@ -24,7 +24,41 @@ on:
   pull_request:
 
 jobs:
+  # Decide whether the change needs the build jobs. A pull request that changes
+  # only documentation skips them. GitHub counts a skipped job as passed, so the
+  # required checks (make-build, cmake-build) do not block such a pull request.
+  # A push to stable always runs all jobs.
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      code: ${{ steps.files.outputs.code }}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Check for changes other than documentation
+      id: files
+      env:
+        EVENT: ${{ github.event_name }}
+        BASE: ${{ github.event.pull_request.base.sha }}
+        HEAD: ${{ github.event.pull_request.head.sha }}
+      run: |
+        code=true
+        if [ "$EVENT" = pull_request ]; then
+          git diff --name-only "$BASE...$HEAD" > files.txt
+          cat files.txt
+          # Documentation: Markdown files, doc/, the license, and the list of
+          # reformat commits for git blame
+          if ! grep -qvE '(\.md$|^doc/|^LICENSE|^\.git-blame-ignore-revs$)' files.txt; then
+            code=false
+          fi
+        fi
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+
   format-check:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
 
     steps:
@@ -40,6 +74,8 @@ jobs:
         git diff --exit-code
 
   g4-build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -116,6 +152,8 @@ jobs:
       run: tests/g4/roundtrip.sh "${{ matrix.grammar }}" "tests/g4/corpus/${{ matrix.grammar }}"
 
   cmake-build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
 
     steps:
@@ -142,6 +180,8 @@ jobs:
         make test_memcheck
 
   make-build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
 
     steps:
