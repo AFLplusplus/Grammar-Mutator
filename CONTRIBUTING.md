@@ -90,17 +90,19 @@ Use one of these types:
 | `feat`     | A new feature                                 | Minor version  |
 | `fix`      | A bug fix                                     | Patch version  |
 | `perf`     | A performance improvement                     | Patch version  |
-| `refactor` | A code change that keeps the behavior         | None           |
-| `docs`     | Documentation only                            | None           |
-| `test`     | Tests only                                    | None           |
-| `build`    | The build system or dependencies              | None           |
-| `ci`       | The CI configuration                          | None           |
-| `chore`    | Other maintenance                             | None           |
-| `style`    | Formatting only                               | None           |
+| `refactor` | A code change that keeps the behavior         | Patch version  |
+| `docs`     | Documentation only                            | Patch version  |
+| `test`     | Tests only                                    | Patch version  |
+| `build`    | The build system or dependencies              | Patch version  |
+| `ci`       | The CI configuration                          | Patch version  |
+| `chore`    | Other maintenance                             | Patch version  |
+| `style`    | Formatting only                               | Patch version  |
 | `revert`   | A revert of an earlier commit                 | Patch version  |
 
 For a breaking change, add `!` after the type or scope, for example
-`feat!: remove the JSON grammar format`. This gives a major version.
+`feat!: remove the JSON grammar format`. This gives a major version. The
+release notes list every pull request, so each type gives at least a patch
+version.
 
 Examples:
 
