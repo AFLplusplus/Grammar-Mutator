@@ -229,3 +229,16 @@ TEST_F(TreeMutationUniquenessTest, SplicingMutation) {
   chunk_store_clear();
 
 }
+
+TEST(TreeMutationTest, UnknownRuleIdCountsEveryRule) {
+
+  tree_t *tree = gen_init__(100);
+  size_t  before = rules_mutation_count(tree);
+  ASSERT_GT(node_num_rules[tree->root->id], 0);
+
+  tree->root->rule_id = RULE_ID_UNKNOWN;
+  EXPECT_EQ(rules_mutation_count(tree), before + 1);
+
+  tree_free(tree);
+
+}

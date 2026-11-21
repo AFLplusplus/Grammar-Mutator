@@ -39,7 +39,7 @@ import sys
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Tuple, Union
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -62,6 +62,10 @@ TOKEN_SEPARATOR = " "
 LINE_SEPARATOR = "\n"
 
 START_KEY = "<START>"
+
+# A symbol of an alternative with its kind, which the parse map describes. The
+# kinds are: lead, rule, token, helper, literal, literal_cont, sep.
+Symbol = Tuple[str, str]
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +156,8 @@ class Grammar:
     imports: tuple[str, ...] = ()
     # The tokens of `tokens { ... }` blocks (imaginary tokens)
     declared_tokens: frozenset[str] = frozenset()
+    # The type of each grammar in the .g4 files: "lexer", "parser", or "combined"
+    grammar_types: tuple[str, ...] = ()
 
 
 class G4Error(Exception):
@@ -540,6 +546,7 @@ def read_grammar(paths: Sequence[Path], meta_parser_dir: Path = DEFAULT_META_PAR
     rules: dict[str, Rule] = {}
     parser_rule_order: list[str] = []
     grammar_names: list[str] = []
+    grammar_types: list[str] = []
     imports: list[str] = []
     declared_tokens: set[str] = set()
 
@@ -558,6 +565,8 @@ def read_grammar(paths: Sequence[Path], meta_parser_dir: Path = DEFAULT_META_PAR
     file_imports: list[list[str]] = []
     for tree in trees:
         grammar_names.append(tree.grammarDecl().identifier().getText())
+        grammar_type = tree.grammarDecl().grammarType()
+        grammar_types.append("lexer" if grammar_type.LEXER() else "parser" if grammar_type.PARSER() else "combined")
         file_imports.append([])
         for prequel in tree.prequelConstruct():
             if prequel.delegateGrammars() is not None:
@@ -598,7 +607,9 @@ def read_grammar(paths: Sequence[Path], meta_parser_dir: Path = DEFAULT_META_PAR
                 token_types=tuple(reader.token_types),
             )
             add(rule, path)
-    return Grammar(rules, parser_rule_order, tuple(grammar_names), tuple(imports), frozenset(declared_tokens))
+    return Grammar(
+        rules, parser_rule_order, tuple(grammar_names), tuple(imports), frozenset(declared_tokens), tuple(grammar_types)
+    )
 
 
 def rule_refs(node: Node) -> set[str]:
@@ -703,7 +714,11 @@ class JsonWriter:
 
     def __init__(self, grammar: Grammar) -> None:
         self.grammar = grammar
-        self.out: dict[str, list[list[str]]] = {}
+        self.out: dict[str, list[list[Symbol]]] = {}
+        # The keys that are on the parser level (the parse map describes them)
+        self.parser_keys: set[str] = {START_KEY}
+        # The ANTLR token type name of each token key
+        self.token_names: dict[str, str] = {}
         self.helper_counts: dict[str, int] = {}
         self.char_set_keys: dict[tuple[str, ...], str] = {}
         self.token_type_keys: dict[str, str] = {}
@@ -733,31 +748,39 @@ class JsonWriter:
         """Return the key of a grammar rule (a missing rule keeps its name)."""
         return key(self.names.get(name, name))
 
-    def new_helper(self, owner: str) -> str:
+    def new_helper(self, owner: str, *, in_parser: bool) -> str:
         """Return a new key for a helper rule of the grammar rule `owner`."""
         count = self.helper_counts.get(owner, 0) + 1
         self.helper_counts[owner] = count
-        return key(self.claim(f"{self.names[owner]}__{count}"))
+        helper = key(self.claim(f"{self.names[owner]}__{count}"))
+        if in_parser:
+            self.parser_keys.add(helper)
+        return helper
 
     # -- rules ---------------------------------------------------------------
 
-    def write(self, start: str) -> dict[str, list[list[str]]]:
-        self.out[START_KEY] = [[self.rule_key(start)]]
+    def write(self, start: str) -> dict[str, list[list[Symbol]]]:
+        # The empty literal is the leading leaf: the parser puts the text
+        # before the first token there. Generation writes nothing for it.
+        self.out[START_KEY] = [[("", "lead"), (self.rule_key(start), "rule")]]
         for name, rule in self.grammar.rules.items():
-            self.out[self.rule_key(name)] = self.alternatives(rule.body, name, in_parser=not rule.is_lexer)
+            key_ = self.rule_key(name)
+            self.out[key_] = self.alternatives(rule.body, name, in_parser=not rule.is_lexer)
+            if not rule.is_lexer:
+                self.parser_keys.add(key_)
         return self.out
 
-    def alternatives(self, node: Node, owner: str, *, in_parser: bool) -> list[list[str]]:
+    def alternatives(self, node: Node, owner: str, *, in_parser: bool) -> list[list[Symbol]]:
         if isinstance(node, Choice):
-            result: list[list[str]] = []
+            result: list[list[Symbol]] = []
             for alternative in node.alternatives:
                 result.extend(self.alternatives(alternative, owner, in_parser=in_parser))
             return result
         return [self.sequence(node, owner, in_parser=in_parser)]
 
-    def sequence(self, node: Node, owner: str, *, in_parser: bool) -> list[str]:  # noqa: PLR0911
+    def sequence(self, node: Node, owner: str, *, in_parser: bool) -> list[Symbol]:  # noqa: PLR0911
         if isinstance(node, Seq):
-            symbols: list[str] = []
+            symbols: list[Symbol] = []
             for item in node.items:
                 symbols.extend(self.sequence(item, owner, in_parser=in_parser))
             return symbols
@@ -767,37 +790,47 @@ class JsonWriter:
             if any(ord(c) > MAX_ASCII for c in node.text):
                 # f1_c_gen.py cannot write non-ASCII text. An empty character
                 # set makes the alternative impossible, so clean() removes it.
-                return [self.char_set(())]
-            text = literal_symbols(node.text)
-            return [*text, TOKEN_SEPARATOR] if in_parser else text
+                return [(self.char_set(()), "helper")]
+            text = [(t, "literal" if i == 0 else "literal_cont") for i, t in enumerate(literal_symbols(node.text))]
+            return [*text, (TOKEN_SEPARATOR, "sep")] if in_parser else text
         if isinstance(node, RuleRef):
             return self.rule_ref(node.name, in_parser=in_parser)
         if isinstance(node, CharSet):
-            return [self.char_set(node.chars)]
+            return [(self.char_set(node.chars), "helper")]
         if isinstance(node, TokenSet):
-            return [self.token_set(node, owner)]
+            return [(self.token_set(node, owner, in_parser=in_parser), "helper")]
         if isinstance(node, Choice):
-            helper = self.new_helper(owner)
+            helper = self.new_helper(owner, in_parser=in_parser)
             self.out[helper] = self.alternatives(node, owner, in_parser=in_parser)
-            return [helper]
-        return [self.repeat(node, owner, in_parser=in_parser)]
+            return [(helper, "helper")]
+        return [(self.repeat(node, owner, in_parser=in_parser), "helper")]
 
-    def rule_ref(self, name: str, *, in_parser: bool) -> list[str]:
+    def rule_ref(self, name: str, *, in_parser: bool) -> list[Symbol]:
         rule = self.grammar.rules.get(name)
         is_token = name[0].isupper()
         if not in_parser or not is_token:
-            return [self.rule_key(name)]
+            return [(self.rule_key(name), "rule")]
         # A token in a parser rule. A token can also come from `-> type(X)`.
         producers = [r.name for r in self.grammar.rules.values() if name in r.token_types and not r.is_hidden]
         if rule is not None and not rule.is_hidden:
             producers.insert(0, name)
         if len(producers) == 1:
-            return [self.rule_key(producers[0]), self.separator_after(producers[0])]
+            token_key = self.rule_key(producers[0])
+            self.token_names[token_key] = self.token_type(producers[0])
+            return [(token_key, "token"), (self.separator_after(producers[0]), "sep")]
         if name not in self.token_type_keys:
+            # A token key: the parser never looks into its alternatives, so
+            # the parse map does not describe them.
             helper = key(self.claim(f"{name}__type"))
             self.token_type_keys[name] = helper
-            self.out[helper] = [[self.rule_key(p)] for p in producers]  # empty if no producer
-        return [self.token_type_keys[name], TOKEN_SEPARATOR]
+            self.token_names[helper] = name
+            self.out[helper] = [[(self.rule_key(p), "token")] for p in producers]  # empty if no producer
+        return [(self.token_type_keys[name], "token"), (TOKEN_SEPARATOR, "sep")]
+
+    def token_type(self, token: str) -> str:
+        """Return the ANTLR token type name of the tokens of the lexer rule `token`."""
+        rule = self.grammar.rules.get(token)
+        return rule.token_types[-1] if rule is not None and rule.token_types else token
 
     def separator_after(self, token: str) -> str:
         """Return the text to put after a token of the lexer rule `token`."""
@@ -810,32 +843,34 @@ class JsonWriter:
         if chars not in self.char_set_keys:
             helper = key(self.claim(f"charset__{len(self.char_set_keys) + 1}"))
             self.char_set_keys[chars] = helper
-            self.out[helper] = [[c] for c in chars]  # empty if no character
+            self.out[helper] = [[(c, "char")] for c in chars]  # empty if no character
         return self.char_set_keys[chars]
 
-    def token_set(self, node: TokenSet, owner: str) -> str:
-        helper = self.new_helper(owner)
-        alternatives: list[list[str]] = []
+    def token_set(self, node: TokenSet, owner: str, *, in_parser: bool) -> str:
+        helper = self.new_helper(owner, in_parser=in_parser)
+        alternatives: list[list[Symbol]] = []
         for name, rule in self.grammar.rules.items():
             if not rule.is_lexer or rule.is_fragment or rule.is_hidden or name in node.excluded_names:
                 continue
             if fixed_text(rule.body) in node.excluded_texts:
                 continue
-            alternatives.append([self.rule_key(name), self.separator_after(name)])
+            token_key = self.rule_key(name)
+            self.token_names[token_key] = self.token_type(name)
+            alternatives.append([(token_key, "token"), (self.separator_after(name), "sep")])
         self.out[helper] = alternatives
         return helper
 
     def repeat(self, node: Repeat, owner: str, *, in_parser: bool) -> str:
         item = self.sequence(node.item, owner, in_parser=in_parser)
-        helper = self.new_helper(owner)
+        helper = self.new_helper(owner, in_parser=in_parser)
         if node.suffix == "?":
             self.out[helper] = [item, []]
         elif node.suffix == "*":
-            self.out[helper] = [[*item, helper], []]
+            self.out[helper] = [[*item, (helper, "helper")], []]
         else:
-            star = self.new_helper(owner)
-            self.out[star] = [[*item, star], []]
-            self.out[helper] = [[*item, star]]
+            star = self.new_helper(owner, in_parser=in_parser)
+            self.out[star] = [[*item, (star, "helper")], []]
+            self.out[helper] = [[*item, (star, "helper")]]
         return helper
 
 
@@ -844,11 +879,11 @@ class JsonWriter:
 # ---------------------------------------------------------------------------
 
 
-def is_nonterminal(symbol: str, rules: dict[str, list[list[str]]]) -> bool:
+def is_nonterminal(symbol: str, rules: dict[str, list[list[Symbol]]]) -> bool:
     return symbol in rules
 
 
-def productive_keys(rules: dict[str, list[list[str]]]) -> set[str]:
+def productive_keys(rules: dict[str, list[list[Symbol]]]) -> set[str]:
     """Return the keys that can give a finite string."""
     productive: set[str] = set()
     changed = True
@@ -858,44 +893,45 @@ def productive_keys(rules: dict[str, list[list[str]]]) -> set[str]:
             if k in productive:
                 continue
             for alternative in alternatives:
-                if all(not is_nonterminal(s, rules) or s in productive for s in alternative):
+                if all(not is_nonterminal(s, rules) or s in productive for s, _kind in alternative):
                     productive.add(k)
                     changed = True
                     break
     return productive
 
 
-def reachable_keys(rules: dict[str, list[list[str]]], start: str) -> set[str]:
+def reachable_keys(rules: dict[str, list[list[Symbol]]], start: str) -> set[str]:
     reachable = {start}
     todo = [start]
     while todo:
         for alternative in rules[todo.pop()]:
-            for symbol in alternative:
+            for symbol, _kind in alternative:
                 if is_nonterminal(symbol, rules) and symbol not in reachable:
                     reachable.add(symbol)
                     todo.append(symbol)
     return reachable
 
 
-def clean(rules: dict[str, list[list[str]]]) -> dict[str, list[list[str]]]:
+def clean(rules: dict[str, list[list[Symbol]]]) -> dict[str, list[list[Symbol]]]:
     """Remove the alternatives and rules that cannot give a finite string, the
-    unreachable rules, and repeated alternatives."""
+    unreachable rules, and repeated alternatives. Each symbol keeps its kind."""
     productive = productive_keys(rules)
     if START_KEY not in productive:
         msg = "the start rule cannot give a finite test case (check the character pool and the token rules)"
         raise G4Error(msg)
-    kept: dict[str, list[list[str]]] = {}
+    kept: dict[str, list[list[Symbol]]] = {}
     for k, alternatives in rules.items():
         if k not in productive:
             continue
         seen: set[tuple[str, ...]] = set()
         kept[k] = []
         for alternative in alternatives:
-            if any(is_nonterminal(s, rules) and s not in productive for s in alternative):
+            names = tuple(s for s, _kind in alternative)
+            if any(is_nonterminal(s, rules) and s not in productive for s in names):
                 continue
-            if tuple(alternative) in seen:
+            if names in seen:
                 continue
-            seen.add(tuple(alternative))
+            seen.add(names)
             kept[k].append(alternative)
     reachable = reachable_keys(kept, START_KEY)
     result = {START_KEY: kept[START_KEY]}
@@ -910,11 +946,33 @@ def clean(rules: dict[str, list[list[str]]]) -> dict[str, list[list[str]]]:
 # ---------------------------------------------------------------------------
 
 
-def convert(
+def module_names(grammar: Grammar) -> tuple[str | None, str | None]:
+    """Return the names of the generated lexer and parser modules.
+
+    A combined grammar X gives XLexer and XParser. A lexer or parser grammar X
+    gives X. An imported grammar does not count.
+    """
+    lexer: str | None = None
+    parser: str | None = None
+    for name, grammar_type in zip(grammar.grammar_names, grammar.grammar_types):
+        if name in grammar.imports:
+            continue
+        if grammar_type == "combined":
+            lexer = lexer or f"{name}Lexer"
+            parser = parser or f"{name}Parser"
+        elif grammar_type == "lexer":
+            lexer = lexer or name
+        else:
+            parser = parser or name
+    return lexer, parser
+
+
+def convert_with_map(
     paths: Sequence[Path],
     start: str | None = None,
     meta_parser_dir: Path = DEFAULT_META_PARSER_DIR,
-) -> dict[str, list[list[str]]]:
+) -> tuple[dict[str, list[list[str]]], dict[str, Any]]:
+    """Convert the grammar. Return the JSON rules and the parse map."""
     grammar = read_grammar(paths, meta_parser_dir)
     check_references(grammar)
     if not grammar.parser_rule_order:
@@ -925,8 +983,44 @@ def convert(
     if start not in grammar.rules or grammar.rules[start].is_lexer:
         msg = f"the start rule {start!r} is not a parser rule"
         raise G4Error(msg)
-    rules = JsonWriter(grammar).write(start)
-    return clean(rules)
+    writer = JsonWriter(grammar)
+    cleaned = clean(writer.write(start))
+    rules = {
+        k: [[s for s, _kind in alternative] for alternative in alternatives] for k, alternatives in cleaned.items()
+    }
+    kinds = {
+        k: [[kind for _s, kind in alternative] for alternative in alternatives]
+        for k, alternatives in cleaned.items()
+        if k in writer.parser_keys
+    }
+    token_keys = {
+        symbol: writer.token_names[symbol]
+        for k in kinds
+        for alternative in cleaned[k]
+        for symbol, kind in alternative
+        if kind == "token" and symbol in writer.token_names
+    }
+    lexer_module, parser_module = module_names(grammar)
+    parse_map: dict[str, Any] = {
+        "version": 1,
+        "start_rule": start,
+        "lexer_module": lexer_module,
+        "parser_module": parser_module,
+        "parser_rules": {
+            name: writer.rule_key(name) for name in grammar.parser_rule_order if writer.rule_key(name) in rules
+        },
+        "token_keys": token_keys,
+        "kinds": kinds,
+    }
+    return rules, parse_map
+
+
+def convert(
+    paths: Sequence[Path],
+    start: str | None = None,
+    meta_parser_dir: Path = DEFAULT_META_PARSER_DIR,
+) -> dict[str, list[list[str]]]:
+    return convert_with_map(paths, start, meta_parser_dir)[0]
 
 
 def main(argv: Iterable[str] | None = None) -> int:
@@ -940,6 +1034,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         help="the JSON grammar file to write",
     )
     parser.add_argument("-s", "--start", help="the start rule (default: the first parser rule)")
+    parser.add_argument("--parse-map", type=Path, help="the parse map file to write (for grammar_parser)")
     parser.add_argument(
         "--meta-dir",
         type=Path,
@@ -949,11 +1044,13 @@ def main(argv: Iterable[str] | None = None) -> int:
     args = parser.parse_args(None if argv is None else list(argv))
 
     try:
-        rules = convert(args.grammars, args.start, args.meta_dir.resolve())
+        rules, parse_map = convert_with_map(args.grammars, args.start, args.meta_dir.resolve())
     except (G4Error, OSError) as e:
         print(f"[-] {e}", file=sys.stderr)
         return 1
     args.output.write_text(json.dumps(rules, indent=1) + "\n")
+    if args.parse_map is not None:
+        args.parse_map.write_text(json.dumps(parse_map, indent=1) + "\n")
     print(f"[+] Wrote {len(rules)} rules to {args.output}")
     return 0
 

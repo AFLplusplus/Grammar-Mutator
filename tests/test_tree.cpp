@@ -16,6 +16,9 @@
 
  */
 
+#include <cstdlib>
+#include <cstring>
+
 #include "tree.h"
 #include "f1_c_fuzz.h"
 
@@ -468,6 +471,42 @@ TEST_F(TreeTest, TreeSerializeDeserialize) {
   EXPECT_TRUE(tree_equal(tree, new_tree));
 
   tree_free(new_tree);
+
+}
+
+TEST_F(TreeTest, DeserializeRejectsBadLengths) {
+
+  tree_serialize(tree);
+  uint8_t *data = (uint8_t *)malloc(tree->ser_len);
+  ASSERT_NE(data, nullptr);
+
+  // The fields of the root node: id, rule_id, subnode_count, val_len
+  const size_t   subnode_count_offset = 8, val_len_offset = 12;
+  const uint32_t bad_values[] = {UINT32_MAX, 0x10000000};
+  for (size_t offset : {subnode_count_offset, val_len_offset}) {
+
+    for (uint32_t bad : bad_values) {
+
+      memcpy(data, tree->ser_buf, tree->ser_len);
+      memcpy(data + offset, &bad, sizeof(bad));
+      EXPECT_EQ(tree_deserialize(data, tree->ser_len), nullptr)
+          << offset << " " << bad;
+
+    }
+
+  }
+
+  // A leaf (id 0) with a subnode
+  const uint32_t leaf_with_child[8] = {0, 0, 1, 0, 0, 0, 0, 0};
+  EXPECT_EQ(tree_deserialize((const uint8_t *)leaf_with_child,
+                             sizeof(leaf_with_child)),
+            nullptr);
+
+  // A tree file that ends early
+  for (size_t len : {(size_t)0, (size_t)15, tree->ser_len - 1})
+    EXPECT_EQ(tree_deserialize(tree->ser_buf, len), nullptr) << len;
+
+  free(data);
 
 }
 

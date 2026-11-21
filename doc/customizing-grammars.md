@@ -39,56 +39,68 @@ This simple grammar can generate two strings: "I like C" and "I like C++".
 
 ## ANTLR 4 Grammars (.g4)
 
-You can also give one or more ANTLR 4 grammar files (`.g4`) instead of a JSON
-grammar, for example a grammar from
-[grammars-v4](https://github.com/antlr/grammars-v4). The build converts them
-into a JSON grammar with [g4_to_json.py](../grammars/g4_to_json.py).
-
-The `.g4` path needs the Python tools in `requirements.txt`. With make, run
-`make deps` once to install them into `.venv`. With CMake, the configure step
-installs them into the build folder.
+You can give ANTLR 4 grammar files (`.g4`) instead of a JSON grammar, for
+example from [grammars-v4](https://github.com/antlr/grammars-v4). The build
+converts them with [g4_to_json.py](../grammars/g4_to_json.py). With make, run
+`make deps` once for the Python tools.
 
 ```bash
-# One combined grammar
 make GRAMMAR_FILE=grammars/g4/JSON.g4
-
-# A lexer grammar and a parser grammar
 make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4"
 
-# CMake: give a list of full paths
+# CMake: a list of full paths
 cmake -DGRAMMAR_FILE="/path/JavaScriptLexer.g4;/path/JavaScriptParser.g4" ...
 ```
 
-- Give all `.g4` files of the grammar. If a grammar uses `import`, also give
-  the imported files. The build stops if a rule or a token has no definition.
-- `GRAMMAR_START` (CMake: `-DGRAMMAR_START`) is the start rule. The default is
-  the first parser rule.
-- The default grammar name comes from the last file, without `Parser` or
-  `Lexer`. So the files above give `libgrammarmutator-javascript.so`.
+- Give all `.g4` files of the grammar, also the imported files.
+- `GRAMMAR_START` sets the start rule. The default is the first parser rule.
+- The grammar name comes from the last file without `Lexer` or `Parser`, so
+  the example above gives `javascript`.
 
-The conversion works as follows:
+The generator ignores actions and predicates, so some generated test cases
+can be invalid. It writes ASCII characters only, and it puts a space after
+each token.
 
-- Each subrule and each `?`, `*`, and `+` becomes a helper rule.
-- Each lexer rule becomes a rule over characters. A character set, a `~` set,
-  or `.` gives one printable ASCII character, a tab, or a newline. A Unicode
-  property such as `\p{L}` gives ASCII characters of the same kind (letters
-  for `\p{L}`). A lexer rule that cannot give an ASCII character is removed.
-- A literal with a non-ASCII character (for example `'\u200C'`) is removed,
-  together with the alternative that contains it.
-- A space comes after each token of a parser rule, because the lexer usually
-  skips whitespace. A token that continues to the end of the line, such as a
-  line comment, gets a newline after it.
-- Actions, predicates, labels, options, and `EOF` are ignored. So a generated
-  test case can break a rule that only a predicate or an action checks.
-- The rules that the start rule cannot reach are removed.
+### Parse Existing Test Cases
 
-Limits of the current version:
+A `.g4` build also makes `grammar_parser-<name>`. It parses your test cases and
+writes their trees. Copy the trees into the AFL++ output folder, as for
+`grammar_generator` (see [README.md](../README.md#using-generated-seeds)).
 
-- The mutator does not parse test cases with a `.g4` grammar yet. Use
-  `grammar_generator-<name>` to make the seeds and their trees (see
-  [README.md](../README.md#using-generated-seeds)). The mutator skips a queue
-  entry that has no tree, and AFL++ fuzzes that entry with its own mutators.
-- A token that only the code of a grammar makes (a `tokens { ... }` entry with
-  no lexer rule, such as `INDENT` in a Python grammar) cannot be generated.
-  The build removes the alternatives that use it and prints a warning.
-- Generated characters are ASCII only.
+```bash
+./grammar_parser-javascript SEEDS_DIR TREES_DIR
+mkdir -p out/default
+cp -r TREES_DIR out/default/trees
+```
+
+- A tree gives the exact bytes of its test case again.
+- The tree name is the file name, with each space changed to `_` (as AFL++
+  does). `TREES_DIR` must not be in `SEEDS_DIR`.
+- `-j N` sets the number of parser processes. The default is one per CPU.
+
+The tool skips a file that it cannot parse, prints the reason, and goes on:
+
+- `not UTF-8`: the file is not UTF-8.
+- `syntax error`: ANTLR rejects the file.
+- `parser limit`: the nesting is too deep (more than 20000 tree levels).
+- `duplicate name`: another file already has this tree name.
+- `no match`: a bug. Please report it with the file.
+
+A grammar with action code needs its Python base classes. Set `G4_SUPPORT_DIR`
+to the `Python3/` folder of the grammar in grammars-v4 (CMake: a full path).
+Without it, `grammar_parser-<name>` stops with a message.
+
+```bash
+make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4" \
+     G4_SUPPORT_DIR=grammars/g4/javascript/Python3
+```
+
+### Limits
+
+- The mutator does not parse test cases with a `.g4` grammar itself. A queue
+  entry without a tree (for example from `-M`/`-S` sync) gets only the AFL++
+  mutators.
+- Each token is one leaf, so the mutator changes a parsed token only as a
+  whole.
+- A token that only grammar code makes (such as `INDENT` in a Python grammar)
+  is not supported.

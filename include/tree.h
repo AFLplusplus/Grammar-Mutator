@@ -16,6 +16,10 @@ extern "C" {
 
 #endif
 
+// A parsed node whose alternative is not known. The rules mutation tries every
+// alternative.
+#define RULE_ID_UNKNOWN UINT32_MAX
+
 typedef struct tree_node node_t;
 struct tree_node {
 

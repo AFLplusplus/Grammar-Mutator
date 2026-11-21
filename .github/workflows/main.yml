@@ -49,6 +49,7 @@ jobs:
     env:
       JSON_G4: grammars/g4/JSON.g4
       JS_G4: grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4
+      JS_SUPPORT: grammars/g4/javascript/Python3
 
     steps:
     - uses: actions/checkout@v4
@@ -63,19 +64,26 @@ jobs:
       run: make -f GNUmakefile test-python
     - name: Select the grammar files
       run: |
-        if [ "${{ matrix.grammar }}" = json ]; then files="$JSON_G4"; else files="$JS_G4"; fi
-        echo "G4_FILES=$files" >> "$GITHUB_ENV"
+        if [ "${{ matrix.grammar }}" = json ]; then
+          echo "G4_FILES=$JSON_G4" >> "$GITHUB_ENV"
+        else
+          echo "G4_FILES=$JS_G4" >> "$GITHUB_ENV"
+          echo "G4_SUPPORT_DIR=$JS_SUPPORT" >> "$GITHUB_ENV"
+        fi
     - name: Compile with make
       if: matrix.build == 'make'
       run: |
-        make -f GNUmakefile GRAMMAR_FILE="$G4_FILES" -j$(nproc)
+        make -f GNUmakefile GRAMMAR_FILE="$G4_FILES" G4_SUPPORT_DIR="${G4_SUPPORT_DIR:-}" -j$(nproc)
         echo "GENERATOR=./grammar_generator-${{ matrix.grammar }}" >> "$GITHUB_ENV"
     - name: Compile with CMake
       if: matrix.build == 'cmake'
       run: |
         list=$(for f in $G4_FILES; do realpath "$f"; done | paste -sd ';')
-        cmake -S . -B build -DANTLR_JAR_LOCATION=$(realpath antlr-4.13.2-complete.jar) "-DGRAMMAR_FILE=$list"
+        support=
+        if [ -n "${G4_SUPPORT_DIR:-}" ]; then support="-DG4_SUPPORT_DIR=$(realpath "$G4_SUPPORT_DIR")"; fi
+        cmake -S . -B build -DANTLR_JAR_LOCATION=$(realpath antlr-4.13.2-complete.jar) "-DGRAMMAR_FILE=$list" $support
         cmake --build build --parallel $(nproc)
+        echo "BUILD_DIR=build" >> "$GITHUB_ENV"
         echo "GENERATOR=./build/src/grammar_generator-${{ matrix.grammar }}" >> "$GITHUB_ENV"
     - name: Generate test cases
       run: |
@@ -98,6 +106,14 @@ jobs:
         print(f"{len(seeds) - len(bad)} of {len(seeds)} test cases are valid JSON")
         sys.exit(1 if bad or not seeds else 0)
         EOF
+    - name: Check that the parsed trees give the generated test cases again
+      # Generation ignores the predicates of the JavaScript grammar, so ANTLR
+      # rejects some generated test cases. Allow these skips for JavaScript.
+      env:
+        ALLOW_SKIPS: ${{ matrix.grammar == 'javascript' && '1' || '' }}
+      run: tests/g4/roundtrip.sh "${{ matrix.grammar }}" seeds
+    - name: Check that the parsed trees give the corpus files again
+      run: tests/g4/roundtrip.sh "${{ matrix.grammar }}" "tests/g4/corpus/${{ matrix.grammar }}"
 
   cmake-build:
     runs-on: ubuntu-24.04

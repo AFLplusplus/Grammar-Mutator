@@ -33,112 +33,7 @@ import string
 import json
 
 from f1_common import LimitFuzzer
-
-
-class TreeNode:
-    node_type: int = 0
-    rule_id: int = 0
-    val: str = ''
-    parent: 'TreeNode' = None
-    subnodes: list = None
-
-    def __init__(self, node_type=0, rule_id=0, val='', subnodes=None):
-        super().__init__()
-
-        self.node_type = node_type
-        self.rule_id = rule_id
-        self.val = val
-
-        if subnodes is None:
-            subnodes = []
-        self.subnodes = subnodes
-        for subnode in self.subnodes:
-            subnode.parent = self
-
-    def __len__(self):
-        return len(self.subnodes)
-
-    def __setitem__(self, key, value):
-        self.subnodes[key] = value
-
-    def __getitem__(self, key):
-        return self.subnodes[key]
-
-    def append_subnode(self, subnode: 'TreeNode'):
-        subnode.parent = self
-        self.subnodes.append(subnode)
-
-    def to_bytes(self):
-        ret = bytes()
-
-        # type
-        ret += self.node_type.to_bytes(4, byteorder='little', signed=False)
-        # rule id
-        ret += self.rule_id.to_bytes(4, byteorder='little', signed=False)
-        # subnode_count
-        subnode_count = len(self)
-        ret += subnode_count.to_bytes(4, byteorder='little', signed=False)
-
-        # Encode the value as UTF-8
-        val_bytes = self.val.encode('utf-8')
-        # val_len (now stores the byte length of the UTF-8 encoded string)
-        val_len = len(val_bytes)
-        ret += val_len.to_bytes(4, byteorder='little', signed=False)
-        # val
-        ret += val_bytes
-
-        # subnodes
-        for subnode in self.subnodes:
-            ret += subnode.to_bytes()
-
-        return ret
-
-    @staticmethod
-
-    def from_bytes(data: bytes):
-        node = TreeNode()
-        consumed = 0
-
-        # type
-        node.node_type = int.from_bytes(data[consumed:consumed + 4], byteorder='little', signed=False)
-        consumed += 4
-        # rule id
-        node.rule_id = int.from_bytes(data[consumed:consumed + 4], byteorder='little', signed=False)
-        consumed += 4
-        # subnode_count
-        subnode_count = int.from_bytes(data[consumed:consumed + 4], byteorder='little', signed=False)
-        consumed += 4
-        # val_len
-        val_len = int.from_bytes(data[consumed:consumed + 4], byteorder='little', signed=False)
-        consumed += 4
-        # val
-        if val_len != 0:
-            node.val = data[consumed:consumed + val_len].decode('utf-8')
-        consumed += val_len
-
-        # subnodes
-        for _ in range(subnode_count):
-            subnode, sub_consumed = TreeNode.from_bytes(data[consumed:])
-
-            node.append_subnode(subnode)
-            consumed += sub_consumed
-
-        return node, consumed
-
-
-    def __str__(self):
-        ret = ''
-        if len(self) == 0:
-            if self.val is None or len(self.val) == 0:
-                return ret
-            ret += self.val
-            return ret
-
-        # subnodes
-        for subnode in self.subnodes:
-            ret += str(subnode)
-
-        return ret
+from tree_file import TERM_ID, Node, serialize
 
 
 def bytes_to_c_str(data: bytes):
@@ -179,7 +74,7 @@ class PooledFuzzer(LimitFuzzer):
         '''
         # If this is a terminal node, just put in the one node:
         if key not in grammar:
-            return [TreeNode(node_type=0, val=key)]
+            return [Node(TERM_ID, 0, key)]
 
         # Enumerate the rules so we know how many there are and so we
         # can match rule IDs correctly:
@@ -215,7 +110,7 @@ class PooledFuzzer(LimitFuzzer):
             return tuple(map(random.choice, pools))
 
         # Select chosen_trees number of random valid sets of subnodes, and return a tree for each
-        return [TreeNode(node_type=self.k_to_id(key), rule_id=rule_id, subnodes=subnodes)
+        return [Node(self.k_to_id(key), rule_id, '', list(subnodes))
                 for subnodes in (random_product(*subnode_possibilities) for _ in range(chosen_trees))]
 
     def completion_trees(self):
@@ -386,7 +281,7 @@ node_t *gen_node_%(name)s(int max_len, int *consumed, int rule_index) {
         result = []
         for k in self.grammar_keys:
             cheap_trees = self.pool_of_trees[k]
-            ser_cheap_trees = [tree.to_bytes() for tree in cheap_trees]
+            ser_cheap_trees = [serialize(tree) for tree in cheap_trees]
             ser_cheap_trees_c_str = [bytes_to_c_str(ser_tree) for ser_tree in ser_cheap_trees]
             result.append('''
 const char* pool_ser_%(k)s[] = {%(ser_trees)s};
