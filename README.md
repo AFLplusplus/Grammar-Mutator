@@ -108,8 +108,9 @@ To e.g. use the test cases of the `mruby` project as input fuzzing seeds just pa
 when we run the fuzzer (if it has been checked out with `git clone https://github.com/mruby/mruby.git` in the current directory).
 
 For a `.g4` grammar, the mutator also parses each seed when AFL++ loads it.
-But a seed with a syntax error gets no tree.
-The AFL++ mutators still change it, but the grammar mutator does not.
+A seed with a syntax error gets no tree, and the grammar mutator does not change it.
+The other AFL++ stages change it, unless `AFL_CUSTOM_MUTATOR_ONLY` is set.
+With `AFL_CUSTOM_MUTATOR_ONLY=1`, AFL++ does not fuzz this seed at all.
 To parse the seeds before you fuzz, run `grammar_parser-$GRAMMAR`.
 It parses the seeds and writes their trees, for example `./grammar_parser-javascript ./seeds ./trees`.
 Then copy the `trees` folder as shown in [Using Generated Seeds](#using-generated-seeds).

@@ -92,8 +92,9 @@ The tool skips a file that it cannot parse, prints the reason, and goes on:
 - `no match`: a bug. Please report it with the file.
 
 If the mutator cannot parse a queue entry, the entry stays in the queue. The
-AFL++ mutators still change it, but the custom mutator does not. The mutator
-does not parse it again in the same run.
+custom mutator does not change it. The other AFL++ stages change it, unless
+`AFL_CUSTOM_MUTATOR_ONLY` is set. With `AFL_CUSTOM_MUTATOR_ONLY=1`, AFL++ does
+not fuzz the entry at all. The mutator does not parse it again in the same run.
 
 The mutator also stops a parse that takes too long. The time limit is 50 ×
 the token count × the median time per token of the earlier parses. The
@@ -113,7 +114,7 @@ make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascr
 
 ### Limits
 
-- A grammar must have no action code, or C++ base classes.
+- A grammar must have no action code, or it must have C++ base classes.
 - Each token is one leaf, so the mutator changes a parsed token only as a
   whole.
 - A token that only grammar code makes (such as `INDENT` in a Python grammar)
