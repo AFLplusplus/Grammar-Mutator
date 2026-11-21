@@ -54,7 +54,9 @@ set_target_properties(grammar_generator
 # Test case parser (only for a .g4 build)
 if (G4_BUILD)
   add_executable(grammar_parser
-    grammar_parser.c)
+    grammar_parser.c
+    grammar_parser_files.c
+    grammar_parser_work.c)
   target_link_libraries(grammar_parser
     PRIVATE grammarmutator
     PRIVATE Threads::Threads)
