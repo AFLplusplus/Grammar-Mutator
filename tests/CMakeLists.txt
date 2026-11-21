@@ -158,3 +158,13 @@ target_link_libraries(test_utils
 add_test(
   NAME test_utils
   COMMAND test_utils)
+
+# Test suite:
+# test the adaptive parse budget
+add_executable(test_parse_budget test_parse_budget.cpp)
+target_link_libraries(test_parse_budget
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
+add_test(
+  NAME test_parse_budget
+  COMMAND test_parse_budget)

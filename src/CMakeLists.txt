@@ -19,6 +19,7 @@
 add_library(grammarmutator SHARED
   chunk_store.c
   list.c
+  parse_budget.c
   tree.c
   tree_mutation.c
   tree_trimming.c
