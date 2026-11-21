@@ -21,6 +21,8 @@
 #   ASAN_OPTIONS=detect_container_overflow=0. The runtime library has no ASan
 #   code, so the container check gives false reports for its vectors (on Linux
 #   and macOS). If you set ASAN_OPTIONS, add detect_container_overflow=0 to it.
+#   A build with ASan skips the tests that throw from more than 64 MB deep in
+#   the parse thread stack: ASan does not clean the stack after such a throw.
 # The paths of the repository and the build must not have spaces.
 set -eu
 

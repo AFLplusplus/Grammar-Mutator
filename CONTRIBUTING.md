@@ -27,9 +27,13 @@ Thank you for your help. This file tells you how to send a change.
 
    If you change the C++ matcher (`lib/antlr4_shim/g4_*`), build a `.g4`
    grammar and run the matcher tests. Run them with AddressSanitizer too. The
-   ANTLR runtime has no ASan code, so ASan needs
-   `ASAN_OPTIONS=detect_container_overflow=0` on Linux and macOS. The script
-   sets it if `ASAN_OPTIONS` is empty. CI has no ASan job.
+   ANTLR runtime has no ASan code, so the container check of ASan gives false
+   reports. The script sets `ASAN_OPTIONS=detect_container_overflow=0` if
+   `ASAN_OPTIONS` is empty. ASan cannot check a test that throws from more
+   than 64 MB deep in the parse thread stack. An ASan build skips such a test
+   and shows `[SKIP]` for it. The ASan run passes on macOS (Apple clang) and
+   on Ubuntu 24.04 arm64 (gcc and clang). Other systems are not checked. CI
+   has no ASan job.
 
    ```bash
    tests/g4/run_matcher_tests.sh

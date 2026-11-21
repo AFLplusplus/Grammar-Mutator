@@ -36,6 +36,19 @@
 
 #include <unistd.h>
 
+// ASAN_BUILD is 1 if the compiler builds the test with AddressSanitizer: gcc
+// defines __SANITIZE_ADDRESS__, and clang has the feature address_sanitizer.
+#if defined(__SANITIZE_ADDRESS__)
+  #define ASAN_BUILD 1
+#elif defined(__has_feature)
+  #if __has_feature(address_sanitizer)
+    #define ASAN_BUILD 1
+  #endif
+#endif
+#ifndef ASAN_BUILD
+  #define ASAN_BUILD 0
+#endif
+
 #include "g4_matcher.h"
 #include "tree.h"
 
@@ -630,9 +643,15 @@ void base_class_exception() {
 
 // -- guards ------------------------------------------------------------------
 
-void depth_limit() {
+// The default limit: the parse goes 200,000 rules deep (about 100 MB of the
+// parse thread stack) and throws from there
+void default_depth_limit() {
 
   check_status(t_nest::grammar, nest_input(200001), PARSE_LIMIT);
+
+}
+
+void depth_limit() {
 
   g4::Limits limits;
   limits.max_rule_depth = 1000;
@@ -1007,6 +1026,11 @@ struct Test {
 
   const char *name;
   void (*run)();
+  // The test throws from more than 64 MB deep in the parse thread stack.
+  // After such a throw, ASan does not clean the stack ("ASan is ignoring
+  // requested __asan_handle_no_return"), and its later reports are false. So
+  // a build with ASan skips the test.
+  bool deep_throw = false;
 
 };
 
@@ -1036,6 +1060,7 @@ const Test TESTS[] = {
     {"reserved_start_rule", reserved_start_rule},
     {"base_class_exception", base_class_exception},
     {"tokens_outside_the_input", tokens_outside_the_input},
+    {"default_depth_limit", default_depth_limit, true},
     {"depth_limit", depth_limit},
     {"thread_error", thread_error},
     {"budget_stops_a_slow_parse", budget_stops_a_slow_parse},
@@ -1055,6 +1080,7 @@ int main(int argc, char **argv) {
 
   int failed_tests = 0;
   int count = 0;
+  int skipped = 0;
   for (const Test &test : TESTS) {
 
     bool selected = argc == 1;
@@ -1065,6 +1091,16 @@ int main(int argc, char **argv) {
     }
 
     if (!selected) continue;
+    if (ASAN_BUILD && test.deep_throw) {
+
+      std::printf("[SKIP] %s (skipped under ASan: it throws from deep in the "
+                  "parse thread stack)\n",
+                  test.name);
+      ++skipped;
+      continue;
+
+    }
+
     ++count;
     failed_checks = 0;
     test.run();
@@ -1073,7 +1109,8 @@ int main(int argc, char **argv) {
 
   }
 
-  std::printf("%d tests, %d failed\n", count, failed_tests);
-  return failed_tests || count == 0 ? 1 : 0;
+  std::printf("%d tests, %d failed, %d skipped\n", count, failed_tests,
+              skipped);
+  return failed_tests || count + skipped == 0 ? 1 : 0;
 
 }
