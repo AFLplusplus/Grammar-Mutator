@@ -38,6 +38,10 @@ extern list_map_t chunk_store;
 typedef map_t(node_t *) node_map_t;
 extern node_map_t seen_chunks;
 
+// Instrumentation for tests: the number of nodes that the hash passes have
+// visited. A linear hash visits each node of an added tree once.
+extern size_t chunk_store_hashed_nodes;
+
 // private functions
 void hash_node(node_t *node, char dest[16 + 1]);
 void chunk_store_take_node(node_t *node);

@@ -23,10 +23,14 @@
 #include "chunk_store.h"
 #include "chunk_store_internal.h"
 #include "utils.h"
+#include "node_stack.h"
 
 // the list, in `chunk_store`, contains a collection of `node_t`
 list_map_t chunk_store;
 node_map_t seen_chunks;
+
+// Instrumentation for tests: the number of nodes that the hash passes visit
+size_t chunk_store_hashed_nodes = 0;
 
 // Tiny implementation of fixed-length hash to text conversion
 static void uint64_to_hex(uint64_t num, char dest[16 + 1]) {
@@ -46,25 +50,96 @@ static void uint64_to_hex(uint64_t num, char dest[16 + 1]) {
 
 }
 
-// Append the node and its subnodes a hash of the node and its subnodes
-static void node_update_hash(node_t *node, XXH3_state_t *hash) {
+// One entry for each node of a subtree, in pre-order
+typedef struct {
 
-  // Use the same fields that `node_equal()` uses, so
-  // that we can be reasonably certain that if the hashes
-  // are equal than `node_equal()` will return true.
-  XXH3_64bits_update(hash, &node->id, sizeof(node->id));
-  XXH3_64bits_update(hash, &node->rule_id, sizeof(node->rule_id));
-  XXH3_64bits_update(hash, &node->val_len, sizeof(node->val_len));
-  XXH3_64bits_update(hash, node->val_buf, node->val_len);
+  node_t  *node;
+  size_t   parent;  // the entry index of the parent
+  uint32_t idx;     // the child index in the parent
+  size_t   base;    // the first slot of the child hashes
+  size_t   size;    // the number of entries in the subtree, itself included
+  uint64_t hash;
 
-  // Do not consider the parent node while comparing two nodes
+} hash_entry_t;
 
-  // subnodes
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+// Hash every node of the subtree in one post-order pass. The hash of a node
+// covers the same fields that `node_equal()` uses and the hashes of its
+// children. The caller frees the result.
+static hash_entry_t *hash_subtree(node_t *root, size_t *count) {
 
-    node_update_hash(node->subnodes[i], hash);
+  hash_entry_t *entries = NULL;
+  size_t        n = 0, cap = 0, slots = 0;
+  node_stack_t  stack = {0};
+
+  node_stack_push(&stack, root, 0, (size_t)-1);
+  while (stack.len) {
+
+    node_frame_t f = node_stack_pop(&stack);
+    if (n == cap) {
+
+      cap = cap ? cap * 2 : 64;
+      entries = realloc(entries, cap * sizeof(hash_entry_t));
+      if (!entries) {
+
+        perror("hash_subtree (realloc)");
+        exit(EXIT_FAILURE);
+
+      }
+
+    }
+
+    entries[n] = (hash_entry_t){f.node, f.aux, f.idx, slots, 1, 0};
+    slots += f.node->subnode_count;
+    node_stack_push_children(&stack, f.node, n);
+    ++n;
 
   }
+
+  node_stack_free(&stack);
+
+  // child hashes: a NULL subnode keeps the slot value 0
+  uint64_t *child_hash = calloc(slots ? slots : 1, sizeof(uint64_t));
+  if (!child_hash) {
+
+    perror("hash_subtree (calloc)");
+    exit(EXIT_FAILURE);
+
+  }
+
+  chunk_store_hashed_nodes += n;
+
+  // The reverse pre-order has every child before its parent
+  for (size_t i = n; i-- > 0;) {
+
+    node_t *node = entries[i].node;
+
+    // Use the same fields that `node_equal()` uses, so
+    // that we can be reasonably certain that if the hashes
+    // are equal than `node_equal()` will return true.
+    // Do not consider the parent node while comparing two nodes.
+    XXH3_state_t hash;
+    XXH3_64bits_reset(&hash);
+    XXH3_64bits_update(&hash, &node->id, sizeof(node->id));
+    XXH3_64bits_update(&hash, &node->rule_id, sizeof(node->rule_id));
+    XXH3_64bits_update(&hash, &node->val_len, sizeof(node->val_len));
+    XXH3_64bits_update(&hash, node->val_buf, node->val_len);
+    XXH3_64bits_update(&hash, child_hash + entries[i].base,
+                       node->subnode_count * sizeof(uint64_t));
+    entries[i].hash = XXH3_64bits_digest(&hash);
+
+    if (i) {
+
+      size_t p = entries[i].parent;
+      child_hash[entries[p].base + entries[i].idx] = entries[i].hash;
+      entries[p].size += entries[i].size;
+
+    }
+
+  }
+
+  free(child_hash);
+  *count = n;
+  return entries;
 
 }
 
@@ -74,17 +149,15 @@ static void node_update_hash(node_t *node, XXH3_state_t *hash) {
 // are equal than `node_equal()` will return true.
 void hash_node(node_t *node, char dest[16 + 1]) {
 
-  // Set up a hash state so we can pass it to sub-nodes recursively:
-  XXH3_state_t hash;
-  XXH3_64bits_reset(&hash);
-
-  node_update_hash(node, &hash);
+  size_t        count;
+  hash_entry_t *entries = hash_subtree(node, &count);
 
   // Need to convert the hash to text so that 0-values in the hash don't cause
   // an inordinant amount of collisions. If we just put the 8-byte integer in as
   // a "string" then the first byte being a zero would cause a collision
   // approximately 1/256 of the time!
-  uint64_to_hex(XXH3_64bits_digest(&hash), dest);
+  uint64_to_hex(entries[0].hash, dest);
+  free(entries);
 
 }
 
@@ -92,43 +165,47 @@ void hash_node(node_t *node, char dest[16 + 1]) {
  * Take ownership of a node for the chunk store, storing it if unique or freeing
  * it if not.
  * @param  node The node, which must not be owned/kept by anybody else. It also
- * should not have a parent except when called recursively.
+ * may have a parent, whose subnode pointer the function patches.
  */
 void chunk_store_take_node(node_t *node) {
 
   if (!node) return;
 
-  const char *node_type = node_type_str(node->id);
+  size_t        count;
+  hash_entry_t *entries = hash_subtree(node, &count);
 
-  // add current subtree
-  char node_hash[16 + 1];
-  hash_node(node, node_hash);
-  node_t **seen_node = map_get(&seen_chunks, node_hash);
-  if (seen_node) {
+  // Walk the entries in pre-order. A duplicate subtree is freed, so skip its
+  // entries.
+  for (size_t i = 0; i < count;) {
 
-    // This node already exists in the tree. So patch up our parent to point at
-    // it and then free the duplicate.
-    if (node->parent) {
+    node_t *cur = entries[i].node;
+    char    node_hash[16 + 1];
+    uint64_to_hex(entries[i].hash, node_hash);
 
-      // Replace myself with the already existing node
-      node_replace_subnode(node->parent, node, *seen_node);
+    node_t **seen_node = map_get(&seen_chunks, node_hash);
+    if (seen_node) {
+
+      // This node already exists in the tree. So patch up our parent to point
+      // at it and then free the duplicate.
+      if (cur->parent) node_replace_subnode(cur->parent, cur, *seen_node);
+
+      // We're a duplicate and not needed anymore, and neither are our subnodes!
+      size_t skip = entries[i].size;
+      node_free(cur);
+      i += skip;
+      continue;
 
     }
 
-    // We're a duplicate and not needed anymore, and neither are our subnodes!
-    node_free(node);
-
-  } else {
-
     // This is a brand new node, so keep it!
-    map_set(&seen_chunks, node_hash, node);
+    map_set(&seen_chunks, node_hash, cur);
 
     // NOTE: If this is a terminal node (node->id == 0), we *could*
     // skip creating a list for them here, because they aren't usable
     // for the splicing mutation (because they are not all interchangable).
     // But for simplicity we can just leave it as-is for now.
-
-    list_t **p_node_list = map_get(&chunk_store, node_type);
+    const char *node_type = node_type_str(cur->id);
+    list_t    **p_node_list = map_get(&chunk_store, node_type);
     if (unlikely(!p_node_list)) {
 
       map_set(&chunk_store, node_type, list_create());
@@ -136,23 +213,12 @@ void chunk_store_take_node(node_t *node) {
 
     }
 
-    list_t *node_list = *p_node_list;
-    list_append(node_list, node);
-
-    // process subnodes
-    node_t *subnode = NULL;
-    for (uint32_t i = 0; i < node->subnode_count; ++i) {
-
-      subnode = node->subnodes[i];
-
-      // NOTE: We *don't* clone this subnode before handing off ownership.
-      //       If the subnode is a duplicate, then it will patch up *this* node
-      //       to point at the already-seen copy and then free the duplicate.
-      chunk_store_take_node(subnode);
-
-    }
+    list_append(*p_node_list, cur);
+    ++i;
 
   }
+
+  free(entries);
 
 }
 

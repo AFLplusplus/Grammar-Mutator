@@ -22,6 +22,7 @@
 
 #include "tree.h"
 #include "utils.h"
+#include "node_stack.h"
 
 #define TREE_BUF_PREALLOC_SIZE (64)
 
@@ -110,50 +111,34 @@ void node_free(node_t *node) {
 
   if (!node) return;
 
-  // id
-  node->id = 0;
+  node_stack_t stack = {0};
+  node_stack_push(&stack, node, 0, 0);
 
-  // rule id
-  node->rule_id = 0;
+  while (stack.len) {
 
-  node->recursion_edge_size = 0;
-  node->non_term_size = 0;
+    node = node_stack_pop(&stack).node;
 
-  // val buf
-  if (node->val_buf) {
-
-    free(node->val_buf);
-    node->val_buf = NULL;
-    node->val_size = 0;
-    node->val_len = 0;
-
-  }
-
-  // parent node
-  node->parent = NULL;
-
-  // subnodes
-  if (node->subnode_count != 0) {
-
-    node_t *subnode = NULL;
+    // `subnode` may be NULL due to parsing errors
     for (uint32_t i = 0; i < node->subnode_count; ++i) {
 
-      subnode = node->subnodes[i];
-
-      // `subnode` may be NULL due to parsing errors
-      if (unlikely(!subnode)) continue;
-
-      node_free(subnode);
+      if (likely(node->subnodes[i]))
+        node_stack_push(&stack, node->subnodes[i], i, 0);
 
     }
 
+    node->id = 0;
+    node->rule_id = 0;
+    node->recursion_edge_size = 0;
+    node->non_term_size = 0;
+    node->parent = NULL;
     node->subnode_count = 0;
+    if (node->val_buf) free(node->val_buf);
+    if (node->subnodes) free(node->subnodes);
+    free(node);
 
   }
 
-  if (node->subnodes) free(node->subnodes);
-
-  free(node);
+  node_stack_free(&stack);
 
 }
 
@@ -207,33 +192,42 @@ node_t *node_clone(node_t *node) {
 
   if (!node) return NULL;
 
-  node_t *new_node = node_create(node->id);
+  node_t      *root = node_create(node->id);
+  node_stack_t stack = {0};
+  node_stack_push(&stack, node, 0, (size_t)root);
 
-  // rule id
-  new_node->rule_id = node->rule_id;
+  while (stack.len) {
 
-  new_node->recursion_edge_size = node->recursion_edge_size;
-  new_node->non_term_size = node->non_term_size;
+    node_frame_t f = node_stack_pop(&stack);
+    node_t      *src = f.node;
+    node_t      *dst = (node_t *)f.aux;
 
-  // val
-  node_set_val(new_node, node->val_buf, node->val_len);
-  new_node->val_len = node->val_len;
+    dst->rule_id = src->rule_id;
+    dst->recursion_edge_size = src->recursion_edge_size;
+    dst->non_term_size = src->non_term_size;
 
-  // subnodes
-  if (node->subnode_count != 0) {
+    node_set_val(dst, src->val_buf, src->val_len);
+    dst->val_len = src->val_len;
 
-    node_init_subnodes(new_node, node->subnode_count);
-    node_t *subnode = NULL;
-    for (uint32_t i = 0; i < node->subnode_count; ++i) {
+    if (src->subnode_count != 0) {
 
-      subnode = node->subnodes[i];
-      node_set_subnode(new_node, i, node_clone(subnode));
+      node_init_subnodes(dst, src->subnode_count);
+      // A NULL subnode stays NULL
+      for (uint32_t i = src->subnode_count; i-- > 0;) {
+
+        if (!src->subnodes[i]) continue;
+        node_t *child = node_create(src->subnodes[i]->id);
+        node_set_subnode(dst, i, child);
+        node_stack_push(&stack, src->subnodes[i], i, (size_t)child);
+
+      }
 
     }
 
   }
 
-  return new_node;
+  node_stack_free(&stack);
+  return root;
 
 }
 
@@ -241,62 +235,91 @@ bool node_equal(node_t *node_a, node_t *node_b) {
 
   if (node_a == node_b) return true;
   if (!node_a || !node_b) return false;
-  if (node_a->id != node_b->id) return false;
-  if (node_a->rule_id != node_b->rule_id) return false;
-  if (node_a->val_len != node_b->val_len) return false;
-  if (memcmp(node_a->val_buf, node_b->val_buf, node_a->val_len) != 0)
-    return false;
 
-  // Do not consider the parent node while comparing two nodes
+  // frames hold the first node; `aux` holds the second
+  node_stack_t stack = {0};
+  node_stack_push(&stack, node_a, 0, (size_t)node_b);
+  bool equal = true;
 
-  // subnodes
-  if (node_a->subnode_count != node_b->subnode_count) return false;
+  while (equal && stack.len) {
 
-  for (uint32_t i = 0; i < node_a->subnode_count; ++i) {
+    node_frame_t f = node_stack_pop(&stack);
+    node_t      *a = f.node;
+    node_t      *b = (node_t *)f.aux;
 
-    if (!node_equal(node_a->subnodes[i], node_b->subnodes[i])) return false;
+    if (a == b) continue;
+    if (!a || !b || a->id != b->id || a->rule_id != b->rule_id ||
+        a->val_len != b->val_len ||
+        memcmp(a->val_buf, b->val_buf, a->val_len) != 0 ||
+        a->subnode_count != b->subnode_count) {
+
+      equal = false;
+      break;
+
+    }
+
+    // Do not consider the parent node while comparing two nodes
+    for (uint32_t i = 0; i < a->subnode_count; ++i) {
+
+      node_stack_push(&stack, a->subnodes[i], i, (size_t)b->subnodes[i]);
+
+    }
 
   }
 
-  return true;
+  node_stack_free(&stack);
+  return equal;
 
 }
 
 void node_get_size(node_t *node) {
 
   if (node == NULL) return;
-  if (node->id == 0) {
 
-    // terminal node
-    node->non_term_size = 0;
-    node->recursion_edge_size = 0;
+  // Collect the nodes in pre-order. Their reverse has every child before its
+  // parent. A terminal node (id 0) is a boundary.
+  node_stack_t stack = {0};
+  node_stack_t order = {0};
+  node_stack_push(&stack, node, 0, 0);
 
-    return;
+  while (stack.len) {
+
+    node_frame_t f = node_stack_pop(&stack);
+    node_stack_push(&order, f.node, 0, 0);
+    if (f.node->id == 0) continue;
+    node_stack_push_children(&stack, f.node, 0);
 
   }
 
-  node->non_term_size = 1;
-  node->recursion_edge_size = 0;
+  while (order.len) {
 
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+    node = node_stack_pop(&order).node;
+    if (node->id == 0) {
 
-    subnode = node->subnodes[i];
-    if (unlikely(!subnode)) continue;
-
-    if (node->id == subnode->id) {
-
-      // recursive link
-      ++node->recursion_edge_size;
+      node->non_term_size = 0;
+      node->recursion_edge_size = 0;
+      continue;
 
     }
 
-    node_get_size(subnode);
+    node->non_term_size = 1;
+    node->recursion_edge_size = 0;
 
-    node->recursion_edge_size += subnode->recursion_edge_size;
-    node->non_term_size += subnode->non_term_size;
+    for (uint32_t i = 0; i < node->subnode_count; ++i) {
+
+      node_t *subnode = node->subnodes[i];
+      if (unlikely(!subnode)) continue;
+
+      if (node->id == subnode->id) ++node->recursion_edge_size;
+      node->recursion_edge_size += subnode->recursion_edge_size;
+      node->non_term_size += subnode->non_term_size;
+
+    }
 
   }
+
+  node_stack_free(&stack);
+  node_stack_free(&order);
 
 }
 
@@ -332,78 +355,97 @@ bool node_replace_subnode(node_t *root, node_t *subnode, node_t *new_subnode) {
 node_t *node_pick_non_term_subnode(node_t *node) {
 
   if (!node) return NULL;
-  if (node->non_term_size == 0) return NULL;
 
-  size_t non_term_size = node->non_term_size;
-  size_t prob = random_below(non_term_size);
+  // Descend one level per pass. Each level draws a new random number.
+  while (1) {
 
-  if (prob < 1) return node;
-  prob -= 1;
+    if (node->non_term_size == 0) return NULL;
 
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+    size_t prob = random_below(node->non_term_size);
+    if (prob < 1) return node;
+    prob -= 1;
 
-    subnode = node->subnodes[i];
+    node_t *next = NULL;
+    for (uint32_t i = 0; i < node->subnode_count; ++i) {
 
-    // `subnode` may be NULL due to parsing errors
-    if (unlikely(!subnode)) continue;
+      node_t *subnode = node->subnodes[i];
 
-    if (subnode->id == 0) continue;  // "0" means the terminal node
+      // `subnode` may be NULL due to parsing errors
+      if (unlikely(!subnode)) continue;
 
-    if (prob < subnode->non_term_size)
-      return node_pick_non_term_subnode(subnode);
-    prob -= subnode->non_term_size;
+      if (subnode->id == 0) continue;  // "0" means the terminal node
+
+      if (prob < subnode->non_term_size) {
+
+        next = subnode;
+        break;
+
+      }
+
+      prob -= subnode->non_term_size;
+
+    }
+
+    // should not reach here when `next` is NULL
+    if (!next) return NULL;
+    node = next;
 
   }
-
-  // should not reach here
-  return NULL;
 
 }
 
 edge_t node_pick_recursion_edge(node_t *node) {
 
   edge_t ret = {NULL, NULL, 0};
-  if (!node) return ret;
-  if (node->recursion_edge_size == 0) return ret;
 
-  size_t recursion_edge_size = node->recursion_edge_size;
-  size_t prob = random_below(recursion_edge_size);
+  while (node) {
 
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+    if (node->recursion_edge_size == 0) return ret;
 
-    subnode = node->subnodes[i];
+    size_t  prob = random_below(node->recursion_edge_size);
+    node_t *next = NULL;
 
-    // `subnode` may be NULL due to parsing errors
-    if (unlikely(!subnode)) continue;
+    for (uint32_t i = 0; i < node->subnode_count; ++i) {
 
-    // "node -> subnode" is a recursion edge
-    if (node->id == subnode->id) {
+      node_t *subnode = node->subnodes[i];
 
-      if (prob < 1) {
+      // `subnode` may be NULL due to parsing errors
+      if (unlikely(!subnode)) continue;
 
-        // select this edge
-        ret.parent = node;
-        ret.subnode = subnode;
-        ret.subnode_offset = i;
-        return ret;
+      // "node -> subnode" is a recursion edge
+      if (node->id == subnode->id) {
+
+        if (prob < 1) {
+
+          // select this edge
+          ret.parent = node;
+          ret.subnode = subnode;
+          ret.subnode_offset = i;
+          return ret;
+
+        }
+
+        prob -= 1;
 
       }
 
-      prob -= 1;
+      // pick from this subnode
+      if (prob < subnode->recursion_edge_size) {
+
+        next = subnode;
+        break;
+
+      }
+
+      prob -= subnode->recursion_edge_size;
 
     }
 
-    // pick from this subnode
-    if (prob < subnode->recursion_edge_size)
-      return node_pick_recursion_edge(subnode);
-
-    prob -= subnode->recursion_edge_size;
+    // should not reach here when `next` is NULL
+    node = next;
 
   }
 
-  // should not reach here
   return ret;
 
 }
@@ -437,84 +479,92 @@ void _node_to_buf(tree_t *tree, node_t *node) {
 
   if (!tree || !node) return;
 
-  // dump `val` if this is a leaf node
-  if (node->subnode_count == 0) {
+  node_stack_t stack = {0};
+  node_stack_push(&stack, node, 0, 0);
 
-    if (node->val_len == 0) return;
+  while (stack.len) {
 
-    size_t   data_len = tree->data_len;
-    uint8_t *data_buf =
-        maybe_grow(BUF_PARAMS(tree, data), data_len + node->val_len);
-    if (!data_buf) {
+    node = node_stack_pop(&stack).node;
 
-      perror("tree output buffer allocation (maybe_grow)");
-      return;
+    // dump `val` if this is a leaf node
+    if (node->subnode_count == 0) {
+
+      if (node->val_len == 0) continue;
+
+      size_t   data_len = tree->data_len;
+      uint8_t *data_buf =
+          maybe_grow(BUF_PARAMS(tree, data), data_len + node->val_len);
+      if (!data_buf) {
+
+        perror("tree output buffer allocation (maybe_grow)");
+        break;
+
+      }
+
+      memcpy(data_buf + data_len, node->val_buf, node->val_len);
+      tree->data_len += node->val_len;
+      continue;
 
     }
 
-    memcpy(data_buf + data_len, node->val_buf, node->val_len);
-    tree->data_len += node->val_len;
-
-    return;
+    node_stack_push_children(&stack, node, 0);
 
   }
 
-  // subnodes
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
-
-    subnode = node->subnodes[i];
-    _node_to_buf(tree, subnode);
-
-  }
+  node_stack_free(&stack);
 
 }
 
 void _node_get_recursion_edges(tree_t *tree, node_t *node) {
 
   if (!tree || !node) return;
-  if (node->subnode_count == 0) return;
 
-  // subnodes
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+  // Visit the nodes in pre-order; the edge of a node comes with the node.
+  node_stack_t stack = {0};
+  node_stack_push(&stack, node, 0, 0);
+  node_t *root = node;
 
-    subnode = node->subnodes[i];
+  while (stack.len) {
 
-    // `subnode` may be NULL due to parsing errors
-    if (unlikely(!subnode)) continue;
+    node_frame_t f = node_stack_pop(&stack);
+    node = f.node;
 
-    if (node->id == subnode->id) {
+    if (node != root && node->parent && node->parent->id == node->id) {
 
       edge_t *edge = malloc(sizeof(edge_t));
-      edge->parent = node;
-      edge->subnode = subnode;
-      edge->subnode_offset = i;
+      edge->parent = node->parent;
+      edge->subnode = node;
+      edge->subnode_offset = f.idx;
       list_append(tree->recursion_edge_list, edge);
 
     }
 
-    _node_get_recursion_edges(tree, subnode);
+    node_stack_push_children(&stack, node, 0);
 
   }
+
+  node_stack_free(&stack);
 
 }
 
 void _node_get_non_terminal_nodes(tree_t *tree, node_t *node) {
 
   if (!tree || !node) return;
-  if (node->id == 0) return;
 
-  list_append(tree->non_terminal_node_list, node);
+  node_stack_t stack = {0};
+  node_stack_push(&stack, node, 0, 0);
 
-  // subnodes
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+  while (stack.len) {
 
-    subnode = node->subnodes[i];
-    _node_get_non_terminal_nodes(tree, subnode);
+    node = node_stack_pop(&stack).node;
+    if (node->id == 0) continue;
+
+    list_append(tree->non_terminal_node_list, node);
+    node_stack_push_children(&stack, node, 0);
 
   }
+
+  node_stack_free(&stack);
 
 }
 
@@ -522,58 +572,52 @@ void _node_serialize(tree_t *tree, node_t *node) {
 
   if (!tree || !node) return;
 
-  // allocate or update the buffer
-  size_t   len = sizeof(node->id) + sizeof(node->rule_id) +
-                 sizeof(node->subnode_count) + sizeof(node->val_len) +
-                 node->val_len;
-  size_t   ser_len = tree->ser_len;
-  uint8_t *ser_buf = maybe_grow(BUF_PARAMS(tree, ser), ser_len + len);
-  if (!ser_buf) {
+  node_stack_t stack = {0};
+  node_stack_push(&stack, node, 0, 0);
 
-    perror("tree serialization buffer allocation (maybe_grow)");
-    return;
+  while (stack.len) {
 
-  }
+    node = node_stack_pop(&stack).node;
 
-  // save `id`
-  memcpy(ser_buf + ser_len, &(node->id), sizeof(node->id));
-  ser_len += sizeof(node->id);
+    // allocate or update the buffer
+    size_t   len = sizeof(node->id) + sizeof(node->rule_id) +
+                   sizeof(node->subnode_count) + sizeof(node->val_len) +
+                   node->val_len;
+    size_t   ser_len = tree->ser_len;
+    uint8_t *ser_buf = maybe_grow(BUF_PARAMS(tree, ser), ser_len + len);
+    if (!ser_buf) {
 
-  // save `rule_id`
-  memcpy(ser_buf + ser_len, &(node->rule_id), sizeof(node->rule_id));
-  ser_len += sizeof(node->rule_id);
+      perror("tree serialization buffer allocation (maybe_grow)");
+      break;
 
-  // save `subnode_count`
-  memcpy(ser_buf + ser_len, &(node->subnode_count),
-         sizeof(node->subnode_count));
-  ser_len += sizeof(node->subnode_count);
+    }
 
-  // save `val`
-  // - save `val_len`
-  memcpy(ser_buf + ser_len, &(node->val_len), sizeof(node->val_len));
-  ser_len += sizeof(node->val_len);
+    memcpy(ser_buf + ser_len, &(node->id), sizeof(node->id));
+    ser_len += sizeof(node->id);
+    memcpy(ser_buf + ser_len, &(node->rule_id), sizeof(node->rule_id));
+    ser_len += sizeof(node->rule_id);
+    memcpy(ser_buf + ser_len, &(node->subnode_count),
+           sizeof(node->subnode_count));
+    ser_len += sizeof(node->subnode_count);
+    memcpy(ser_buf + ser_len, &(node->val_len), sizeof(node->val_len));
+    ser_len += sizeof(node->val_len);
+    memcpy(ser_buf + ser_len, node->val_buf, node->val_len);
+    ser_len += node->val_len;
 
-  // - save `val_buf`
-  memcpy(ser_buf + ser_len, node->val_buf, node->val_len);
-  ser_len += node->val_len;
+    tree->ser_len = ser_len;
 
-  tree->ser_len = ser_len;
-
-  // subnodes
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
-
-    subnode = node->subnodes[i];
-    _node_serialize(tree, subnode);
+    node_stack_push_children(&stack, node, 0);
 
   }
+
+  node_stack_free(&stack);
 
 }
 
-node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
+// Read one node header and its value. Return NULL if the data is bad. The
+// subnodes are not read.
+static node_t *_node_read(const uint8_t *data_buf, size_t data_size,
                           size_t *consumed_size) {
-
-  if (!data_buf) return NULL;
 
   node_t *node = node_create(0);
   size_t  min_len = sizeof(node->id) + sizeof(node->rule_id) +
@@ -588,21 +632,13 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
 
   size_t ser_len = *consumed_size;
 
-  // `id`
   memcpy(&(node->id), data_buf + ser_len, sizeof(node->id));
   ser_len += sizeof(node->id);
-
-  // `rule_id`
   memcpy(&(node->rule_id), data_buf + ser_len, sizeof(node->rule_id));
   ser_len += sizeof(node->rule_id);
-
-  // `subnode_count`
   memcpy(&(node->subnode_count), data_buf + ser_len,
          sizeof(node->subnode_count));
   ser_len += sizeof(node->subnode_count);
-
-  // `val`
-  // - `val_len`
   memcpy(&(node->val_len), data_buf + ser_len, sizeof(node->val_len));
   ser_len += sizeof(node->val_len);
 
@@ -619,34 +655,56 @@ node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
 
   }
 
-  // - `val_buf`
   node_set_val(node, (data_buf + ser_len), node->val_len);
   ser_len += node->val_len;
 
   *consumed_size = ser_len;
 
-  if (!node->subnode_count) return node;
+  if (node->subnode_count) node_init_subnodes(node, node->subnode_count);
 
-  // subnodes
-  node_init_subnodes(node, node->subnode_count);
+  return node;
 
-  node_t *subnode = NULL;
-  for (uint32_t i = 0; i < node->subnode_count; ++i) {
+}
 
-    subnode = _node_deserialize(data_buf, data_size, consumed_size);
+node_t *_node_deserialize(const uint8_t *data_buf, size_t data_size,
+                          size_t *consumed_size) {
+
+  if (!data_buf) return NULL;
+
+  node_t *root = _node_read(data_buf, data_size, consumed_size);
+  if (!root) return NULL;
+
+  // frames: `node` is the parent, `idx` is the next child to read
+  node_stack_t stack = {0};
+  if (root->subnode_count) node_stack_push(&stack, root, 0, 0);
+
+  while (stack.len) {
+
+    node_frame_t *top = &stack.items[stack.len - 1];
+    if (top->idx == top->node->subnode_count) {
+
+      --stack.len;
+      continue;
+
+    }
+
+    node_t *subnode = _node_read(data_buf, data_size, consumed_size);
     if (unlikely(!subnode)) {
 
-      // unlikely reach here
-      node_free(node);
+      // unlikely reach here; the unread subnodes are NULL
+      node_free(root);
+      node_stack_free(&stack);
       return NULL;
 
     }
 
-    node_set_subnode(node, i, subnode);
+    node_set_subnode(top->node, top->idx++, subnode);
+    if (subnode->subnode_count) node_stack_push(&stack, subnode, 0, 0);
 
   }
 
-  return node;
+  node_stack_free(&stack);
+  return root;
 
 }
 

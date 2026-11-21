@@ -21,6 +21,7 @@
 
 #include "tree.h"
 #include "f1_c_fuzz.h"
+#include "utils.h"
 
 #include "gtest/gtest.h"
 #include "gtest_ext.h"
@@ -507,6 +508,56 @@ TEST_F(TreeTest, DeserializeRejectsBadLengths) {
     EXPECT_EQ(tree_deserialize(tree->ser_buf, len), nullptr) << len;
 
   free(data);
+
+}
+
+TEST_F(TreeTest, DeepTreeNoRecursion) {
+
+  // A chain of non-terminal nodes with one leaf "x" at the bottom
+  const size_t depth = 1000000;
+  node_t      *cur = node_create_with_val(0, "x", 1);
+  for (size_t i = 0; i < depth; ++i) {
+
+    node_t *parent = node_create(1);
+    node_init_subnodes(parent, 1);
+    node_set_subnode(parent, 0, cur);
+    cur = parent;
+
+  }
+
+  tree_t *tree = tree_create();
+  tree->root = cur;
+
+  EXPECT_EQ(tree_get_size(tree), depth);
+  EXPECT_EQ(tree->root->recursion_edge_size, depth - 1);
+
+  tree_to_buf(tree);
+  ASSERT_EQ(tree->data_len, 1u);
+  EXPECT_EQ(tree->data_buf[0], 'x');
+
+  tree_serialize(tree);
+  tree_t *new_tree = tree_deserialize(tree->ser_buf, tree->ser_len);
+  ASSERT_NE(new_tree, nullptr);
+  EXPECT_TRUE(tree_equal(tree, new_tree));
+  tree_free(new_tree);
+
+  new_tree = tree_clone(tree);
+  EXPECT_TRUE(tree_equal(tree, new_tree));
+  EXPECT_EQ(new_tree->root->subnodes[0]->parent, new_tree->root);
+  tree_free(new_tree);
+
+  tree_get_non_terminal_nodes(tree);
+  EXPECT_EQ(tree->non_terminal_node_list->size, depth);
+
+  tree_get_recursion_edges(tree);
+  EXPECT_EQ(tree->recursion_edge_list->size, depth - 1);
+
+  random_set_seed(0);
+  EXPECT_NE(node_pick_non_term_subnode(tree->root), nullptr);
+  edge_t edge = node_pick_recursion_edge(tree->root);
+  EXPECT_NE(edge.subnode, nullptr);
+
+  tree_free(tree);
 
 }
 

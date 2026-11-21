@@ -19,6 +19,7 @@
 #include "tree_mutation.h"
 #include "f1_c_fuzz.h"
 #include "chunk_store.h"
+#include "node_stack.h"
 
 static size_t max_tree_len = 1000;
 
@@ -123,23 +124,26 @@ tree_t *rules_mutation(tree_t *tree, node_t *node, uint32_t rule_id) {
 
 size_t _node_rules_mutation_count(node_t *node) {
 
-  if (unlikely(!node)) return 0;
-  if (node->id == 0) return 0;
-  if (unlikely(node_num_rules[node->id] <= 0)) return 0;
+  size_t       ret = 0;
+  node_stack_t stack = {0};
+  if (node) node_stack_push(&stack, node, 0, 0);
 
-  // An unknown rule id has no skipped alternative, so count every rule.
-  size_t ret = node->rule_id >= node_num_rules[node->id]
-                   ? node_num_rules[node->id]
-                   : node_num_rules[node->id] - 1;
+  while (stack.len) {
 
-  node_t *subnode;
-  for (size_t i = 0; i < node->subnode_count; ++i) {
+    node = node_stack_pop(&stack).node;
+    if (node->id == 0) continue;
+    if (unlikely(node_num_rules[node->id] <= 0)) continue;
 
-    subnode = node->subnodes[i];
-    ret += _node_rules_mutation_count(subnode);
+    // An unknown rule id has no skipped alternative, so count every rule.
+    ret += node->rule_id >= node_num_rules[node->id]
+               ? node_num_rules[node->id]
+               : node_num_rules[node->id] - 1;
+
+    node_stack_push_children(&stack, node, 0);
 
   }
 
+  node_stack_free(&stack);
   return ret;
 
 }
@@ -154,12 +158,25 @@ size_t rules_mutation_count(tree_t *tree) {
 // The number of bytes that a subtree serializes to
 static size_t node_data_len(node_t *node) {
 
-  if (!node) return 0;
-  if (node->subnode_count == 0) return node->val_len;
+  size_t       data_len = 0;
+  node_stack_t stack = {0};
+  if (node) node_stack_push(&stack, node, 0, 0);
 
-  size_t data_len = 0;
-  for (uint32_t i = 0; i < node->subnode_count; ++i)
-    data_len += node_data_len(node->subnodes[i]);
+  while (stack.len) {
+
+    node = node_stack_pop(&stack).node;
+    if (node->subnode_count == 0) {
+
+      data_len += node->val_len;
+      continue;
+
+    }
+
+    node_stack_push_children(&stack, node, 0);
+
+  }
+
+  node_stack_free(&stack);
   return data_len;
 
 }
