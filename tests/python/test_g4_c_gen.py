@@ -34,8 +34,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "grammars"))
 
 from f1_c_gen import CFuzzer
-from g4_c_gen import GrammarError, check_helpers, cpp_method_name, cpp_string, generate
+import g4_c_gen
+from g4_c_gen import GrammarError, check_helpers, cpp_method_name, cpp_string, f1_order, generate
 from g4_helpers import DEFAULT_ANTLR_JAR, ROOT
+import g4_to_json
 from g4_to_json import convert_with_map
 
 SCRIPT = ROOT / "grammars" / "g4_c_gen.py"
@@ -48,7 +50,7 @@ Rules = Dict[str, List[List[str]]]
 
 # The kinds that refer to a key, and the kinds that hold text
 KEY_KINDS = ("Rule", "Token", "Helper")
-SYMBOL = re.compile(r'\{g4::Kind::(\w+), (\d+), \{"((?:[^"\\]|\\.)*)", (\d+)\}\}')
+SYMBOL = re.compile(r'\{::g4::Kind::(\w+), (\d+), \{"((?:[^"\\]|\\.)*)", (\d+)\}\}')
 ALTERNATIVE = re.compile(r"\{(g4_k\d+_r\d+|nullptr), (\d+)\}")
 KEY = re.compile(r'\{\{"((?:[^"\\]|\\.)*)", (\d+)\}, (g4_k\d+|nullptr), (\d+), \{"((?:[^"\\]|\\.)*)", (\d+)\}\}')
 
@@ -70,7 +72,7 @@ def read_tables(source: str) -> list[tuple[str, list[list[tuple[str, int, bytes]
     of (kind, key index, text)), and its token type name.
     """
     symbols = {}
-    for name, body in re.findall(r"const g4::Symbol (g4_k\d+_r\d+)\[\] = \{\n(.*?)\n\};", source, re.DOTALL):
+    for name, body in re.findall(r"const ::g4::Symbol (g4_k\d+_r\d+)\[\] = \{\n(.*?)\n\};", source, re.DOTALL):
         found = []
         for kind, key_index, text, length in SYMBOL.findall(body):
             data = unescape(text)
@@ -78,13 +80,13 @@ def read_tables(source: str) -> list[tuple[str, list[list[tuple[str, int, bytes]
             found.append((kind, int(key_index), data))
         symbols[name] = found
     alternatives = {}
-    for name, body in re.findall(r"const g4::Alternative (g4_k\d+)\[\] = \{(.*?)\};", source, re.DOTALL):
+    for name, body in re.findall(r"const ::g4::Alternative (g4_k\d+)\[\] = \{(.*?)\};", source, re.DOTALL):
         alternatives[name] = []
         for array, count in ALTERNATIVE.findall(body):
             alternative = symbols[array] if array != "nullptr" else []
             assert len(alternative) == int(count), (name, array)
             alternatives[name].append(alternative)
-    (body,) = re.findall(r"const g4::Key g4_keys\[\] = \{\n(.*?)\n\};", source, re.DOTALL)
+    (body,) = re.findall(r"const ::g4::Key g4_keys\[\] = \{\n(.*?)\n\};", source, re.DOTALL)
     keys = []
     for name, _length, array, count, token_type, _type_length in KEY.findall(body):
         alts = alternatives[array] if array != "nullptr" else []
@@ -143,6 +145,40 @@ class TableTest(unittest.TestCase):
                     # not describe. So it has no alternatives in the tables.
                     self.assertEqual(alternatives, [], key)
 
+    def test_f1_order_covers_lexer_keys(self) -> None:
+        # The tables carry no lexer keys. So check f1_order for them directly.
+        for paths in ([JSON_G4], JS_G4):
+            grammar, parse_map = convert_with_map(paths)
+            order = f1_order(grammar)
+            fuzzer = CFuzzer(copy.deepcopy(grammar))
+            lexer_keys = [key for key in grammar if key not in parse_map["kinds"]]
+            self.assertTrue(lexer_keys)
+            for key in lexer_keys:
+                self.assertEqual([grammar[key][i] for i in order[key]], fuzzer.grammar[key], key)
+
+    def test_start_key_is_the_same_in_both_scripts(self) -> None:
+        self.assertEqual(g4_c_gen.START_KEY, g4_to_json.START_KEY)
+
+    def test_generated_code_qualifies_g4_from_the_global_namespace(self) -> None:
+        grammar = {"<START>": [["", "<s>"]], "<s>": [["a", " "]]}
+        kinds = {"<START>": [["lead", "rule"]], "<s>": [["literal", "sep"]]}
+        source = generate(grammar, small_map(kinds), "g4")
+        self.assertIn("namespace g4 {", source)
+        self.assertIn("::g4::Grammar", source)
+        # No g4:: without a leading :: (a namespace g4 would hide the library).
+        self.assertIsNone(re.search(r"(?<!:)\bg4::", source))
+
+    def test_include_path_is_a_plain_c_path(self) -> None:
+        grammar = {"<START>": [["", "<s>"]], "<s>": [["a", " "]]}
+        kinds = {"<START>": [["lead", "rule"]], "<s>": [["literal", "sep"]]}
+        for bad in ('a"b.h', "a\\b.h", "a\nb.h", "a\rb.h"):
+            with self.assertRaises(GrammarError, msg=repr(bad)):
+                generate(grammar, small_map(kinds), "t", lexer_header=bad)
+            with self.assertRaises(GrammarError, msg=repr(bad)):
+                generate(grammar, small_map(kinds), "t", parser_header=bad)
+        source = generate(grammar, small_map(kinds), "t", lexer_header="dir with space/L.h")
+        self.assertIn('#include "dir with space/L.h"\n', source)
+
     def test_rule_ids_follow_f1_order(self) -> None:
         grammar = {"<START>": [["", "<s>"]], "<s>": [["a", " ", "b", " "], ["a", " "]]}
         kinds = {"<START>": [["lead", "rule"]], "<s>": [["literal", "sep", "literal", "sep"], ["literal", "sep"]]}
@@ -177,7 +213,7 @@ class TableTest(unittest.TestCase):
         self.assertEqual(
             [(name, token_type) for name, _alts, token_type in keys][3:], [("<ID>", "ID"), ("<charset__1>", "")]
         )
-        self.assertIn('const g4::ParserRule g4_parser_rules[] = {\n    {{"s", 1}, 1},\n};', source)
+        self.assertIn('const ::g4::ParserRule g4_parser_rules[] = {\n    {{"s", 1}, 1},\n};', source)
         self.assertIn("    g4_keys, 5,\n    g4_parser_rules, 1,\n    0,\n", source)
 
     def test_glue_uses_the_parse_map_and_the_options(self) -> None:

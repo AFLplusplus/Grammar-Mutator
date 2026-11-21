@@ -12,7 +12,7 @@
 """Write the C++ parse tables of a .g4 grammar.
 
 g4_to_json.py writes a JSON grammar and a parse map. This script writes
-g4_grammar.cpp from them. The file defines `const g4::Grammar NS::grammar`
+g4_grammar.cpp from them. The file defines `const ::g4::Grammar NS::grammar`
 (see lib/antlr4_shim/g4_matcher.h): the keys, their alternatives in F1 order,
 the symbol kinds, the token type names, the parser rule names, and the
 functions that make the ANTLR lexer and parser. The C++ matcher reads only
@@ -29,7 +29,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Tuple
+from typing import Any, NamedTuple, Tuple
 
 from f1_common import LimitFuzzer
 
@@ -72,8 +72,6 @@ KEY_KINDS = ("rule", "token", "helper")
 
 # A symbol in the tables: the g4::Kind name, the key index, and the text
 TableSymbol = Tuple[str, int, str]
-# typing.Dict, not dict[...]: this alias runs at import time on Python 3.8.
-Rules = Dict[str, List[List[str]]]
 
 
 class GrammarError(ValueError):
@@ -287,8 +285,8 @@ def generate(
         "#include <memory>",
         "",
         '#include "g4_matcher.h"',
-        f"#include {json.dumps(lexer_header)}",
-        f"#include {json.dumps(parser_header)}",
+        f"#include {include_path(lexer_header)}",
+        f"#include {include_path(parser_header)}",
         "",
         f"namespace {namespace} {{",
         "",
@@ -302,19 +300,19 @@ def generate(
                 entries.append("{nullptr, 0}")
                 continue
             name = f"g4_k{index}_r{rule_id}"
-            out.append(f"const g4::Symbol {name}[] = {{")
-            out.extend(f"    {{g4::Kind::{kind}, {key}, {cpp_string(text)}}}," for kind, key, text in alternative)
+            out.append(f"const ::g4::Symbol {name}[] = {{")
+            out.extend(f"    {{::g4::Kind::{kind}, {key}, {cpp_string(text)}}}," for kind, key, text in alternative)
             out.append("};")
             entries.append(f"{{{name}, {len(alternative)}}}")
         if entries:
-            out.append(f"const g4::Alternative g4_k{index}[] = {{{', '.join(entries)}}};")
-    out.append("const g4::Key g4_keys[] = {")
+            out.append(f"const ::g4::Alternative g4_k{index}[] = {{{', '.join(entries)}}};")
+    out.append("const ::g4::Key g4_keys[] = {")
     for index, table in enumerate(tables):
         alternatives = f"g4_k{index}" if table.alternatives else "nullptr"
         token_type = cpp_string(table.token_type or "")
         out.append(f"    {{{cpp_string(table.name)}, {alternatives}, {len(table.alternatives)}, {token_type}}},")
     out.append("};")
-    out.append("const g4::ParserRule g4_parser_rules[] = {")
+    out.append("const ::g4::ParserRule g4_parser_rules[] = {")
     out.extend(f"    {{{cpp_string(name)}, {key}}}," for name, key in rules)
     out.append("};")
     out += [
@@ -333,8 +331,8 @@ def generate(
         "",
         "}  // namespace",
         "",
-        "extern const g4::Grammar grammar;",
-        "const g4::Grammar grammar = {",
+        "extern const ::g4::Grammar grammar;",
+        "const ::g4::Grammar grammar = {",
         f"    g4_keys, {len(tables)},",
         f"    g4_parser_rules, {len(rules)},",
         f"    {[t.name for t in tables].index(START_KEY)},",
@@ -348,6 +346,18 @@ def generate(
         "",
     ]
     return "\n".join(out)
+
+
+def include_path(path: str) -> str:
+    """Return path as the quoted argument of a C++ #include line.
+
+    A C++ include path has no escapes. So a path with a quote, a backslash, or
+    a line break cannot go in a quoted include. Raise GrammarError for it.
+    """
+    if not path or any(c in path for c in '"\\\r\n') or any(ord(c) < 32 for c in path):
+        msg = f"the header path {path!r} cannot go in a C++ #include line"
+        raise GrammarError(msg)
+    return f'"{path}"'
 
 
 def check_namespace(namespace: str) -> None:
