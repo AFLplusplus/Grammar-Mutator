@@ -803,7 +803,13 @@ tree_t *make_tree(const Grammar &grammar, const Names &names,
   }
 
   // A lexer base class can make tokens with any positions. The tokens must
-  // be in input order, must not overlap, and must be in the input.
+  // be in input order, must not overlap, and must be in the input. An empty
+  // token is valid. The leaves take their bytes from the input at the token
+  // positions. So a token that overlaps the token before it gives a leaf that
+  // repeats bytes, and a token out of order gives a separator that ends
+  // before it starts. Then the tree bytes cannot be the input bytes, so the
+  // matcher rejects such tokens. One check finds both: a token must not start
+  // before the end of the token before it.
   const size_t code_points = offsets.size() - 1;
   size_t       previous_end = 0;
   for (antlr4::Token *token : tokens) {

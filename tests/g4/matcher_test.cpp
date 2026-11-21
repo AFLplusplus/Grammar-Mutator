@@ -91,6 +91,7 @@ DECLARE_GRAMMAR(reserved)
 DECLARE_GRAMMAR(superclass)
 DECLARE_GRAMMAR(spin)
 DECLARE_GRAMMAR(handmade)
+DECLARE_GRAMMAR(bom)
 
 // The tree code in src/tree.c calls tree_parse. Here it parses with the JSON
 // test grammar.
@@ -376,6 +377,25 @@ void bom_is_rejected_not_changed() {
 
   check_status(t_json::grammar, "\xef\xbb\xbf" + std::string(JSON_INPUT),
                PARSE_SYNTAX_ERROR);
+
+}
+
+void bom_on_a_hidden_channel() {
+
+  // The lexer puts U+FEFF on the hidden channel. The input stream keeps a BOM
+  // at the input start, so the tree keeps it too.
+  const std::string bom = "\xef\xbb\xbf";
+  Tree              tree = round_trip(t_bom::grammar, bom + "ab cd");
+  if (tree) {
+
+    CHECK(tree->root->subnode_count > 0);
+    CHECK_EQ(value(tree->root->subnodes[0]), bom);
+
+  }
+
+  tree = round_trip(t_bom::grammar, bom);
+  if (tree) CHECK((leaves(tree->root) == std::vector<std::string>{bom}));
+  round_trip(t_bom::grammar, "ab" + bom + " cd" + bom + bom);
 
 }
 
@@ -718,11 +738,24 @@ void budget_checks_the_clock_in_prediction() {
 
 void tokens_outside_the_input() {
 
-  // The lexer base class gives a token at the positions 0 to 0 before the
-  // real tokens. For an empty input, the token ends after the input. For
-  // "ab", it overlaps the real token "ab".
+  // The rule: the tokens must be in input order, must not overlap, and must
+  // be in the input. Else the matcher gives PARSE_NO_MATCH. The lexer base
+  // class gives a token at the positions 0 to 0 before the real tokens. For
+  // an empty input, the token ends after the input. For "ab", it overlaps the
+  // real token "ab" (a token before the end of the token before it, so also
+  // a token out of order).
   check_status(t_handmade::grammar, "", PARSE_NO_MATCH);
   check_status(t_handmade::grammar, "ab", PARSE_NO_MATCH);
+  // For " ab", the made token covers the space, before "ab". The leaves take
+  // their bytes from the input, not from the token text "x". So the tree
+  // gives the input.
+  Tree tree = round_trip(t_handmade::grammar, " ab");
+  if (tree) {
+
+    CHECK((leaves(tree->root) ==
+           std::vector<std::string>{"", " ", "", "ab", ""}));
+
+  }
 
 }
 
@@ -979,6 +1012,7 @@ const Test TESTS[] = {
 
     {"json_round_trip", json_round_trip},
     {"bom_is_rejected_not_changed", bom_is_rejected_not_changed},
+    {"bom_on_a_hidden_channel", bom_on_a_hidden_channel},
     {"leading_text_goes_to_the_lead_leaf", leading_text_goes_to_the_lead_leaf},
     {"non_ascii_in_tokens_and_comments", non_ascii_in_tokens_and_comments},
     {"empty_input", empty_input},
