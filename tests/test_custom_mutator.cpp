@@ -580,6 +580,65 @@ static string tree_file_text(const string &fn) {
 
 }
 
+// An entry without a tree: the fuzz stages return no data, and the trim
+// callbacks do nothing.
+TEST_F(CustomMutatorTest, NoTreeEntryFuzzTrimAndPostTrim) {
+
+  const string fn = queue_dir + "/notree_0";
+  write_test_case(fn, (const uint8_t *)"\xFD", 1);
+  ASSERT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  ASSERT_EQ(mutator->data->tree_cur, nullptr);
+
+  uint8_t *buf = (uint8_t *)0x1;
+  EXPECT_EQ(afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096),
+            0u);
+  EXPECT_EQ(buf, nullptr);
+
+  EXPECT_EQ(afl_custom_init_trim(mutator->data, nullptr, 0), 0);
+  buf = (uint8_t *)0x1;
+  EXPECT_EQ(afl_custom_trim(mutator->data, &buf), 0u);
+  EXPECT_EQ(buf, nullptr);
+  EXPECT_EQ(afl_custom_post_trim(mutator->data, 1), 0);
+  EXPECT_EQ(afl_custom_post_trim(mutator->data, 0), 0);
+  expect_no_tree_file(tree_out_dir + "/notree_0");
+
+}
+
+// A new entry that the parser rejects gets no tree file. The callback still
+// returns 0 (the queue file does not change).
+TEST_F(CustomMutatorTest, QueueNewEntryOfAnInvalidCaseWritesNoTree) {
+
+  const string orig = queue_dir + "/new_orig";
+  const string fn = queue_dir + "/new_bad";
+  write_test_case(orig, (const uint8_t *)"x", 1);
+  write_test_case(fn, (const uint8_t *)"\xFD", 1);
+
+  EXPECT_EQ(
+      afl_custom_queue_new_entry(mutator->data, (const uint8_t *)fn.c_str(),
+                                 (const uint8_t *)orig.c_str()),
+      0);
+  expect_no_tree_file(tree_out_dir + "/new_bad");
+  EXPECT_EQ(mutator->data->mutated_tree, nullptr);
+
+}
+
+// An initial entry (no original file name) goes through `queue_get`, which
+// writes its tree file.
+TEST_F(CustomMutatorTest, QueueNewEntryWithoutOriginalParsesTheEntry) {
+
+  const string fn = queue_dir + "/new_init";
+  string       valid = valid_test_case();
+  write_test_case(fn, (const uint8_t *)valid.data(), valid.size());
+
+  EXPECT_EQ(afl_custom_queue_new_entry(mutator->data,
+                                       (const uint8_t *)fn.c_str(), nullptr),
+            0);
+  EXPECT_NE(mutator->data->tree_cur, nullptr);
+  EXPECT_EQ(tree_file_text(tree_out_dir + "/new_init"), valid);
+
+}
+
 // Another AFL++ stage (for example havoc or cmplog) can find a new entry after
 // the custom stage. Then the last mutated tree is not the tree of the entry.
 TEST_F(CustomMutatorTest, QueueNewEntryFromAnotherStage) {

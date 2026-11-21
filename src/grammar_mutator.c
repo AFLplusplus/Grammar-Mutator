@@ -165,8 +165,30 @@ static tree_t *parse_entry(my_mutator_t *data, const char *fn) {
   tree_t        *tree = load_tree_from_test_case_ex(fn, data->budget, &status);
   if (tree) return tree;
 
-  if (status != PARSE_OK && status != PARSE_THREAD_ERROR)
-    map_set(&data->rejected, fn, 1);
+  // Print each warning once per run, not once per entry.
+  static bool warned_thread = false, warned_rejected = false;
+
+  if (status == PARSE_THREAD_ERROR && !warned_thread) {
+
+    warned_thread = true;
+    fprintf(stderr,
+            "[grammar mutator] warning: the parse thread cannot start. "
+            "The mutator does not parse test cases that have no tree file.\n");
+
+  }
+
+  if (status != PARSE_OK && status != PARSE_THREAD_ERROR &&
+      map_set(&data->rejected, fn, 1) != 0 && !warned_rejected) {
+
+    // The set is out of memory. The entry stays unmarked, so the next call
+    // parses it again. This costs time only.
+    warned_rejected = true;
+    fprintf(stderr,
+            "[grammar mutator] warning: out of memory. The mutator parses a "
+            "rejected test case again.\n");
+
+  }
+
   return NULL;
 
 }
