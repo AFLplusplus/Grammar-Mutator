@@ -45,7 +45,7 @@ f1_c_fuzz.h
 # .g4 grammars (generated)
 grammars/g4_grammar.json
 grammars/g4_parse_map.json
-grammars/g4_python/
+grammars/g4_work/
 grammars/antlr4/generated/
 
 # Python

@@ -49,4 +49,15 @@ target_include_directories(grammarmutator
 set_target_properties(grammar_generator
   PROPERTIES OUTPUT_NAME "grammar_generator-${GRAMMAR_FILENAME}")
 
+# Test case parser (only for a .g4 build)
+if (G4_BUILD)
+  add_executable(grammar_parser
+    grammar_parser.c)
+  target_link_libraries(grammar_parser
+    PRIVATE grammarmutator
+    PRIVATE Threads::Threads)
+  set_target_properties(grammar_parser
+    PROPERTIES OUTPUT_NAME "grammar_parser-${GRAMMAR_FILENAME}")
+endif ()
+
 add_subdirectory(benchmark)

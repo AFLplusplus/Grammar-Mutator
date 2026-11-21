@@ -85,7 +85,7 @@ jobs:
     env:
       JSON_G4: grammars/g4/JSON.g4
       JS_G4: grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4
-      JS_SUPPORT: grammars/g4/javascript/Python3
+      JS_SUPPORT: grammars/g4/javascript/Cpp
 
     steps:
     - uses: actions/checkout@v4
@@ -121,6 +121,13 @@ jobs:
         cmake --build build --parallel $(nproc)
         echo "BUILD_DIR=build" >> "$GITHUB_ENV"
         echo "GENERATOR=./build/src/grammar_generator-${{ matrix.grammar }}" >> "$GITHUB_ENV"
+    - name: Matcher tests
+      # The tests build their own grammars, so one grammar per build system is
+      # enough
+      if: matrix.grammar == 'json'
+      run: tests/g4/run_matcher_tests.sh
+    - name: grammar_parser tests
+      run: tests/g4/test_grammar_parser.sh "${{ matrix.grammar }}"
     - name: Generate test cases
       run: |
         if [ "${{ matrix.grammar }}" = json ]; then count=200; else count=50; fi

@@ -100,9 +100,13 @@ ifeq ($(BUILD),yes)
     # files
     GRAMMAR_JSON := $(CURDIR)/grammars/g4_grammar.json
     PARSE_MAP := $(CURDIR)/grammars/g4_parse_map.json
-    PARSER_DIR := $(CURDIR)/grammars/g4_python
-    # The folder with the base classes and the rewrite script of a grammar
-    # with action code, for example grammars-v4 javascript/javascript/Python3
+    # The work folder for the .g4 files (transformGrammar.py changes them)
+    G4_WORK_DIR := $(CURDIR)/grammars/g4_work
+    # The sub-makes compile the C++ parser of the .g4 grammar and
+    # grammar_parser-<name>
+    override G4_BUILD := 1
+    # The folder with the C++ base classes and the rewrite script of a grammar
+    # with action code, for example grammars-v4 javascript/javascript/Cpp
     ifdef G4_SUPPORT_DIR
       ifneq "$(words $(G4_SUPPORT_DIR))" "1"
         $(error G4_SUPPORT_DIR must not have spaces: $(G4_SUPPORT_DIR))
@@ -123,7 +127,9 @@ ifeq ($(BUILD),yes)
       $(error G4_SUPPORT_DIR works only with .g4 grammar files)
     endif
     GRAMMAR_JSON := $(GRAMMAR_FILE)
+    override G4_BUILD :=
   endif
+  export G4_BUILD
   # .grammar records the grammar files, the start rule, and the support
   # folder. A change in them makes the build generate the code again.
   GRAMMAR_STAMP := $(strip $(GRAMMAR_FILE) $(GRAMMAR_START) $(G4_SUPPORT_DIR))
@@ -159,7 +165,7 @@ export CXX_FLAGS_OPT
 GEN_FILES = \
 	.grammar \
 	grammars/Grammar.g4 \
-	grammars/g4_grammar.json grammars/g4_parse_map.json grammars/g4_python \
+	grammars/g4_grammar.json grammars/g4_parse_map.json grammars/g4_work \
 	grammars/antlr4/generated \
 	src/f1_c_fuzz.c include/f1_c_fuzz.h \
 	lib/antlr4_shim/generated
@@ -170,15 +176,6 @@ all: build
 # Generation
 src/f1_c_fuzz.c include/f1_c_fuzz.h: grammars/f1_c_gen.py grammars/f1_common.py grammars/tree_file.py .grammar $(GRAMMAR_JSON)
 	$(PYTHON) grammars/f1_c_gen.py $(GRAMMAR_JSON) $(CURDIR)
-
-# The launcher of the parser for .g4 files. It runs grammars/g4_parse.py with
-# the grammar and the Python parser. The launcher uses only its own copy of
-# them in PARSER_DATA, so a build of a different grammar does not change it.
-PARSER_LAUNCHER = src/grammar_parser-$(GRAMMAR_FILENAME)
-# Escape the characters that are special in a sed replacement with the
-# delimiter "|": "\", "&", and "|"
-sed_escape = $(subst |,\|,$(subst &,\&,$(subst \,\\,$(1))))
-PARSER_DATA = $(PARSER_LAUNCHER).d
 
 # The Python parser for .g4 files, from the ANTLR 4 meta-grammar. A build
 # finds the jar (ANTLR_JAR_LOCATION). "make test-python" does not, so it uses
@@ -199,51 +196,40 @@ $(GRAMMAR_JSON): .grammar grammars/g4_to_json.py $(META_PARSER) $(VENV_STAMP) $(
 $(PARSE_MAP): $(GRAMMAR_JSON)
 	@test -f $@ || { echo "Missing $@. Run make clean."; exit 1; }
 
-# The Python parser: the .g4 files (changed by transformGrammar.py, if the
-# support folder has it), the generated lexer and parser, and the base classes
+# The C++ parser in lib/antlr4_shim/generated: the parse tables
+# (g4_grammar.cpp), the ANTLR lexer and parser from the .g4 files (changed by
+# transformGrammar.py, if the support folder has it), and the C++ base classes
 # of the support folder. Without G4_SUPPORT_DIR, a grammar with action code
-# gives a clear message when grammar_parser-<name> runs.
-PARSER_STAMP = $(PARSER_DIR)/.built
-$(PARSER_STAMP): .grammar $(G4_FILES) $(if $(G4_SUPPORT_DIR),$(wildcard $(G4_SUPPORT_DIR)/*)) $(VENV_STAMP)
-	rm -rf "$(PARSER_DIR)"
-	mkdir -p "$(PARSER_DIR)"
-	cp $(G4_FILES) "$(PARSER_DIR)/"
+# fails at the C++ compile step with a hint. The lexer and parser stay in the
+# global namespace (no -package), because the base classes use their names
+# without a namespace. The target is the file that the recipe writes last.
+SHIM_GENERATED = lib/antlr4_shim/generated/g4_grammar.cpp
+$(SHIM_GENERATED): .grammar $(G4_FILES) $(if $(G4_SUPPORT_DIR),$(wildcard $(G4_SUPPORT_DIR)/*)) \
+                           $(GRAMMAR_JSON) $(PARSE_MAP) grammars/g4_c_gen.py $(VENV_STAMP)
+	@$(MAKE) -C lib clean
+	rm -rf "$(G4_WORK_DIR)"
+	mkdir -p "$(G4_WORK_DIR)" lib/antlr4_shim/generated
+	cp $(G4_FILES) "$(G4_WORK_DIR)/"
 	$(if $(G4_SUPPORT_DIR),if [ -f "$(G4_SUPPORT_DIR)/transformGrammar.py" ]; then \
-	     (cd "$(PARSER_DIR)" && "$(CURDIR)/.venv/bin/python" "$(G4_SUPPORT_DIR)/transformGrammar.py"); fi)
-	$(if $(G4_SUPPORT_DIR),for f in "$(G4_SUPPORT_DIR)"/*.py; do \
-	     [ "$$(basename "$$f")" = transformGrammar.py ] || cp "$$f" "$(PARSER_DIR)/" || exit 1; done)
-	java -jar $(ANTLR_JAR_LOCATION) -Dlanguage=Python3 -Xexact-output-dir \
-	     -o "$(PARSER_DIR)" "$(PARSER_DIR)"/*.g4
-	@touch $@
-
-$(PARSER_LAUNCHER): grammars/grammar_parser.in .grammar $(GRAMMAR_JSON) $(PARSE_MAP) $(PARSER_STAMP)
-	rm -rf "$(PARSER_DATA)"
-	mkdir -p "$(PARSER_DATA)"
-	cp "$(GRAMMAR_JSON)" "$(PARSER_DATA)/grammar.json"
-	cp "$(PARSE_MAP)" "$(PARSER_DATA)/parse_map.json"
-	cp -R "$(PARSER_DIR)" "$(PARSER_DATA)/python"
-	sed -e 's|@VENV_PYTHON@|$(call sed_escape,$(CURDIR)/.venv/bin/python)|' \
-	    -e 's|@G4_PARSE@|$(call sed_escape,$(CURDIR)/grammars/g4_parse.py)|' \
-	    -e 's|@PARSER_DATA@|$(call sed_escape,$(CURDIR)/$(PARSER_DATA))|g' \
-	    grammars/grammar_parser.in > $@
-	chmod +x $@
-
-# The shim gets a parser that rejects all input. grammar_parser-<name> parses
-# the test cases.
-PARSER_G4 = grammars/g4_placeholder/Grammar.g4
+	     (cd "$(G4_WORK_DIR)" && "$(CURDIR)/.venv/bin/python" "$(G4_SUPPORT_DIR)/transformGrammar.py"); fi)
+	$(if $(G4_SUPPORT_DIR),for f in "$(G4_SUPPORT_DIR)"/*.cpp "$(G4_SUPPORT_DIR)"/*.h; do \
+	     [ ! -f "$$f" ] || cp "$$f" lib/antlr4_shim/generated/ || exit 1; done)
+	java -jar $(ANTLR_JAR_LOCATION) -Dlanguage=Cpp -Xexact-output-dir \
+	     -o lib/antlr4_shim/generated "$(G4_WORK_DIR)"/*.g4
+	.venv/bin/python grammars/g4_c_gen.py --grammar $(GRAMMAR_JSON) --parse-map $(PARSE_MAP) \
+	     --namespace g4build -o lib/antlr4_shim/generated
 else
 grammars/Grammar.g4: grammars/f1_g4_translate.py .grammar $(GRAMMAR_JSON)
 	$(PYTHON) grammars/f1_g4_translate.py $(GRAMMAR_JSON) ./grammars
 
-PARSER_G4 = grammars/Grammar.g4
-endif
-
-lib/antlr4_shim/generated: $(PARSER_G4) .grammar
+SHIM_GENERATED = lib/antlr4_shim/generated
+$(SHIM_GENERATED): grammars/Grammar.g4 .grammar
 	@$(MAKE) -C lib clean
 	java -jar $(ANTLR_JAR_LOCATION) \
 	     -Dlanguage=Cpp -DcontextSuperClass=antlr4::RuleContextWithAltNum \
 	     -o lib/antlr4_shim/generated \
-	     $(abspath $(PARSER_G4))
+	     $(abspath grammars/Grammar.g4)
+endif
 
 .PHONY: build
 build: src/f1_c_fuzz.c include/f1_c_fuzz.h third_party build_lib
@@ -251,12 +237,11 @@ build: src/f1_c_fuzz.c include/f1_c_fuzz.h third_party build_lib
 	@ln -sf src/grammar_generator-$(GRAMMAR_FILENAME) grammar_generator-$(GRAMMAR_FILENAME)
 	@ln -sf src/libgrammarmutator-$(GRAMMAR_FILENAME).so libgrammarmutator-$(GRAMMAR_FILENAME).so
 ifneq "$(G4_FILES)" ""
-	@$(MAKE) $(PARSER_LAUNCHER)
-	@ln -sf $(PARSER_LAUNCHER) grammar_parser-$(GRAMMAR_FILENAME)
+	@ln -sf src/grammar_parser-$(GRAMMAR_FILENAME) grammar_parser-$(GRAMMAR_FILENAME)
 endif
 
 .PHONY: build_lib
-build_lib: lib/antlr4_shim/generated src/f1_c_fuzz.c include/f1_c_fuzz.h third_party
+build_lib: $(SHIM_GENERATED) src/f1_c_fuzz.c include/f1_c_fuzz.h third_party
 	@$(MAKE) -C lib all
 
 ifdef ENABLE_TESTING
@@ -327,7 +312,8 @@ clean:
 	@$(MAKE) -C third_party $@
 	@rm -rf $(GEN_FILES)
 	@rm -rf grammars/__pycache__
-	@rm -rf src/grammar_parser-*.d
+	@# The files of older .g4 builds
+	@rm -rf src/grammar_parser-*.d grammars/g4_python
 	@rm -f grammar_generator-* libgrammarmutator-*.so grammar_parser-* src/grammar_parser-*
 
 .PHONY: help
@@ -357,7 +343,7 @@ help:
 	@echo "               more ANTLR 4 .g4 files (for example \"Lexer.g4 Parser.g4\")"
 	@echo "GRAMMAR_START - the start rule of a .g4 grammar (default: the first parser rule)"
 	@echo "G4_SUPPORT_DIR - for a .g4 grammar with action code: the grammars-v4 folder of the"
-	@echo "                 target language (for example javascript/javascript/Python3)"
+	@echo "                 C++ target (for example javascript/javascript/Cpp)"
 	@echo "GRAMMAR_FILENAME - name that will be used in the naming of the generated grammar"
 	@echo "                   files, e.g. \"ruby\" => ./grammar_generator-ruby"
 	@echo "ANTLR_JAR_LOCATION - the path to ANTLR4 jar file"
