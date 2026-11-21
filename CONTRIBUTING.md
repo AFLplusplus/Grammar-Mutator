@@ -91,17 +91,24 @@ is not clear from the subject.
    make test_memcheck
    ```
 
-3. Format the C and C++ code with clang-format 23. Other major versions give
-   different output, so the format script refuses them. `make format-deps`
-   installs clang-format 23 into `.venv` with pip. The `format-check` CI job
-   fails if `make code-format` changes a file.
+3. If you change the Python tools in `grammars/` (for example the `.g4`
+   tools), run their unit tests. They need java and the ANTLR jar.
 
    ```bash
-   make format-deps   # once
+   make test-python
+   ```
+
+4. Format the C and C++ code with clang-format 23. Other major versions give
+   different output, so the format script refuses them. `make deps` installs
+   clang-format 23 and the other Python tools into `.venv` with pip. The
+   `format-check` CI job fails if `make code-format` changes a file.
+
+   ```bash
+   make deps   # once
    make code-format
    ```
 
-4. Fill in the pull request template.
+5. Fill in the pull request template.
 
 ## Releases
 
