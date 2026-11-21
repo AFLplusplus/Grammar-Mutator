@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "f1_c_fuzz.h"
 #include "utils.h"
@@ -134,12 +135,28 @@ int main(int argc, const char *argv[]) {
 
     }
 
+    // Write the test case and its tree file. If the tree write fails, also
+    // remove the test case and stop. Then no test case is without its tree
+    // file.
+    char tree_fn[PATH_MAX];
     snprintf(fn, PATH_MAX, "%s/%d", out_dir, num);
-    dump_tree_to_test_case(tree, fn);
-    snprintf(fn, PATH_MAX, "%s/%d", tree_out_dir, num);
-    write_tree_to_file(tree, fn);
+    snprintf(tree_fn, PATH_MAX, "%s/%d", tree_out_dir, num);
+    bool written = dump_tree_to_test_case(tree, fn);
+    if (written && !write_tree_to_file(tree, tree_fn)) {
+
+      unlink(fn);
+      written = false;
+
+    }
 
     tree_free(tree);
+    if (!written) {
+
+      fprintf(stderr, "Unable to write test case %d; stop\n", num);
+      hash_set_free(seen);
+      return EXIT_FAILURE;
+
+    }
 
   }
 

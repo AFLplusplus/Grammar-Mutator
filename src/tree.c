@@ -16,7 +16,9 @@
 
  */
 
+#include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 
@@ -1062,88 +1064,79 @@ tree_t *load_tree_from_test_case_ex(const char     *filename,
 
 }
 
-void write_tree_to_file(tree_t *tree, const char *filename) {
+// Write `len` bytes of `buf` to a new file. On an error, print a message,
+// remove the incomplete file, and return false. `who` names the caller in the
+// messages.
+static bool write_whole_file(const char *filename, const uint8_t *buf,
+                             size_t len, const char *who) {
 
-  int fd, ret;
+  int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  if (unlikely(fd < 0)) {
 
-  // Serialize the tree. Without memory for it, write no tree file.
+    fprintf(stderr, "Unable to create the file %s (%s): %s\n", filename, who,
+            strerror(errno));
+    return false;
+
+  }
+
+  ssize_t ret = write(fd, buf, len);
+  int     err = errno;
+  bool    ok = ret >= 0 && (size_t)ret == len;
+  if (close(fd) != 0 && ok) {
+
+    err = errno;
+    ok = false;
+
+  }
+
+  if (unlikely(!ok)) {
+
+    if (ret >= 0 && (size_t)ret != len)
+      fprintf(stderr, "Short write to the file %s (%s)\n", filename, who);
+    else
+      fprintf(stderr, "Unable to write the file %s (%s): %s\n", filename, who,
+              strerror(err));
+    unlink(filename);
+    return false;
+
+  }
+
+  return true;
+
+}
+
+bool write_tree_to_file(tree_t *tree, const char *filename) {
+
+  // Serialize the tree. Without memory for it, leave no tree file.
   if (!tree_serialize(tree)) {
 
     fprintf(
         stderr,
         "Unable to serialize the tree: out of memory (write_tree_to_file)\n");
-    return;
+    unlink(filename);  // no old file of another tree stays
+    return false;
 
   }
 
-  // Open the file
-  fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-  if (unlikely(fd < 0)) {
-
-    perror("Unable to create the file (write_tree_to_file)");
-    return;
-
-  }
-
-  // Write the data
-  ret = write(fd, tree->ser_buf, tree->ser_len);
-  if (unlikely(ret < 0)) {
-
-    perror("Unable to write (write_tree_to_file)");
-    return;
-
-  }
-
-  if (unlikely((size_t)ret != tree->ser_len)) {
-
-    perror("Short write to tree file (write_tree_to_file)");
-    return;
-
-  }
-
-  close(fd);
+  return write_whole_file(filename, tree->ser_buf, tree->ser_len,
+                          "write_tree_to_file");
 
 }
 
-void dump_tree_to_test_case(tree_t *tree, const char *filename) {
+bool dump_tree_to_test_case(tree_t *tree, const char *filename) {
 
-  int fd, ret;
-
-  // Unparse the tree. Without memory for it, write no test case file.
+  // Unparse the tree. Without memory for it, leave no test case file.
   if (!tree_to_buf(tree)) {
 
     fprintf(stderr,
             "Unable to unparse the tree: out of memory "
             "(dump_tree_to_test_case)\n");
-    return;
+    unlink(filename);  // no old file of another tree stays
+    return false;
 
   }
 
-  // Open the file
-  fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-  if (unlikely(fd < 0)) {
-
-    perror("Unable to create the file (dump_tree_to_test_case)");
-    exit(EXIT_FAILURE);
-
-  }
-
-  // Write the data
-  ret = write(fd, tree->data_buf, tree->data_len);
-  if (unlikely(ret < 0)) {
-
-    perror("Unable to write (write_tree_to_file)");
-    return;
-
-  }
-
-  if (unlikely((size_t)ret != tree->data_len)) {
-
-    perror("Short write to tree file (dump_tree_to_test_case)");
-    return;
-
-  }
-
-  close(fd);
+  return write_whole_file(filename, tree->data_buf, tree->data_len,
+                          "dump_tree_to_test_case");
 
 }
