@@ -222,6 +222,46 @@ test_read_error_exits_2() {
   expect_in_file stderr "[-] Cannot read b.json: "
 }
 
+test_write_error_exits_2() {
+  if [ "$(id -u)" -eq 0 ]; then
+    echo "    skipped: root can write in a folder with mode 555"
+    return
+  fi
+  mkdir seeds trees
+  printf '[]' > seeds/a.json
+  chmod 555 trees
+  run seeds trees
+  chmod 755 trees
+  expect_code 2
+  expect_in_file stderr "[-] Cannot write the tree of a.json: "
+}
+
+test_mkdir_error_exits_2() {
+  mkdir seeds
+  printf '[]' > seeds/a.json
+  printf 'x' > file
+  run seeds file/sub
+  expect_code 2
+  expect_in_file stderr "[-] Cannot make the folder file/sub: "
+}
+
+test_empty_folder_argument_exits_2() {
+  mkdir seeds
+  printf '[]' > seeds/a.json
+  run seeds ""
+  expect_code 2
+  expect_in_file stderr "[-] TREES_DIR must not be empty"
+  run "" trees
+  expect_code 2
+  expect_in_file stderr "[-] SEEDS_DIR must not be empty"
+  ls > list
+  expect_file list "list
+seeds
+stderr
+stdout
+"
+}
+
 test_removes_the_old_tree_of_a_skipped_file() {
   mkdir seeds
   printf '[]' > seeds/a.json
@@ -340,6 +380,9 @@ test_reports_parser_limit
 test_jobs_give_the_same_output
 test_bad_options_exit_2
 test_read_error_exits_2
+test_write_error_exits_2
+test_mkdir_error_exits_2
+test_empty_folder_argument_exits_2
 test_removes_the_old_tree_of_a_skipped_file
 test_keeps_a_file_that_is_not_a_tree
 test_duplicate_names_follow_the_file_system

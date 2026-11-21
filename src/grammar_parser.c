@@ -685,13 +685,14 @@ static int check_folders(const char *seeds_dir, const char *trees_dir) {
 }
 
 // Make a folder and its parents (as "mkdir -p"). Return 0, or -1 with errno
-// set.
+// set. An empty path gives -1 with ENOENT.
 static int make_folders(const char *path) {
 
   char *p = xstrdup(path);
-  for (char *c = p + 1; *c; ++c) {
+  for (char *c = p; *c; ++c) {
 
-    if (*c != '/') continue;
+    // A "/" at the start is the root folder, not a parent to make
+    if (*c != '/' || c == p) continue;
     *c = '\0';
     if (mkdir(p, 0777) && errno != EEXIST) {
 
@@ -867,6 +868,14 @@ int main(int argc, char *argv[]) {
 
   const char *seeds_dir = argv[optind];
   const char *trees_dir = argv[optind + 1];
+  if (!seeds_dir[0] || !trees_dir[0]) {
+
+    fprintf(stderr, "[-] %s must not be empty\n",
+            seeds_dir[0] ? "TREES_DIR" : "SEEDS_DIR");
+    usage(stderr, argv[0]);
+    return 2;
+
+  }
 
   struct stat st;
   if (stat(seeds_dir, &st) || !S_ISDIR(st.st_mode)) {
