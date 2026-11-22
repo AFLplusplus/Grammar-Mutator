@@ -16,9 +16,9 @@
 // The version of the Grammar Mutator. Release Please updates the lines with an
 // "x-release-please" comment in each release pull request. Do not edit them by
 // hand.
-#define GRAMMAR_MUTATOR_VERSION "1.0.0"  // x-release-please-version
+#define GRAMMAR_MUTATOR_VERSION "1.1.0"  // x-release-please-version
 #define GRAMMAR_MUTATOR_VERSION_MAJOR 1  // x-release-please-major
-#define GRAMMAR_MUTATOR_VERSION_MINOR 0  // x-release-please-minor
+#define GRAMMAR_MUTATOR_VERSION_MINOR 1  // x-release-please-minor
 #define GRAMMAR_MUTATOR_VERSION_PATCH 0  // x-release-please-patch
 
 #endif
