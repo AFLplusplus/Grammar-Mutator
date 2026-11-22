@@ -7,43 +7,78 @@ A grammar-based custom mutator for AFL++ to handle highly-structured inputs.
 - Developer: [Shengtuo Hu (h1994st)](https://github.com/h1994st)
 - Mentors: [Marc Heuse](https://github.com/vanhauser-thc), [Andrea Fioraldi](https://github.com/andreafioraldi)
 
+## Contents
+
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Prerequisites](#prerequisites)
+- [Building the Grammar Mutator](#building-the-grammar-mutator)
+- [Seeds](#seeds)
+- [Fuzzing](#fuzzing)
+- [Configuration](#configuration)
+- [Contact and Contributions](#contact-and-contributions)
+
 ## Overview
 
-We developed a grammar mutator to enhance AFL++ such that AFL++ can handle highly-structured inputs, such as JSON, Ruby, etc.
-The grammar mutator leverages the idea of [F1 fuzzer](https://github.com/vrthra/F1) and [Nautilus](https://github.com/nautilus-fuzz/nautilus) for test case generation and mutations.
-In summary, this repository includes:
+The grammar mutator lets AFL++ fuzz targets that read highly-structured inputs, such as JSON or Ruby.
+It does not mutate a byte buffer.
+It parses each test case into a tree, changes the tree, and writes the tree back as bytes.
+It uses ideas from the [F1 fuzzer](https://github.com/vrthra/F1) for test case generation and from [Nautilus](https://github.com/nautilus-fuzz/nautilus) for the mutations.
+
+This repository includes:
 
 - Grammars in a JSON format or in the ANTLR 4 format (`.g4`), for example from [grammars-v4](https://github.com/antlr/grammars-v4)
 - Tree-based mutation: rules mutation, random mutation, random recursive mutation, splicing mutation
 - Tree-based trimming: subtree trimming, recursive trimming
-- An ANTLR4 shim for parsing fuzzing test cases during the runtime
-- Documents about how to build the grammar mutator, specify custom grammars, and use the grammar mutator
-- Comprehensive test cases for unit testing
-- Sample grammar files and a script to convert nautilus's python grammar file
+- An ANTLR 4 shim that parses test cases while AFL++ runs
+- Tools that generate seeds (`grammar_generator`) and parse existing seeds (`grammar_parser`, for `.g4` grammars)
+- Sample grammars and a script that converts Nautilus Python grammars
+- Unit tests
 
-For more details about tree-based mutation, trimming, and grammar-based fuzzing, please refer to [Nautilus paper](https://www.syssec.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2018/12/17/NDSS19-Nautilus.pdf).
+For more details about tree-based mutation, trimming, and grammar-based fuzzing, refer to the [Nautilus paper](https://www.syssec.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2018/12/17/NDSS19-Nautilus.pdf).
+A fuzzing writeup on Apache that uses the AFL++ Grammar Mutator is at
+[https://securitylab.github.com/research/fuzzing-apache-1](https://securitylab.github.com/research/fuzzing-apache-1).
 
-A fuzzing writeup on Apache which uses the AFL++ Grammmar Mutator can be found here:
-[https://securitylab.github.com/research/fuzzing-apache-1](https://securitylab.github.com/research/fuzzing-apache-1)
-
-## Getting Started
-
-### Prerequisites
-
-Before getting started, the following tools/packages should be installed:
+## Quick Start
 
 ```bash
-sudo apt install valgrind uuid-dev default-jre python3
-# ANTLR 4.13.2 needs Java 11 or later. In the Grammar-Mutator folder,
-# `make antlr-jar` downloads the jar that matches the build. Or download it:
+make antlr-jar                         # download the ANTLR 4.13.2 jar
+make GRAMMAR_FILE=grammars/ruby.json   # build the mutator for a grammar
+./grammar_generator-ruby 100 1000 ./seeds ./trees
+mkdir -p out/default && cp -r trees out/default
+
+export AFL_CUSTOM_MUTATOR_LIBRARY=./libgrammarmutator-ruby.so
+export AFL_CUSTOM_MUTATOR_ONLY=1
+afl-fuzz -i seeds -o out -- /path/to/target @@
+```
+
+The sections below explain each step.
+
+## Prerequisites
+
+Install these packages:
+
+```bash
+sudo apt install valgrind uuid-dev default-jre python3 python3-venv
+```
+
+The build needs the ANTLR 4.13.2 jar (Java 11 or later).
+In the Grammar-Mutator folder, `make antlr-jar` downloads it.
+You can also download it yourself:
+
+```bash
 wget https://www.antlr.org/download/antlr-4.13.2-complete.jar
 sudo cp -f antlr-4.13.2-complete.jar /usr/local/lib
 ```
-If you do not leave the JAR file in the Grammar-Mutator directory or do not copy
-it to /usr/local/lib then you must specify the location via ANTLR_JAR_LOCATION=...
-in the make command.
 
-Note that the grammar mutator is based on the latest custom mutator APIs in AFL++, so please use the latest `dev` or `stable` branch of [AFL++](https://github.com/AFLplusplus/AFLplusplus/tree/dev).
+The build looks for the jar in the Grammar-Mutator folder and in `/usr/local/lib`.
+If the jar is in another place, add `ANTLR_JAR_LOCATION=...` to the make command.
+
+A `.g4` grammar also needs the Python tools in `.venv`.
+Run `make deps` once to install them (this needs `python3-venv` and access to PyPI).
+
+The grammar mutator uses the latest custom mutator APIs of AFL++.
+Use the latest `stable` or `dev` branch of [AFL++](https://github.com/AFLplusplus/AFLplusplus):
 
 ```bash
 git clone https://github.com/AFLplusplus/AFLplusplus.git
@@ -52,17 +87,13 @@ make distrib
 sudo make install
 ```
 
-### Building the Grammar Mutator
+## Building the Grammar Mutator
 
-Next you need to build the grammar mutator.
-To specify the grammar, you can use the `GRAMMAR_FILE` environment variable.
+Set the grammar with `GRAMMAR_FILE`.
 The grammar can be one of two kinds:
 
-- **A JSON grammar file.** There are several in the `grammars` directory, such as `json.json`, `ruby.json` and `http.json`.
-- **An ANTLR 4 grammar (`.g4` files).** You can use a grammar from [grammars-v4](https://github.com/antlr/grammars-v4) directly. Give all its `.g4` files, for example the lexer and the parser grammar. Samples are in `grammars/g4`. Run `make deps` once before the first `.g4` build: it installs the Python tools for the conversion into `.venv`.
-
-Please refer to [customizing-grammars.md](doc/customizing-grammars.md) for more details about both kinds, and to its [ANTLR 4 section](doc/customizing-grammars.md#antlr-4-grammars-g4) for the current limits of `.g4` grammars.
-Note that pull requests with new grammars are welcome! :-)
+- **A JSON grammar file.** There are several in the `grammars` folder, such as `json.json`, `ruby.json`, and `http.json`.
+- **An ANTLR 4 grammar (`.g4` files).** You can use a grammar from [grammars-v4](https://github.com/antlr/grammars-v4) directly. Give all its `.g4` files, for example the lexer grammar and the parser grammar. Samples are in `grammars/g4`.
 
 ```bash
 # A JSON grammar
@@ -72,74 +103,88 @@ make GRAMMAR_FILE=grammars/ruby.json
 make deps
 make GRAMMAR_FILE=grammars/g4/JSON.g4
 
-# ... or a lexer grammar and a parser grammar
-make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4"
+# ... or a lexer grammar and a parser grammar. This grammar has action code,
+# so it also needs its C++ base classes (G4_SUPPORT_DIR).
+make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4" \
+     G4_SUPPORT_DIR=grammars/g4/javascript/Cpp
 ```
 
-Note that the shared library and grammar generator are named after the grammar file that is specified so you can have multiple grammars generated.
-The grammar name part is based on the filename with everything cut off after a underline, dash or dot, hency `ruby.json` will result in `ruby` and hence `grammar_generator-ruby` and `libgrammarmutator-ruby.so` will be created.
-For `.g4` grammars, the name comes from the last file without `Lexer` or `Parser`, so the JavaScript example above gives `javascript`.
-You can specify your own naming by setting `GRAMMAR_FILENAME=yourname` as make option.
+Refer to [customizing-grammars.md](doc/customizing-grammars.md) for both kinds of grammar.
+Its [ANTLR 4 section](doc/customizing-grammars.md#antlr-4-grammars-g4) gives the limits of `.g4` grammars.
+Pull requests with new grammars are welcome! :-)
 
-Now, you should be able to see two symbolic files `libgrammarmutator-ruby.so` and `grammar_generator-ruby` under the root directory.
-These two files actually locate in the `src` directory.
+### Output Files
 
-If you would like to fork the project and fix bugs or contribute to the project, you can take a look at [building-grammar-mutator.md](doc/building-grammar-mutator.md) for full building instructions.
+The build creates these files in the `src` folder, with symbolic links to them in the repository root:
 
-### Instrumenting Fuzzing Targets
+- `libgrammarmutator-<name>.so`: the custom mutator library for AFL++
+- `grammar_generator-<name>`: makes seeds and their trees (see [Generating Seeds](#generating-seeds))
+- `grammar_parser-<name>`: parses existing seeds into trees, for a `.g4` grammar only (see [Using Existing Seeds](#using-existing-seeds))
 
-You can refer to [sample-fuzzing-targets.md](doc/sample-fuzzing-targets.md) to build the example fuzzing targets.
+The name comes from the grammar file, so you can build the mutator for more than one grammar:
 
-### Seeds
+- For a JSON grammar, the build cuts the file name at the first underscore, dash, or dot. So `ruby.json` gives `ruby`.
+- For a `.g4` grammar, the name is the last file name without `Lexer` or `Parser`. So the JavaScript example above gives `javascript`.
+- To set your own name, add `GRAMMAR_FILENAME=yourname` to the make command.
 
-Before fuzzing the real program, you need to prepare the input fuzzing seeds. You can either:
+To fork the project, fix bugs, or contribute, refer to [building-grammar-mutator.md](doc/building-grammar-mutator.md) for the full build instructions.
 
-- Generating seeds for a given grammar
-- Using existing seeds
+## Seeds
 
-#### Using Existing Seeds
+Before you fuzz the target, prepare the seeds.
+You can generate seeds from the grammar, or use existing seeds.
+In both cases, you can give the mutator the trees of the seeds, so that it does not parse them again.
 
-You can feed your own fuzzing seeds to the fuzzer, which does not need to match with your input grammar file.
-Assuming that the grammar mutator is built with `grammars/ruby.json`, which is a simplified Ruby grammar and does not cover all Ruby syntax.
-In this case, the parsing error will definitely occur.
-For any parsing errors, the grammar mutator will not terminate but save the error portion as a terminal node in the tree, such that we will not lose too much information on the original test case.
+### Generating Seeds
 
-To e.g. use the test cases of the `mruby` project as input fuzzing seeds just pass the `-i mruby/test/t` to afl-fuzz
-when we run the fuzzer (if it has been checked out with `git clone https://github.com/mruby/mruby.git` in the current directory).
-
-For a `.g4` grammar, the mutator also parses each seed when AFL++ loads it.
-A seed with a syntax error gets no tree, and the grammar mutator does not change it.
-The other AFL++ stages change it, unless `AFL_CUSTOM_MUTATOR_ONLY` is set.
-With `AFL_CUSTOM_MUTATOR_ONLY=1`, AFL++ does not fuzz this seed at all.
-To parse the seeds before you fuzz, run `grammar_parser-$GRAMMAR`.
-It parses the seeds and writes their trees, for example `./grammar_parser-javascript ./seeds ./trees`.
-Then copy the `trees` folder as shown in [Using Generated Seeds](#using-generated-seeds).
-Refer to the [ANTLR 4 section](doc/customizing-grammars.md#parse-existing-test-cases) for the skip reasons, the parse time limit, and `G4_SUPPORT_DIR`.
-
-#### Using Generated Seeds
-
-`grammar_generator` can be used to generate input fuzzing seeds and corresponding tree files, following the grammar file that you specified during the compilation of the grammar mutator (i.e., `GRAMMAR_FILE`).
-You can control the number of generated seeds and the maximal size of the corresponding trees.
-Usually, the larger the tree size is, the more complex the corresponding input seed is.
+`grammar_generator-<name>` makes seeds and their tree files from the grammar of the build.
+You can set the number of seeds and the maximum tree size.
+A larger tree usually gives a more complex seed.
 The generator does not write empty seeds or the same seed twice.
 If 100 tries in a row give no new seed, it stops early and writes fewer than `<max_num>` seeds.
 
 ```bash
-# Usage
-# ./grammar_generator-$GRAMMAR <max_num> <max_size> <seed_output_dir> <tree_output_dir> [<random seed>]
-#
-# <random seed> is optional
-# e.g.:
+# Usage:
+# ./grammar_generator-<name> <max_num> <max_size> <seed_output_dir> <tree_output_dir> [<random seed>]
 ./grammar_generator-ruby 100 1000 ./seeds ./trees
 ```
 
-Afterwards copy the `trees` folder with that exact name to the output directory that you will use with afl-fuzz (e.g. `-o out -S default`):
+Then [copy the trees](#copying-the-trees).
+
+### Using Existing Seeds
+
+You can give your own seeds to the fuzzer.
+They do not have to match the grammar.
+The mutator parses each seed when AFL++ loads it.
+What happens with a seed that the grammar does not cover depends on the kind of grammar:
+
+- **A JSON grammar:** the mutator keeps the bad part as a terminal node in the tree, so the seed does not lose much information. For example, `grammars/ruby.json` is a simplified Ruby grammar, so most real Ruby files have parse errors.
+- **A `.g4` grammar:** a seed with a syntax error gets no tree, and the grammar mutator does not change it. The other AFL++ stages change it, unless `AFL_CUSTOM_MUTATOR_ONLY` is set. With `AFL_CUSTOM_MUTATOR_ONLY=1`, AFL++ does not fuzz this seed at all.
+
+For example, to use the test cases of the `mruby` project as seeds, clone it with `git clone https://github.com/mruby/mruby.git` and give `-i mruby/test/t` to `afl-fuzz`.
+
+With a `.g4` grammar, you can parse the seeds before you fuzz.
+This makes the start of `afl-fuzz` faster:
+
+```bash
+./grammar_parser-javascript ./seeds ./trees
+```
+
+Then [copy the trees](#copying-the-trees).
+The [ANTLR 4 section](doc/customizing-grammars.md#parse-existing-test-cases) of customizing-grammars.md gives the skip reasons, the parse time limit, and `G4_SUPPORT_DIR`.
+
+### Copying the Trees
+
+Copy the `trees` folder, with this exact name, into the output folder of `afl-fuzz` (for example `-o out` with the default fuzzer name `default`):
+
 ```bash
 mkdir -p out/default
 cp -r trees out/default
 ```
 
-Note that if you use multiple fuzzers (-M/-S sync mode) then you have to do this for all fuzzer instances, e.g. when the fuzzer instances are named fuzzer1 to fuzzer8:
+If you use more than one fuzzer instance (`-M`/`-S` sync mode), do this for each instance.
+For example, for the instances `fuzzer1` to `fuzzer8`:
+
 ```bash
 for i in 1 2 3 4 5 6 7 8; do
   mkdir -p out/fuzzer$i
@@ -147,45 +192,48 @@ for i in 1 2 3 4 5 6 7 8; do
 done
 ```
 
-### Fuzzing the Target with the Grammar Mutator!
+## Fuzzing
 
-Let's start running the fuzzer.
-The following example command is using Ruby grammar (from `grammars/ruby.json`) where `mruby` project has been cloned to the root `Grammar-Mutator` directory.
+### Instrumenting the Target
 
-The default memory limit for child process is `75M` in `afl-fuzz`.
-This may not be enough for some test cases, so it is recommended to increase it to `128M` by adding an option `-m 128`.
+Refer to [sample-fuzzing-targets.md](doc/sample-fuzzing-targets.md) to build the sample fuzzing targets.
+
+### Running the Fuzzer
+
+This example uses the Ruby grammar (`grammars/ruby.json`) and the `mruby` target:
 
 ```bash
 export AFL_CUSTOM_MUTATOR_LIBRARY=./libgrammarmutator-ruby.so
 export AFL_CUSTOM_MUTATOR_ONLY=1
-afl-fuzz -m 128 -i seeds -o out -- /path/to/target @@
+afl-fuzz -i seeds -o out -- /path/to/target @@
 ```
 
-You may notice that the fuzzer will be stuck for a while at the beginning of fuzzing.
-One reason for the stuck is the large `max_size` (i.e., 1000) we choose, which results in a large size of test cases that increases the loading time.
-Another reason is the costly parsing operations in the grammar mutator.
-Since the input seeds are in string format, the grammar mutator needs to parse them into tree representations at first, which is costly.
-The large `max_size` passed into `grammar_generator-$GRAMMAR` does help us generate deeply nested trees, but it further increases the parsing overhead.
+The fuzzer can be slow at the start, for two reasons:
 
-### Changing the Default Configurations
+- Large seeds take more time to load. A large `<max_size>` for `grammar_generator-<name>` gives large seeds.
+- The mutator must parse each seed that has no tree. To skip this step, copy the trees of the seeds (see [Copying the Trees](#copying-the-trees)).
 
-Users can set the number of mutations per queue entry, and the parse time limit, with these environment variables:
+## Configuration
 
-- `RANDOM_MUTATION_STEPS`: the number of random mutations
-- `RANDOM_RECURSIVE_MUTATION_STEPS`: the number of random recursive mutations
-- `SPLICING_MUTATION_STEPS`: the number of splicing mutations
-- `RULES_MUTATION_STEPS`: the maximum number of rules mutations
-- `TRIMMING_STEPS`: the maximum number of trimming steps
-- `PARSE_TIME_BUDGET`: `0` removes the time limit for the parse of a test case with a `.g4` grammar. Any other value keeps the limit.
+The mutator reads these environment variables:
 
-By default, each of the first three mutation types runs 1000 times, and the
-rules mutation tries every other rule at every nonterminal node of the tree.
-With `RULES_MUTATION_STEPS`, the rules mutation tries at most that many of these
-node and rule pairs, sampled uniformly across the whole tree and tried in tree
-order. The trimming of a new queue entry tries every nonterminal node and
-every recursion of its tree, from the root down. With `TRIMMING_STEPS`, it
-stops after that many tries and keeps what it has trimmed by then. Change them
-as follows, if needed. :)
+| Variable | Effect |
+|---|---|
+| `RANDOM_MUTATION_STEPS` | The number of random mutations (default 1000) |
+| `RANDOM_RECURSIVE_MUTATION_STEPS` | The number of random recursive mutations (default 1000) |
+| `SPLICING_MUTATION_STEPS` | The number of splicing mutations (default 1000) |
+| `RULES_MUTATION_STEPS` | The maximum number of rules mutations (default: no limit) |
+| `TRIMMING_STEPS` | The maximum number of trimming steps (default: no limit) |
+| `PARSE_TIME_BUDGET` | `0` removes the time limit for the parse of a test case with a `.g4` grammar. Any other value keeps the limit. |
+
+By default, the rules mutation tries every other rule at every nonterminal node of the tree.
+With `RULES_MUTATION_STEPS`, it tries at most that many of these node and rule pairs.
+It samples them uniformly across the whole tree and tries them in tree order.
+
+The trimming of a new queue entry tries every nonterminal node and every recursion of its tree, from the root down.
+With `TRIMMING_STEPS`, it stops after that many tries and keeps what it has trimmed by then.
+
+For example:
 
 ```bash
 export RANDOM_MUTATION_STEPS=10000
@@ -195,13 +243,13 @@ export RULES_MUTATION_STEPS=10000
 export TRIMMING_STEPS=10000
 export AFL_CUSTOM_MUTATOR_LIBRARY=./libgrammarmutator-ruby.so
 export AFL_CUSTOM_MUTATOR_ONLY=1
-afl-fuzz -m 128 -i seeds -o out -- /path/to/target @@
+afl-fuzz -i seeds -o out -- /path/to/target @@
 ```
 
-## Contact & Contributions
+## Contact and Contributions
 
-We welcome any questions and contributions! Feel free to open an issue or submit a pull request!
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
+We welcome questions and contributions! Feel free to open an issue or submit a pull request.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 
 ### Branches and Releases
 
