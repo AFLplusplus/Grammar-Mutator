@@ -1,6 +1,6 @@
 # Grammar Mutator - AFL++
 
-![Grammar Mutator CI](https://github.com/AFLplusplus/Grammar-Mutator/workflows/Grammar%20Mutator%20CI/badge.svg)
+[![Grammar Mutator CI](https://github.com/AFLplusplus/Grammar-Mutator/actions/workflows/main.yml/badge.svg)](https://github.com/AFLplusplus/Grammar-Mutator/actions/workflows/main.yml)
 
 A grammar-based custom mutator for AFL++ to handle highly-structured inputs.
 
