@@ -25,6 +25,21 @@ Thank you for your help. This file tells you how to send a change.
    make test-python
    ```
 
+   If you change the C++ matcher (`lib/antlr4_shim/g4_*`), build a `.g4`
+   grammar and run the matcher tests. Run them with AddressSanitizer too. The
+   ANTLR runtime has no ASan code, so the container check of ASan gives false
+   reports. The script sets `ASAN_OPTIONS=detect_container_overflow=0` if
+   `ASAN_OPTIONS` is empty. ASan cannot check a test that throws from more
+   than 64 MB deep in the parse thread stack. An ASan build skips such a test
+   and shows `[SKIP]` for it. The ASan run passes on macOS (Apple clang) and
+   on Ubuntu 24.04 arm64 (gcc and clang). Other systems are not checked. CI
+   has no ASan job.
+
+   ```bash
+   tests/g4/run_matcher_tests.sh
+   MATCHER_FLAGS=-fsanitize=address tests/g4/run_matcher_tests.sh
+   ```
+
 4. Format the C and C++ code with clang-format 23. Other major versions give
    different output, so the format script refuses them. `make deps` installs
    clang-format 23 and the other Python tools into `.venv` with pip. The

@@ -150,6 +150,33 @@ TEST_F(ChunkStoreTest, GetAlternativeNode) {
 
 }
 
+TEST_F(ChunkStoreTest, DeepChainIsLinear) {
+
+  // A chain of nodes with one leaf at the bottom. Every subtree is different
+  const size_t depth = 200000;
+  node_t      *cur = node_create_with_val(0, "x", 1);
+  for (size_t i = 0; i < depth; ++i) {
+
+    node_t *parent = node_create(1);
+    node_init_subnodes(parent, 1);
+    node_set_subnode(parent, 0, cur);
+    cur = parent;
+
+  }
+
+  tree_t *tree = tree_create();
+  tree->root = cur;
+
+  const size_t node_count = depth + 1;
+  chunk_store_hashed_nodes = 0;
+  chunk_store_add_tree(tree);
+  EXPECT_LE(chunk_store_hashed_nodes, 2 * node_count);
+  EXPECT_EQ(num_seen_chunks(), node_count);
+
+  tree_free(tree);
+
+}
+
 int main(int argc, char **argv) {
 
   ::testing::InitGoogleTest(&argc, argv);

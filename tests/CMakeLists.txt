@@ -49,7 +49,9 @@ add_subdirectory(
   ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
   EXCLUDE_FROM_ALL)
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
+# The generated headers come before include/. A make build in the source
+# folder writes include/f1_c_fuzz.h, maybe for another grammar.
+include_directories(${CMAKE_BINARY_DIR}/f1/include ${CMAKE_SOURCE_DIR}/include)
 
 # Test suite 1:
 # run a custom mutator library, which generates test cases for a specific
@@ -58,6 +60,8 @@ add_executable(test_custom_mutator test_custom_mutator.cpp)
 target_link_libraries(test_custom_mutator
   PRIVATE gtest_main
   PRIVATE grammarmutator)
+target_include_directories(test_custom_mutator
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)
 add_test(
   NAME test_custom_mutator
   COMMAND test_custom_mutator)
@@ -68,14 +72,17 @@ add_executable(test_tree test_tree.cpp)
 target_link_libraries(test_tree
   PRIVATE gtest_main
   PRIVATE grammarmutator)
+# test_tree checks some cases only for one grammar, so it needs the name
+target_compile_definitions(test_tree PRIVATE GRAMMAR_NAME="${GRAMMAR_FILENAME}")
 add_test(
   NAME test_tree
   COMMAND test_tree)
-if ("${GRAMMAR_FILE}" STREQUAL "${CMAKE_SOURCE_DIR}/grammars/ruby_grammar.json")
-  message(STATUS "Enable testing on parsing 'testcases/array.rb'")
+if ("${GRAMMAR_FILE}" STREQUAL "${CMAKE_SOURCE_DIR}/grammars/ruby.json")
+  message(STATUS "Enable testing on parsing 'testcases/array.rb' and 'testcases/ruby'")
   target_compile_definitions(test_tree
     PRIVATE ENABLE_PARSING_ARRAY_RB
-    PRIVATE ARRAY_RB_PATH="${CMAKE_CURRENT_SOURCE_DIR}/testcases/array.rb")
+    PRIVATE ARRAY_RB_PATH="${CMAKE_CURRENT_SOURCE_DIR}/testcases/array.rb"
+    PRIVATE RUBY_CASES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/testcases/ruby")
 endif ()
 
 # Test suite 3:
@@ -158,3 +165,13 @@ target_link_libraries(test_utils
 add_test(
   NAME test_utils
   COMMAND test_utils)
+
+# Test suite 10:
+# test the adaptive parse budget
+add_executable(test_parse_budget test_parse_budget.cpp)
+target_link_libraries(test_parse_budget
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
+add_test(
+  NAME test_parse_budget
+  COMMAND test_parse_budget)

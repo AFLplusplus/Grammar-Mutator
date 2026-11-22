@@ -16,11 +16,17 @@
 
  */
 
+#include <dirent.h>
+
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iterator>
+#include <string>
 
 #include "tree.h"
 #include "f1_c_fuzz.h"
+#include "utils.h"
 
 #include "gtest/gtest.h"
 #include "gtest_ext.h"
@@ -510,6 +516,56 @@ TEST_F(TreeTest, DeserializeRejectsBadLengths) {
 
 }
 
+TEST_F(TreeTest, DeepTreeNoRecursion) {
+
+  // A chain of non-terminal nodes with one leaf "x" at the bottom
+  const size_t depth = 1000000;
+  node_t      *cur = node_create_with_val(0, "x", 1);
+  for (size_t i = 0; i < depth; ++i) {
+
+    node_t *parent = node_create(1);
+    node_init_subnodes(parent, 1);
+    node_set_subnode(parent, 0, cur);
+    cur = parent;
+
+  }
+
+  tree_t *tree = tree_create();
+  tree->root = cur;
+
+  EXPECT_EQ(tree_get_size(tree), depth);
+  EXPECT_EQ(tree->root->recursion_edge_size, depth - 1);
+
+  tree_to_buf(tree);
+  ASSERT_EQ(tree->data_len, 1u);
+  EXPECT_EQ(tree->data_buf[0], 'x');
+
+  tree_serialize(tree);
+  tree_t *new_tree = tree_deserialize(tree->ser_buf, tree->ser_len);
+  ASSERT_NE(new_tree, nullptr);
+  EXPECT_TRUE(tree_equal(tree, new_tree));
+  tree_free(new_tree);
+
+  new_tree = tree_clone(tree);
+  EXPECT_TRUE(tree_equal(tree, new_tree));
+  EXPECT_EQ(new_tree->root->subnodes[0]->parent, new_tree->root);
+  tree_free(new_tree);
+
+  tree_get_non_terminal_nodes(tree);
+  EXPECT_EQ(tree->non_terminal_node_list->size, depth);
+
+  tree_get_recursion_edges(tree);
+  EXPECT_EQ(tree->recursion_edge_list->size, depth - 1);
+
+  random_set_seed(0);
+  EXPECT_NE(node_pick_non_term_subnode(tree->root), nullptr);
+  edge_t edge = node_pick_recursion_edge(tree->root);
+  EXPECT_NE(edge.subnode, nullptr);
+
+  tree_free(tree);
+
+}
+
 #if defined(ENABLE_PARSING_ARRAY_RB) && defined(ARRAY_RB_PATH)
 TEST_F(TreeTest, ParseArrayRb) {
 
@@ -517,6 +573,49 @@ TEST_F(TreeTest, ParseArrayRb) {
   tree_to_buf(array_rb_tree);
   EXPECT_EQ(array_rb_tree->data_len, 4052);
   tree_free(array_rb_tree);
+
+}
+
+#endif
+
+#if defined(RUBY_CASES_DIR)
+// Each .rb file in RUBY_CASES_DIR fits grammars/ruby.json. So the
+// parser keeps every byte, and the tree gives the file again.
+TEST_F(TreeTest, RubyCasesRoundTrip) {
+
+  DIR *dir = opendir(RUBY_CASES_DIR);
+  ASSERT_NE(dir, nullptr);
+
+  int            count = 0;
+  struct dirent *entry;
+  while ((entry = readdir(dir)) != nullptr) {
+
+    std::string name = entry->d_name;
+    if (name.size() <= 3 || name.compare(name.size() - 3, 3, ".rb") != 0)
+      continue;
+
+    std::ifstream file(std::string(RUBY_CASES_DIR) + "/" + name,
+                       std::ios::binary);
+    ASSERT_TRUE(file.good()) << name;
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+
+    parse_status_t status = PARSE_THREAD_ERROR;
+    tree_t *tree = tree_parse((const uint8_t *)content.data(), content.size(),
+                              nullptr, &status);
+    ASSERT_NE(tree, nullptr) << name;
+    EXPECT_EQ(status, PARSE_OK) << name;
+    ASSERT_TRUE(tree_to_buf(tree)) << name;
+    EXPECT_EQ(std::string((const char *)tree->data_buf, tree->data_len),
+              content)
+        << name;
+    tree_free(tree);
+    ++count;
+
+  }
+
+  closedir(dir);
+  EXPECT_EQ(count, 6);
 
 }
 
@@ -532,6 +631,103 @@ TEST_F(TreeTest, ParseSpecialCharacter) {
   auto len = strlen(special_str);
   auto tree = tree_from_buf((const uint8_t *)special_str, len);
   EXPECT_EQ(tree, nullptr);
+
+}
+
+TEST_F(TreeTest, TreeParseReportsStatus) {
+
+  parse_status_t status = PARSE_THREAD_ERROR;
+  char           bad[] = "\xFD";
+  EXPECT_EQ(tree_parse((const uint8_t *)bad, 1, nullptr, &status), nullptr);
+  EXPECT_EQ(status, PARSE_SYNTAX_ERROR);
+
+  // A generated tree gives a valid test case for any grammar
+  tree_t *gen = gen_init__(0);
+  tree_to_buf(gen);
+  status = PARSE_THREAD_ERROR;
+  tree_t *parsed = tree_parse(gen->data_buf, gen->data_len, nullptr, &status);
+  EXPECT_NE(parsed, nullptr);
+  EXPECT_EQ(status, PARSE_OK);
+  tree_free(parsed);
+  tree_free(gen);
+
+  // The status pointer may be NULL
+  EXPECT_EQ(tree_parse((const uint8_t *)bad, 1, nullptr, nullptr), nullptr);
+
+}
+
+// Return true if the subtree has a terminal node without a value. A token
+// from the lexer has at least one character. So for the JSON shim, such a node
+// is a token that ANTLR made up in recovery.
+static bool has_empty_terminal(const node_t *node) {
+
+  if (!node) return false;
+  if (node->id == 0 && node->subnode_count == 0) return node->val_len == 0;
+  for (uint32_t i = 0; i < node->subnode_count; ++i)
+    if (has_empty_terminal(node->subnodes[i])) return true;
+  return false;
+
+}
+
+// ANTLR can make up a token in error recovery (its text is "<missing X>").
+// That text is not in the input, so the tree must not hold it.
+TEST_F(TreeTest, RecoveredMissingTokenIsNotInTheTree) {
+
+  const char *inputs[] = {"def a.b(1", "a=[1,2", "a=(1", "a = b.c(1"};
+  int         made_up = 0;
+  for (const char *input : inputs) {
+
+    parse_status_t status = PARSE_THREAD_ERROR;
+    tree_t        *t =
+        tree_parse((const uint8_t *)input, strlen(input), nullptr, &status);
+    if (!t) continue;  // a grammar that rejects the input has nothing to check
+
+    EXPECT_EQ(status, PARSE_OK) << input;  // a recovered tree is still OK
+    tree_to_buf(t);
+    std::string bytes((const char *)t->data_buf, t->data_len);
+    EXPECT_EQ(bytes.find("<missing"), std::string::npos)
+        << input << " -> " << bytes;
+    if (has_empty_terminal(t->root)) ++made_up;
+    tree_free(t);
+
+  }
+
+  // The CI runs the unit tests with the Ruby grammar. There, at least one
+  // input must make ANTLR make up a token, so that the test checks something.
+  if (strcmp(GRAMMAR_NAME, "ruby") == 0) EXPECT_GT(made_up, 0);
+
+}
+
+TEST_F(TreeTest, EmptyTestCaseFile) {
+
+  const char *fn = "empty_test_case_file";
+  FILE       *f = fopen(fn, "wb");
+  ASSERT_NE(f, nullptr);
+  fclose(f);
+
+  // A raw value that is not a valid status proves that the parser ran. The
+  // code stores it as bytes, so the enum never holds a value out of its range.
+  static_assert(sizeof(parse_status_t) == sizeof(unsigned),
+                "the test needs a status the size of unsigned");
+  const unsigned sentinel = 99;
+  parse_status_t status;
+  memcpy(&status, &sentinel, sizeof(status));
+  tree_t  *t = load_tree_from_test_case_ex(fn, nullptr, &status);
+  unsigned after;
+  memcpy(&after, &status, sizeof(after));
+  EXPECT_NE(after, sentinel);
+  if (t) tree_free(t);
+  remove(fn);
+
+}
+
+TEST_F(TreeTest, MissingTestCaseFileKeepsStatus) {
+
+  parse_status_t status = PARSE_OK;
+  EXPECT_EQ(
+      load_tree_from_test_case_ex("no_such_test_case_file", nullptr, &status),
+      nullptr);
+  EXPECT_EQ(status, PARSE_OK);
 
 }
 

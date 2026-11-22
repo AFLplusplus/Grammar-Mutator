@@ -48,6 +48,21 @@ TEST(TreeMutationTest, RandomMutation) {
 
 }
 
+// A failed size walk sets the root sizes to 0. Then the picks find no node.
+// The random and splicing mutations return NULL and do not stop the program.
+TEST(TreeMutationTest, MutationOfATreeWithoutSizesReturnsNull) {
+
+  auto tree = tree_create();
+  tree->root = node_create(1);
+  tree->root->non_term_size = 0;
+
+  EXPECT_EQ(random_mutation(tree), nullptr);
+  EXPECT_EQ(splicing_mutation(tree), nullptr);
+
+  tree_free(tree);
+
+}
+
 TEST(TreeMutationTest, RandomRecursiveMutation) {
 
   random_set_seed(0);  // Fix the random seed
@@ -227,6 +242,45 @@ TEST_F(TreeMutationUniquenessTest, SplicingMutation) {
 
   // clear the chunk store
   chunk_store_clear();
+
+}
+
+TEST(TreeMutationTest, DeepTreeRulesMutationCount) {
+
+  // Pick a node type with at least two rules
+  uint32_t id = 0;
+  for (uint32_t i = 1; i < sizeof(node_num_rules) / sizeof(node_num_rules[0]);
+       ++i) {
+
+    if (node_num_rules[i] >= 2) {
+
+      id = i;
+      break;
+
+    }
+
+  }
+
+  ASSERT_NE(id, 0u);
+
+  // A chain of nodes of this type, each with a known rule id
+  const size_t depth = 1000000;
+  node_t      *cur = node_create_with_val(0, "x", 1);
+  for (size_t i = 0; i < depth; ++i) {
+
+    node_t *parent = node_create_with_rule_id(id, 0);
+    node_init_subnodes(parent, 1);
+    node_set_subnode(parent, 0, cur);
+    cur = parent;
+
+  }
+
+  tree_t *tree = tree_create();
+  tree->root = cur;
+
+  EXPECT_EQ(rules_mutation_count(tree), depth * (node_num_rules[id] - 1));
+
+  tree_free(tree);
 
 }
 

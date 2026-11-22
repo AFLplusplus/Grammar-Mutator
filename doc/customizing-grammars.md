@@ -63,9 +63,12 @@ each token.
 
 ### Parse Existing Test Cases
 
-A `.g4` build also makes `grammar_parser-<name>`. It parses your test cases and
-writes their trees. Copy the trees into the AFL++ output folder, as for
-`grammar_generator` (see [README.md](../README.md#using-generated-seeds)).
+The mutator parses each queue entry that has no tree, for example a seed or an
+entry from `-M`/`-S` sync. This parse step can be slow for many large seeds.
+To skip it, a `.g4` build also makes `grammar_parser-<name>`. This C program
+parses your test cases and writes their trees. Copy the trees into the AFL++
+output folder, as for `grammar_generator` (see
+[README.md](../README.md#using-generated-seeds)).
 
 ```bash
 ./grammar_parser-javascript SEEDS_DIR TREES_DIR
@@ -76,30 +79,42 @@ cp -r TREES_DIR out/default/trees
 - A tree gives the exact bytes of its test case again.
 - The tree name is the file name, with each space changed to `_` (as AFL++
   does). `TREES_DIR` must not be in `SEEDS_DIR`.
-- `-j N` sets the number of parser processes. The default is one per CPU.
+- `-j N` sets the number of parser threads. The default is one per CPU. Put
+  `-j N` before the folders.
 
 The tool skips a file that it cannot parse, prints the reason, and goes on:
 
 - `not UTF-8`: the file is not UTF-8.
 - `syntax error`: ANTLR rejects the file.
-- `parser limit`: the nesting is too deep (more than 20000 tree levels).
+- `parser limit`: the nesting is too deep (more than 200000 parser rule
+  levels), or the grammar code throws an error.
 - `duplicate name`: another file already has this tree name.
 - `no match`: a bug. Please report it with the file.
 
-A grammar with action code needs its Python base classes. Set `G4_SUPPORT_DIR`
-to the `Python3/` folder of the grammar in grammars-v4 (CMake: a full path).
-Without it, `grammar_parser-<name>` stops with a message.
+If the mutator cannot parse a queue entry, the entry stays in the queue. The
+custom mutator does not change it. The other AFL++ stages change it, unless
+`AFL_CUSTOM_MUTATOR_ONLY` is set. With `AFL_CUSTOM_MUTATOR_ONLY=1`, AFL++ does
+not fuzz the entry at all. The mutator does not parse it again in the same run.
+
+The mutator also stops a parse that takes too long. The time limit is 50 ×
+the token count × the median time per token of the earlier parses. The
+minimum is 50 ms. The limit starts after 32 successful parses. Set
+`PARSE_TIME_BUDGET=0` to remove the limit. `grammar_parser-<name>` has no
+time limit.
+
+A grammar with action code or a `superClass` needs its C++ base classes. Set
+`G4_SUPPORT_DIR` to the `Cpp/` folder of the grammar in grammars-v4 (CMake: a
+full path). The `Python3/` folder does not work. Without the base classes, the
+C++ compile step fails with a hint.
 
 ```bash
 make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascript/JavaScriptParser.g4" \
-     G4_SUPPORT_DIR=grammars/g4/javascript/Python3
+     G4_SUPPORT_DIR=grammars/g4/javascript/Cpp
 ```
 
 ### Limits
 
-- The mutator does not parse test cases with a `.g4` grammar itself. A queue
-  entry without a tree (for example from `-M`/`-S` sync) gets only the AFL++
-  mutators.
+- A grammar must have no action code, or it must have C++ base classes.
 - Each token is one leaf, so the mutator changes a parsed token only as a
   whole.
 - A token that only grammar code makes (such as `INDENT` in a Python grammar)

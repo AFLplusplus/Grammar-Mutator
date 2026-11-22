@@ -2,4 +2,3 @@
 # Keep the vendored and sample .g4 grammars
 !antlr4/*.g4
 !g4/**/*.g4
-!g4_placeholder/*.g4

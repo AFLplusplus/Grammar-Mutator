@@ -139,6 +139,24 @@ if (_g4_file_count EQUAL 0)
 endif ()
 # Configure again when a grammar file changes
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${GRAMMAR_FILE})
+# Configure again when a script of the configure step changes. The configure
+# step runs the scripts and writes the generated files.
+set(_configure_scripts
+  ${CMAKE_SOURCE_DIR}/grammars/f1_c_gen.py
+  ${CMAKE_SOURCE_DIR}/grammars/f1_common.py
+  ${CMAKE_SOURCE_DIR}/grammars/tree_file.py)
+if (_g4_file_count GREATER 0)
+  list(APPEND _configure_scripts
+    ${CMAKE_SOURCE_DIR}/grammars/g4_to_json.py
+    ${CMAKE_SOURCE_DIR}/grammars/g4_c_gen.py
+    ${CMAKE_SOURCE_DIR}/grammars/antlr4/ANTLRv4Lexer.g4
+    ${CMAKE_SOURCE_DIR}/grammars/antlr4/ANTLRv4Parser.g4
+    ${CMAKE_SOURCE_DIR}/grammars/antlr4/LexerAdaptor.py
+    ${CMAKE_SOURCE_DIR}/requirements.txt)
+else ()
+  list(APPEND _configure_scripts ${CMAKE_SOURCE_DIR}/grammars/f1_g4_translate.py)
+endif ()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${_configure_scripts})
 
 if (NOT GRAMMAR_FILENAME)
   if (_g4_file_count GREATER 0)
@@ -202,20 +220,15 @@ if (_g4_file_count GREATER 0)
     message(FATAL_ERROR "Unable to convert the .g4 grammar: ${result}")
   endif ()
 
-  # The data of grammar_parser-<name>: a copy of the JSON grammar and the
-  # parse map, and the Python parser. The launcher uses only this folder, so a
-  # build of a different grammar does not change it.
-  set(PARSER_DATA ${CMAKE_BINARY_DIR}/src/grammar_parser-${GRAMMAR_FILENAME}.d)
-  file(REMOVE_RECURSE ${PARSER_DATA})
-  file(MAKE_DIRECTORY ${PARSER_DATA})
-  file(COPY ${GRAMMAR_JSON} ${PARSE_MAP} DESTINATION ${PARSER_DATA})
-
-  # The Python parser for test cases. G4_SUPPORT_DIR is the folder with the
-  # base classes and the rewrite script of a grammar with action code, for
-  # example grammars-v4 javascript/javascript/Python3.
-  set(PARSER_DIR ${PARSER_DATA}/python)
-  file(MAKE_DIRECTORY ${PARSER_DIR})
-  file(COPY ${G4_FILES} DESTINATION ${PARSER_DIR})
+  # The work folder for the .g4 files. G4_SUPPORT_DIR is the folder with the
+  # C++ base classes and the rewrite script of a grammar with action code, for
+  # example grammars-v4 javascript/javascript/Cpp. Its transformGrammar.py
+  # changes the .g4 files in the work folder. lib/antlr4_shim makes the C++
+  # parser from them.
+  set(G4_WORK_DIR ${CMAKE_BINARY_DIR}/g4_work)
+  file(REMOVE_RECURSE ${G4_WORK_DIR})
+  file(MAKE_DIRECTORY ${G4_WORK_DIR})
+  file(COPY ${G4_FILES} DESTINATION ${G4_WORK_DIR})
   if (G4_SUPPORT_DIR)
     if (NOT IS_ABSOLUTE "${G4_SUPPORT_DIR}")
       message(FATAL_ERROR "Please provide the full path to G4_SUPPORT_DIR: ${G4_SUPPORT_DIR}")
@@ -228,40 +241,15 @@ if (_g4_file_count GREATER 0)
     if (EXISTS "${G4_SUPPORT_DIR}/transformGrammar.py")
       execute_process(
         COMMAND ${GRAMMAR_VENV}/bin/python ${G4_SUPPORT_DIR}/transformGrammar.py
-        WORKING_DIRECTORY ${PARSER_DIR}
+        WORKING_DIRECTORY ${G4_WORK_DIR}
         RESULT_VARIABLE result)
       if (result)
         message(FATAL_ERROR "Unable to run transformGrammar.py: ${result}")
       endif ()
     endif ()
-    file(GLOB _support_py "${G4_SUPPORT_DIR}/*.py")
-    list(REMOVE_ITEM _support_py "${G4_SUPPORT_DIR}/transformGrammar.py")
-    if (_support_py)
-      file(COPY ${_support_py} DESTINATION ${PARSER_DIR})
-    endif ()
   endif ()
-  file(GLOB _work_g4_files "${PARSER_DIR}/*.g4")
-  execute_process(
-    COMMAND ${Java_JAVA_EXECUTABLE} -jar ${ANTLR_JAR_LOCATION} -Dlanguage=Python3
-            -Xexact-output-dir -o ${PARSER_DIR} ${_work_g4_files}
-    RESULT_VARIABLE result)
-  if (result)
-    message(FATAL_ERROR "Unable to generate the Python parser: ${result}")
-  endif ()
-  # The launcher of the parser. It runs grammars/g4_parse.py.
-  set(VENV_PYTHON ${GRAMMAR_VENV}/bin/python)
-  set(G4_PARSE ${CMAKE_SOURCE_DIR}/grammars/g4_parse.py)
-  configure_file(${CMAKE_SOURCE_DIR}/grammars/grammar_parser.in
-                 ${CMAKE_BINARY_DIR}/src/grammar_parser-${GRAMMAR_FILENAME}
-                 @ONLY
-                 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                                  GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-               ${CMAKE_SOURCE_DIR}/grammars/grammar_parser.in)
-
-  # The shim gets a parser that rejects all input. grammar_parser-<name>
-  # parses the test cases.
-  set(GRAMMAR_G4_FILE "${CMAKE_SOURCE_DIR}/grammars/g4_placeholder/Grammar.g4")
+  file(GLOB G4_WORK_FILES "${G4_WORK_DIR}/*.g4")
+  set(G4_BUILD ON)
 else ()
   set(GRAMMAR_JSON ${GRAMMAR_FILE})
   execute_process(
@@ -272,6 +260,12 @@ else ()
     message(FATAL_ERROR "CMake step for g4 translation failed: ${result}")
   endif ()
   set(GRAMMAR_G4_FILE "${CMAKE_BINARY_DIR}/f1/Grammar.g4")
+  if (EXISTS ${GRAMMAR_G4_FILE})
+    message(STATUS "Grammar g4: ${GRAMMAR_G4_FILE}")
+  else ()
+    message(FATAL_ERROR "The g4 grammar file does not exist: ${GRAMMAR_FILE}")
+  endif ()
+  set(G4_BUILD OFF)
 endif ()
 execute_process(
   COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/grammars/f1_c_gen.py ${GRAMMAR_JSON} ${CMAKE_BINARY_DIR}/f1
@@ -280,11 +274,9 @@ execute_process(
 if (result)
   message(FATAL_ERROR "CMake step for f1_c_fuzz failed: ${result}")
 endif ()
-if (EXISTS ${GRAMMAR_G4_FILE})
-  message(STATUS "Grammar g4: ${GRAMMAR_G4_FILE}")
-else ()
-  message(FATAL_ERROR "The g4 grammar file does not exist: ${GRAMMAR_FILE}")
-endif ()
+
+# The parser of a .g4 build runs each parse in its own thread
+find_package(Threads REQUIRED)
 
 add_subdirectory(src)
 add_subdirectory(lib)

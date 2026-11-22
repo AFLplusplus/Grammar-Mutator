@@ -22,6 +22,7 @@
 tree_t *subtree_trimming(tree_t *tree, node_t *node) {
 
   tree_t *trimmed_tree = NULL;
+  if (unlikely(!node)) return NULL;
 
   // generate the minimal subtree
   gen_func_t gen_func = gen_funcs[node->id];
@@ -78,6 +79,13 @@ tree_t *recursive_trimming(tree_t *tree, edge_t edge) {
     // if `parent` is the root node of the tree, return the tail part
     trimmed_tree = tree_create();
     trimmed_tree->root = node_clone(tail);
+    if (!trimmed_tree->root) {
+
+      tree_free(trimmed_tree);
+      return NULL;
+
+    }
+
     return trimmed_tree;
 
   }

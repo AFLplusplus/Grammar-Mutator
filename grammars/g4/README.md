@@ -17,15 +17,16 @@ the grammar mutator with a `.g4` grammar.
   The grammar has action code and a base class (`superClass`) for checks such
   as strict mode. Generation ignores them, so not all generated test cases
   are valid JavaScript.
-- `javascript/Python3/` has the base classes and the grammar rewrite script for
-  the Python 3 target: `JavaScriptLexerBase.py`, `JavaScriptParserBase.py`,
-  `transformGrammar.py`, and `README.md`. They come from
-  [grammars-v4](https://github.com/antlr/grammars-v4/tree/master/javascript/javascript/Python3),
+- `javascript/Cpp/` has the base classes and the grammar rewrite script for
+  the C++ target: `JavaScriptLexerBase.cpp`, `JavaScriptLexerBase.h`,
+  `JavaScriptParserBase.cpp`, `JavaScriptParserBase.h`, `transformGrammar.py`,
+  and `README.md`. They come from
+  [grammars-v4](https://github.com/antlr/grammars-v4/tree/master/javascript/javascript/Cpp),
   commit `30c6ea0dac4a03f0f8bb454a6d15435c424b6f69`, with no local changes.
   These files have no license header, and grammars-v4 has no license file for
   the full repository. The grammar files next to them
   (`JavaScriptLexer.g4` and `JavaScriptParser.g4`) have the MIT license in
-  their headers. The build uses the `Python3/` files through `G4_SUPPORT_DIR`:
-  `make GRAMMAR_FILE="<lexer> <parser>" G4_SUPPORT_DIR=grammars/g4/javascript/Python3`.
+  their headers. The build uses the `Cpp/` files through `G4_SUPPORT_DIR`:
+  `make GRAMMAR_FILE="<lexer> <parser>" G4_SUPPORT_DIR=grammars/g4/javascript/Cpp`.
 
 Many more grammars are in [grammars-v4](https://github.com/antlr/grammars-v4).

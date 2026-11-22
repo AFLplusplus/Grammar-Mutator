@@ -100,6 +100,27 @@ TEST_F(GrammarGeneratorTest, SeedsAreNotEmptyAndNotRepeated) {
 
 }
 
+// A folder with the name of the first tree file makes the tree write fail. The
+// generator then stops with an error and removes the test case of the pair.
+TEST_F(GrammarGeneratorTest, StopsAndRemovesTheTestCaseIfTheTreeWriteFails) {
+
+  ASSERT_TRUE(fs::create_directories(dir / "trees" / "0"));
+  EXPECT_NE(Run(5, 20), 0);
+  EXPECT_FALSE(fs::exists(dir / "seeds" / "0"));
+  EXPECT_EQ(Count("seeds"), 0u);
+
+}
+
+// A folder with the name of the first test case makes the test case write
+// fail. The generator then stops with an error and writes no tree file.
+TEST_F(GrammarGeneratorTest, StopsIfTheTestCaseWriteFails) {
+
+  ASSERT_TRUE(fs::create_directories(dir / "seeds" / "0"));
+  EXPECT_NE(Run(5, 20), 0);
+  EXPECT_EQ(Count("trees"), 0u);
+
+}
+
 TEST_F(GrammarGeneratorTest, StopsWhenNoNewSeedIsFound) {
 
   // With a size of 1, the grammar gives only a few different test cases

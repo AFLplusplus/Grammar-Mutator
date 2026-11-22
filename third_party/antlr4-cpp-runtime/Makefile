@@ -53,7 +53,10 @@ $(ANTLR4_CXX_RUNTIME_ZIP):
 $(ANTLR4_CXX_RUNTIME_DIR): | $(ANTLR4_CXX_RUNTIME_ZIP)
 	@unzip -q $(ANTLR4_CXX_RUNTIME_ZIP) -d $(ANTLR4_CXX_RUNTIME_DIR)
 
+# "ar q" adds to an archive that exists. Remove the old archive first, so it
+# does not keep old copies of the objects.
 $(TARGET): $(ANTLR4_CXX_RUNTIME_OBJS)
+	rm -f $@
 	$(AR) qc $@ $^
 	ranlib $@
 

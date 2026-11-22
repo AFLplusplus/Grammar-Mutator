@@ -10,6 +10,7 @@
 
 #include "helpers.h"
 #include "list.h"
+#include "parse_budget.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -134,8 +135,10 @@ bool node_equal(node_t *node_a, node_t *node_b);
  * Calculate the total number of non-terminal subnodes and the total number of
  * recursive edges in the tree
  * @param  node The root node of a tree
+ * @return      True on success. False if the walk ran out of memory. The sizes
+ *              of `node` are then 0.
  */
-void node_get_size(node_t *node);
+bool node_get_size(node_t *node);
 
 /**
  * Replace `subnode` in a stree (`root`) with `new_subnode`. Note that, this
@@ -210,8 +213,36 @@ void tree_free(tree_t *tree);
 /**
  * Convert a parsing tree into a concrete test case stored in the data buffer
  * @param  tree The parsing tree
+ * @return      True on success. False if memory ran out. `data_len` is then 0.
  */
-void tree_to_buf(tree_t *tree);
+bool tree_to_buf(tree_t *tree);
+
+/**
+ * The result of one parse. A parser that returns a tree sets PARSE_OK.
+ * A parser that returns NULL sets another value.
+ */
+typedef enum {
+
+  PARSE_OK,
+  PARSE_NOT_UTF8,
+  PARSE_SYNTAX_ERROR,
+  PARSE_LIMIT,
+  PARSE_NO_MATCH,
+  PARSE_THREAD_ERROR
+
+} parse_status_t;
+
+/**
+ * Parse the given buffer to construct a parsing tree. Each ANTLR shim
+ * defines this function.
+ * @param  buf    The buffer of a test case
+ * @param  len    The size of the buffer
+ * @param  budget The parse time budget, or NULL for no budget
+ * @param  status Receives the result of the parse, or NULL
+ * @return        A newly created tree, or NULL if the parse fails
+ */
+tree_t *tree_parse(const uint8_t *buf, size_t len, parse_budget_t *budget,
+                   parse_status_t *status);
 
 /**
  * Parse the given buffer to construct a parsing tree
@@ -224,8 +255,9 @@ tree_t *tree_from_buf(const uint8_t *data_buf, size_t data_size);
 /**
  * Serialize a given tree into binary data
  * @param tree    A given tree
+ * @return        True on success. False if memory ran out. `ser_len` is then 0.
  */
-void tree_serialize(tree_t *tree);
+bool tree_serialize(tree_t *tree);
 
 /**
  * Deserialize the data to recover a tree
@@ -238,7 +270,8 @@ tree_t *tree_deserialize(const uint8_t *data_buf, size_t data_size);
 /**
  * Clone a parsing tree
  * @param  tree The parsing tree
- * @return      A newly created tree with the same data as `tree`
+ * @return      A newly created tree with the same data as `tree`, or NULL if
+ *              memory ran out
  */
 tree_t *tree_clone(tree_t *tree);
 
@@ -255,21 +288,26 @@ bool tree_equal(tree_t *tree_a, tree_t *tree_b);
  * Calculate the size of a given tree (i.e., the total number of non-terminal
  * nodes in a tree).
  * @param  tree A given tree
- * @return      The total number of non-terminal nodes in this tree
+ * @return      The total number of non-terminal nodes in this tree. 0 if the
+ *              root is a terminal node or if the walk ran out of memory.
  */
 size_t tree_get_size(tree_t *tree);
 
 /**
  * Get all recursion edges in the tree, and store them in a linked list
  * @param tree A given tree
+ * @return     True on success. False if the walk ran out of memory. The list is
+ *             then empty or NULL, and the caller must not take steps from it.
  */
-void tree_get_recursion_edges(tree_t *tree);
+bool tree_get_recursion_edges(tree_t *tree);
 
 /**
  * Get all non-terminal nodes in the tree, and store them in a linked list
  * @param tree A given tree
+ * @return     True on success. False if the walk ran out of memory. The list is
+ *             then empty or NULL, and the caller must not take steps from it.
  */
-void tree_get_non_terminal_nodes(tree_t *tree);
+bool tree_get_non_terminal_nodes(tree_t *tree);
 
 /**
  * Read/Deserialize a tree from a file
@@ -286,18 +324,38 @@ tree_t *read_tree_from_file(const char *filename);
 tree_t *load_tree_from_test_case(const char *filename);
 
 /**
- * Write/Serialize a tree to a file
- * @param tree     The tree to be written to the file
- * @param filename The path to the tree file
+ * Load/Parse a tree from a test case file, with a budget and a status.
+ * If the code cannot open or read the file, it returns NULL and does not
+ * change "status". The caller sets "status" to PARSE_OK before the call.
+ * So NULL with PARSE_OK means that the code did not read the file.
+ * @param filename The path to the fuzzing test case
+ * @param budget   The parse time budget, or NULL
+ * @param status   Receives the result of the parse, or NULL
+ * @return         The parsed tree, or NULL
  */
-void write_tree_to_file(tree_t *tree, const char *filename);
+tree_t *load_tree_from_test_case_ex(const char     *filename,
+                                    parse_budget_t *budget,
+                                    parse_status_t *status);
 
 /**
- * Dump a tree to a test case file
+ * Write/Serialize a tree to a file. On an error, the function prints a message
+ * and returns false. If there is not sufficient memory to serialize the tree,
+ * or if the write is not complete, it also removes the file.
+ * @param tree     The tree to be written to the file
+ * @param filename The path to the tree file
+ * @return         True on success; otherwise, false
+ */
+bool write_tree_to_file(tree_t *tree, const char *filename);
+
+/**
+ * Dump a tree to a test case file. On an error, the function prints a message
+ * and returns false. If there is not sufficient memory to unparse the tree, or
+ * if the write is not complete, it also removes the file.
  * @param tree     The tree to be written to the file
  * @param filename The path to the test case file
+ * @return         True on success; otherwise, false
  */
-void dump_tree_to_test_case(tree_t *tree, const char *filename);
+bool dump_tree_to_test_case(tree_t *tree, const char *filename);
 
 #ifdef __cplusplus
 

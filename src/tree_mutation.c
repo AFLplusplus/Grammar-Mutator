@@ -19,6 +19,7 @@
 #include "tree_mutation.h"
 #include "f1_c_fuzz.h"
 #include "chunk_store.h"
+#include "node_stack.h"
 
 static size_t max_tree_len = 1000;
 
@@ -33,14 +34,16 @@ tree_t *random_mutation(tree_t *tree) {
   if (unlikely(!tree)) return NULL;
 
   tree_t *mutated_tree = tree_clone(tree);
+  if (unlikely(!mutated_tree)) return NULL;
 
   // Randomly pick a node in the tree
   node_t *node = node_pick_non_term_subnode(mutated_tree->root);
   if (unlikely(node == NULL)) {
 
-    // By design, _pick_non_term_node should not return NULL
-    perror("_pick_non_term_node returns NULL");
-    exit(EXIT_FAILURE);
+    // The sizes of the tree are 0, for example after a failed size walk
+    fprintf(stderr, "The tree has no node to pick (%s)\n", __func__);
+    tree_free(mutated_tree);
+    return NULL;
 
   }
 
@@ -123,24 +126,28 @@ tree_t *rules_mutation(tree_t *tree, node_t *node, uint32_t rule_id) {
 
 size_t _node_rules_mutation_count(node_t *node) {
 
-  if (unlikely(!node)) return 0;
-  if (node->id == 0) return 0;
-  if (unlikely(node_num_rules[node->id] <= 0)) return 0;
+  // If a push fails, the function returns 0: no rules mutation runs.
+  size_t       ret = 0;
+  node_stack_t stack = {0};
+  bool         ok = !node || node_stack_push(&stack, node, 0, 0);
 
-  // An unknown rule id has no skipped alternative, so count every rule.
-  size_t ret = node->rule_id >= node_num_rules[node->id]
-                   ? node_num_rules[node->id]
-                   : node_num_rules[node->id] - 1;
+  while (ok && stack.len) {
 
-  node_t *subnode;
-  for (size_t i = 0; i < node->subnode_count; ++i) {
+    node = node_stack_pop(&stack).node;
+    if (node->id == 0) continue;
+    if (unlikely(node_num_rules[node->id] <= 0)) continue;
 
-    subnode = node->subnodes[i];
-    ret += _node_rules_mutation_count(subnode);
+    // An unknown rule id has no skipped alternative, so count every rule.
+    ret += node->rule_id >= node_num_rules[node->id]
+               ? node_num_rules[node->id]
+               : node_num_rules[node->id] - 1;
+
+    ok = node_stack_push_children(&stack, node, 0);
 
   }
 
-  return ret;
+  node_stack_free(&stack);
+  return ok ? ret : 0;
 
 }
 
@@ -154,13 +161,28 @@ size_t rules_mutation_count(tree_t *tree) {
 // The number of bytes that a subtree serializes to
 static size_t node_data_len(node_t *node) {
 
-  if (!node) return 0;
-  if (node->subnode_count == 0) return node->val_len;
+  // If a push fails, the function returns SIZE_MAX. The growth check then
+  // rejects the mutation.
+  size_t       data_len = 0;
+  node_stack_t stack = {0};
+  bool         ok = !node || node_stack_push(&stack, node, 0, 0);
 
-  size_t data_len = 0;
-  for (uint32_t i = 0; i < node->subnode_count; ++i)
-    data_len += node_data_len(node->subnodes[i]);
-  return data_len;
+  while (ok && stack.len) {
+
+    node = node_stack_pop(&stack).node;
+    if (node->subnode_count == 0) {
+
+      data_len += node->val_len;
+      continue;
+
+    }
+
+    ok = node_stack_push_children(&stack, node, 0);
+
+  }
+
+  node_stack_free(&stack);
+  return ok ? data_len : SIZE_MAX;
 
 }
 
@@ -169,6 +191,7 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n, size_t max_growth) {
   if (unlikely(!tree)) return NULL;
 
   tree_t *mutated_tree = tree_clone(tree);
+  if (unlikely(!mutated_tree)) return NULL;
 
   edge_t picked_edge = node_pick_recursion_edge(mutated_tree->root);
   if (picked_edge.parent == NULL || picked_edge.subnode == NULL) {
@@ -185,7 +208,10 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n, size_t max_growth) {
 
   // Every repetition adds the parent without the tail to the input. Check it
   // before the repetitions are built, which may need much memory.
-  if ((node_data_len(parent) - node_data_len(tail)) * num > max_growth) {
+  size_t parent_len = node_data_len(parent);
+  size_t tail_len = node_data_len(tail);
+  if (parent_len == SIZE_MAX || tail_len == SIZE_MAX ||
+      (parent_len - tail_len) * num > max_growth) {
 
     tree_free(mutated_tree);
     return NULL;
@@ -200,6 +226,34 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n, size_t max_growth) {
   for (size_t i = 0; i < num; ++i) {
 
     cloned_part = node_clone(parent);
+    if (unlikely(!cloned_part)) {
+
+      // Reattach the tail to `parent`, then drop the repetitions built so far.
+      // `tail` is the last one built, or the original tail.
+      if (tail != picked_edge.subnode) {
+
+        tail->parent = NULL;
+        parent->subnodes[offset] = picked_edge.subnode;
+        picked_edge.subnode->parent = parent;
+        // The chain from `tail` down to `picked_edge.subnode` is a copy.
+        // Detach the original tail from its deepest copy before the free.
+        node_t *cur = tail;
+        while (cur->subnodes[offset] != picked_edge.subnode)
+          cur = cur->subnodes[offset];
+        cur->subnodes[offset] = NULL;
+        node_free(tail);
+
+      } else {
+
+        picked_edge.subnode->parent = parent;
+        parent->subnodes[offset] = picked_edge.subnode;
+
+      }
+
+      tree_free(mutated_tree);
+      return NULL;
+
+    }
 
     // attach the tail to the cloned part
     tail->parent = cloned_part;
@@ -222,14 +276,16 @@ tree_t *splicing_mutation(tree_t *tree) {
   if (unlikely(!tree)) return NULL;
 
   tree_t *mutated_tree = tree_clone(tree);
+  if (unlikely(!mutated_tree)) return NULL;
 
   // randomly pick a node in the tree
   node_t *node = node_pick_non_term_subnode(mutated_tree->root);
   if (unlikely(node == NULL)) {
 
-    // By design, _pick_non_term_node should not return NULL
-    perror("_pick_non_term_node returns NULL");
-    exit(EXIT_FAILURE);
+    // The sizes of the tree are 0, for example after a failed size walk
+    fprintf(stderr, "The tree has no node to pick (%s)\n", __func__);
+    tree_free(mutated_tree);
+    return NULL;
 
   }
 

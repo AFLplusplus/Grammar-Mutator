@@ -37,6 +37,9 @@ GTEST_LIBS = $(GTEST_DIR)/libgtest_main.a $(GTEST_DIR)/libgtest.a
 GTEST_INCLUDE = $(GTEST_ROOT_DIR)/googletest/include
 
 CXX_FLAGS = -std=gnu++17 $(CXX_FLAGS_OPT)
+# Each compile also writes a .d file with the headers of the object. So a
+# change in a header makes the objects that include it again.
+DEP_FLAGS = -MMD -MP
 CXX_DEFINES =
 CXX_INCLUDES = -I../include -isystem $(GTEST_ROOT_DIR)/googletest/include -isystem $(GTEST_ROOT_DIR)/googletest
 
@@ -101,30 +104,40 @@ test_rxi_map: test_rxi_map.o $(LIBS) $(RXI_MAP_LIB)
 
 .PRECIOUS: test_%.o
 test_%.o: test_%.cpp $(GTEST_INCLUDE)
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
-ifeq "$(realpath $(GRAMMAR_FILE))" "$(realpath ../grammars/ruby_grammar.json)"
+# test_tree checks some cases only for one grammar, so it needs the name
+test_tree.o: CXX_DEFINES += -DGRAMMAR_NAME=\"$(GRAMMAR_FILENAME)\"
+
+ifeq "$(realpath $(GRAMMAR_FILE))" "$(realpath ../grammars/ruby.json)"
 test_tree.o: test_tree.cpp $(GTEST_INCLUDE)
 	$(CXX) -DENABLE_PARSING_ARRAY_RB -DARRAY_RB_PATH=\"`realpath testcases/array.rb`\" \
-	       $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
+	       -DRUBY_CASES_DIR=\"`realpath testcases/ruby`\" \
+	       $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 endif
 
 .PRECIOUS: test_tree_mutation.o
 test_tree_mutation.o: test_tree_mutation.cpp $(GTEST_INCLUDE)
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
+
+.PRECIOUS: test_custom_mutator.o
+test_custom_mutator.o: test_custom_mutator.cpp $(GTEST_INCLUDE)
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_chunk_store.o
 test_chunk_store.o: test_chunk_store.cpp $(GTEST_INCLUDE)
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_rxi_map.o
 test_rxi_map.o: test_rxi_map.cpp $(GTEST_INCLUDE)
-	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) -o $@ -c $<
+	$(CXX) $(CXX_DEFINES) $(CXX_INCLUDES) -I../third_party/rxi_map $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
 .PRECIOUS: test_grammar_generator.o
 test_grammar_generator.o: test_grammar_generator.cpp $(GTEST_INCLUDE)
 	$(CXX) -DGRAMMAR_GENERATOR=\"$(abspath ../src/grammar_generator-$(GRAMMAR_FILENAME))\" \
-	       $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o $@ -c $<
+	       $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) $(DEP_FLAGS) -o $@ -c $<
+
+-include $(OBJS:.o=.d)
 
 .PHONY: run_test
 run_test: check_test_programs $(addprefix run_,$(TARGETS))
@@ -140,6 +153,6 @@ memcheck: check_test_programs $(VALGRIND_LOG_DIR) $(MEMCHECK_TARGETS)
 clean:
 	@$(MAKE) -C $(GTEST_DIR) clean
 	@rm -f $(TARGETS)
-	@rm -f $(OBJS)
+	@rm -f $(OBJS) $(OBJS:.o=.d)
 	@rm -rf $(VALGRIND_LOG_DIR)
 	@rm -rf afl_test_fuzz_out

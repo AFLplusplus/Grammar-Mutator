@@ -63,6 +63,6 @@ echo "[*] Seeds: $(find "$work/seeds" -type f | wc -l | tr -d ' ') .js files"
 
 jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
 ${MAKE:-make} GRAMMAR_FILE="$grammar_dir/JavaScriptLexer.g4 $grammar_dir/JavaScriptParser.g4" \
-  G4_SUPPORT_DIR="$grammar_dir/Python3" -j"$jobs"
+  G4_SUPPORT_DIR="$grammar_dir/Cpp" -j"$jobs"
 
 ALLOW_SKIPS=1 tests/g4/roundtrip.sh javascript "$work/seeds"

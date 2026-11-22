@@ -21,6 +21,10 @@ else
 fi
 parser=$bin_dir/grammar_parser-$name
 lib=$BUILD_DIR/src/libgrammarmutator-$name.so
+# CMake on macOS makes a .dylib file
+if [ ! -f "$lib" ] && [ -f "$BUILD_DIR/src/libgrammarmutator-$name.dylib" ]; then
+  lib=$BUILD_DIR/src/libgrammarmutator-$name.dylib
+fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
