@@ -711,6 +711,13 @@ uint32_t afl_custom_fuzz_count(my_mutator_t                          *data,
 
 }
 
+// AFL++ only checks that this symbol exists. It then does not load a second
+// test case (`add_buf`) for each `afl_custom_fuzz` call. The mutator does not
+// use `add_buf`, because the splicing mutation reads the chunk store.
+void afl_custom_splice_optout(__attribute__((unused)) my_mutator_t *data) {
+
+}
+
 // Fuzz the given test case several times, which is defined by the
 // `custom_mutator_stage` in `afl-fuzz-one.c`
 size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
