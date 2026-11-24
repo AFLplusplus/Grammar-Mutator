@@ -213,7 +213,7 @@ The fuzzer can be slow at the start, for two reasons:
 - Large seeds take more time to load. A large `<max_size>` for `grammar_generator-<name>` gives large seeds.
 - The mutator must parse each seed that has no tree. To skip this step, copy the trees of the seeds (see [Copying the Trees](#copying-the-trees)).
 
-The name of each queue entry that the mutator finds tells its mutation stage: `op:gm-rules`, `op:gm-random`, `op:gm-recursive`, or `op:gm-splice`.
+AFL++ adds the mutation stage to the name of each case that a mutation stage finds, in `queue/`, `crashes/`, and `hangs/`: `op:gm-rules`, `op:gm-random`, `op:gm-recursive`, or `op:gm-splice`.
 
 ## Configuration
 

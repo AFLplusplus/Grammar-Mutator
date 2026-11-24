@@ -720,12 +720,13 @@ void afl_custom_splice_optout(__attribute__((unused)) my_mutator_t *data) {
 
 }
 
-// The labels of the stages 0 to 3 in the queue file names
+// The labels of the stages 0 to 3 in the file names of the found cases
 static const char *const stage_labels[] = {"op:gm-rules", "op:gm-random",
                                            "op:gm-recursive", "op:gm-splice"};
 
-// AFL++ adds the result to the name of a queue entry that the last output
-// found. Return NULL if there is no label. AFL++ then uses its own text.
+// AFL++ adds the result to the name of a case that the last output found, in
+// `queue/`, `crashes/`, or `hangs/`. Return NULL if there is no label. AFL++
+// then uses its own text.
 const char *afl_custom_describe(my_mutator_t *data,
                                 size_t        max_description_len) {
 
