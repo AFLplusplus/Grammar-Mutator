@@ -74,6 +74,11 @@ typedef struct my_mutator {
                               // 2: random recursive mutation (20 times)
                               // 3: splicing mutation (100 times)
 
+  // The stage of the last output, for `afl_custom_describe`. UINT8_MAX if the
+  // current entry has no output yet.
+  uint8_t described_stage;
+  char    description[32];
+
   size_t cur_fuzzing_step;
   size_t total_rules_mutation_steps;
   size_t total_random_mutation_steps;
@@ -103,16 +108,17 @@ int32_t afl_custom_init_trim(my_mutator_t *data, uint8_t *buf, size_t buf_size);
 size_t  afl_custom_trim(my_mutator_t *data, uint8_t **out_buf);
 int32_t afl_custom_post_trim(my_mutator_t *data, int success);
 
-uint32_t afl_custom_fuzz_count(my_mutator_t *data, const uint8_t *buf,
-                               size_t buf_size);
-size_t   afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
-                         uint8_t **out_buf, uint8_t *add_buf,
-                         size_t add_buf_size,  // add_buf can be NULL
-                         size_t max_size);
-void     afl_custom_splice_optout(my_mutator_t *data);
-uint8_t  afl_custom_queue_new_entry(my_mutator_t  *data,
-                                    const uint8_t *filename_new_queue,
-                                    const uint8_t *filename_orig_queue);
+uint32_t    afl_custom_fuzz_count(my_mutator_t *data, const uint8_t *buf,
+                                  size_t buf_size);
+size_t      afl_custom_fuzz(my_mutator_t *data, uint8_t *buf, size_t buf_size,
+                            uint8_t **out_buf, uint8_t *add_buf,
+                            size_t add_buf_size,  // add_buf can be NULL
+                            size_t max_size);
+void        afl_custom_splice_optout(my_mutator_t *data);
+const char *afl_custom_describe(my_mutator_t *data, size_t max_description_len);
+uint8_t     afl_custom_queue_new_entry(my_mutator_t  *data,
+                                       const uint8_t *filename_new_queue,
+                                       const uint8_t *filename_orig_queue);
 
 #ifdef __cplusplus
 

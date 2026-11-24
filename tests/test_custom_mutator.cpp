@@ -471,6 +471,96 @@ TEST_F(CustomMutatorTest, TerminalRootHasNoFuzzOrTrimSteps) {
 
 }
 
+// The labels that `afl_custom_describe` gives for the stages 0 to 3
+static const char *const kStageLabels[] = {"op:gm-rules", "op:gm-random",
+                                           "op:gm-recursive", "op:gm-splice"};
+
+// Write a random tree as a queue entry and its tree file. Return the name of
+// the queue entry.
+static string queue_random_tree(const string &queue_dir,
+                                const string &tree_out_dir,
+                                const string &name) {
+
+  auto         tree = gen_init__(0);
+  const string fn = queue_dir + "/" + name;
+  dump_tree_to_test_case(tree, fn.c_str());
+  write_tree_to_file(tree, (tree_out_dir + "/" + name).c_str());
+  tree_free(tree);
+  return fn;
+
+}
+
+// AFL++ calls `afl_custom_describe` after `afl_custom_fuzz` returns. At the
+// last step of a stage, `afl_custom_fuzz` already moved to the next stage. The
+// label must name the stage that made the output.
+TEST_F(CustomMutatorTest, DescribeNamesTheStageOfEachOutput) {
+
+  const string fn = queue_random_tree(queue_dir, tree_out_dir, "describe");
+  ASSERT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  uint32_t num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
+  ASSERT_GT(num, 0u);
+
+  size_t last_steps = 0;
+  for (uint32_t i = 0; i < num; ++i) {
+
+    uint8_t stage = mutator->data->cur_fuzzing_stage;
+    ASSERT_LT(stage, 4u);
+    uint8_t *buf = nullptr;
+    afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
+    ASSERT_NE(buf, nullptr);
+
+    const char *label = afl_custom_describe(mutator->data, 256);
+    ASSERT_NE(label, nullptr) << "step " << i;
+    EXPECT_STREQ(label, kStageLabels[stage]) << "step " << i;
+    if (mutator->data->cur_fuzzing_stage != stage) ++last_steps;
+
+  }
+
+  // The test must include the last step of at least one stage
+  EXPECT_GE(last_steps, 1u);
+
+}
+
+// AFL++ gives the space left in the file name. The label must fit in it.
+TEST_F(CustomMutatorTest, DescribeCutsToTheMaximumLength) {
+
+  const string fn = queue_random_tree(queue_dir, tree_out_dir, "describe_len");
+  ASSERT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  ASSERT_GT(afl_custom_fuzz_count(mutator->data, nullptr, 0), 0u);
+  uint8_t *buf = nullptr;
+  afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
+  ASSERT_NE(buf, nullptr);
+
+  // Each label starts with "op:gm-"
+  EXPECT_STREQ(afl_custom_describe(mutator->data, 6), "op:gm");
+  EXPECT_EQ(afl_custom_describe(mutator->data, 0), nullptr);
+
+}
+
+// Without an output of the current entry, there is no label. AFL++ then uses
+// its own description.
+TEST_F(CustomMutatorTest, DescribeIsNullBeforeTheFirstOutput) {
+
+  const string fn = queue_random_tree(queue_dir, tree_out_dir, "describe_new");
+  ASSERT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  EXPECT_EQ(afl_custom_describe(mutator->data, 256), nullptr);
+
+  ASSERT_GT(afl_custom_fuzz_count(mutator->data, nullptr, 0), 0u);
+  uint8_t *buf = nullptr;
+  afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);
+  ASSERT_NE(buf, nullptr);
+  EXPECT_NE(afl_custom_describe(mutator->data, 256), nullptr);
+
+  // The next entry starts with no label again
+  ASSERT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  EXPECT_EQ(afl_custom_describe(mutator->data, 256), nullptr);
+
+}
+
 // AFL++ 5.03c and later can add a trimmed case to the queue during the trim
 // loop. Then AFL++ calls `afl_custom_queue_new_entry` before the next
 // `afl_custom_trim` call. See issue #57.

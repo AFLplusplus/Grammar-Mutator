@@ -100,6 +100,7 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   }
 
   data->afl = afl;
+  data->described_stage = UINT8_MAX;
   map_init(&data->rejected);
 
   if (parse_time_budget_on) {
@@ -232,6 +233,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   }
 
   data->tree_cur = NULL;
+  data->described_stage = UINT8_MAX;
 
   // Figure out where the "trees" folder is stashed!
   // Strip off the file portion of the filename:
@@ -718,6 +720,28 @@ void afl_custom_splice_optout(__attribute__((unused)) my_mutator_t *data) {
 
 }
 
+// The labels of the stages 0 to 3 in the queue file names
+static const char *const stage_labels[] = {"op:gm-rules", "op:gm-random",
+                                           "op:gm-recursive", "op:gm-splice"};
+
+// AFL++ adds the result to the name of a queue entry that the last output
+// found. Return NULL if there is no label. AFL++ then uses its own text.
+const char *afl_custom_describe(my_mutator_t *data,
+                                size_t        max_description_len) {
+
+  uint8_t stage = data->described_stage;
+  if (stage >= sizeof(stage_labels) / sizeof(stage_labels[0]) ||
+      max_description_len == 0)
+    return NULL;
+
+  size_t size = max_description_len < sizeof(data->description)
+                    ? max_description_len
+                    : sizeof(data->description);
+  snprintf(data->description, size, "%s", stage_labels[stage]);
+  return data->description;
+
+}
+
 // Fuzz the given test case several times, which is defined by the
 // `custom_mutator_stage` in `afl-fuzz-one.c`
 size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
@@ -806,6 +830,10 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
     return 0;
 
   }
+
+  // Keep the stage of this output for `afl_custom_describe`. The code below
+  // can move to the next stage before AFL++ asks for the label.
+  data->described_stage = data->cur_fuzzing_stage;
 
   // update internal status
   ++data->cur_fuzzing_step;
