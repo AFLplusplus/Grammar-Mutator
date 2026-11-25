@@ -71,7 +71,8 @@ static uint64_t parse_time_budget_from_env(void) {
 
       fprintf(stderr,
               "[grammar mutator] warning: PARSE_TIME_BUDGET_MS must be a "
-              "whole number of ms. The mutator uses 50.\n");
+              "whole number of ms, at most 18446744073709. The mutator uses "
+              "50.\n");
       return PARSE_BUDGET_MIN_NS;
 
     }

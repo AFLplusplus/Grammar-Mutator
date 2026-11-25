@@ -1173,8 +1173,15 @@ TEST(CustomMutatorEnv, ParseTimeBudgetMs) {
 
   };
 
-  const Case cases[] = {{"0", 0},       {"200", 200000000}, {nullptr, 50000000},
-                        {"", 50000000}, {"abc", 50000000},  {"12ms", 50000000}};
+  const Case cases[] = {{"0", 0},
+                        {"200", 200000000},
+                        {nullptr, 50000000},
+                        {"", 50000000},
+                        {"abc", 50000000},
+                        {"12ms", 50000000},
+                        // The largest value, and one more
+                        {"18446744073709", 18446744073709000000ull},
+                        {"18446744073710", 50000000}};
   for (const Case &c : cases) {
 
     const char *label = c.value ? c.value : "(unset)";
