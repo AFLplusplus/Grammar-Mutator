@@ -818,39 +818,85 @@ TEST_F(CustomMutatorTest, QueueNewEntryWithoutOriginalWritesTheTreeFile) {
 
 }
 
+// Give a random tree whose bytes are not "text". A short length gives the
+// smallest tree, so the code asks for a long one.
+static tree_t *tree_unlike(const string &text) {
+
+  tree_t *tree = nullptr;
+  for (int i = 0; i < 100; ++i) {
+
+    tree_free(tree);
+    tree = gen_init__(1000);
+    tree_to_buf(tree);
+    if (string((const char *)tree->data_buf, tree->data_len) != text) break;
+
+  }
+
+  return tree;
+
+}
+
+// Give the bytes of a file
+static string file_bytes(const string &fn) {
+
+  FILE *f = fopen(fn.c_str(), "rb");
+  if (!f) return "<no file>";
+  string bytes;
+  char   chunk[4096];
+  size_t n;
+  while ((n = fread(chunk, 1, sizeof(chunk), f)) > 0)
+    bytes.append(chunk, n);
+  fclose(f);
+  return bytes;
+
+}
+
 // AFL++ names an initial entry "id:...,orig:<seed name>". Its tree file is
 // "trees/<seed name>", for example from grammar_generator. The callback uses
 // that file and writes no other tree file.
 TEST_F(CustomMutatorTest, QueueNewEntryOfASeedUsesItsTreeFile) {
 
-  // The tree file has other bytes than the queue file, so a parse of the
-  // queue file gives another tree. A short length gives the smallest tree.
   random_set_seed(1234);
-  string  valid = valid_test_case();
-  string  seed_text = valid;
-  tree_t *seed_tree = nullptr;
-  for (int i = 0; i < 100 && seed_text == valid; ++i) {
-
-    tree_free(seed_tree);
-    seed_tree = gen_init__(1000);
-    tree_to_buf(seed_tree);
-    seed_text = string((const char *)seed_tree->data_buf, seed_tree->data_len);
-
-  }
-
-  write_tree_to_file(seed_tree, (tree_out_dir + "/seed_1").c_str());
-  tree_free(seed_tree);
-  ASSERT_NE(seed_text, valid);
+  tree_t      *seed_tree = tree_unlike(valid_test_case());
+  const string tree_fn = tree_out_dir + "/seed_1";
+  write_tree_to_file(seed_tree, tree_fn.c_str());
+  const string tree_file = file_bytes(tree_fn);
 
   const string name = "id:000000,time:0,execs:0,orig:seed_1";
   const string fn = queue_dir + "/" + name;
-  write_test_case(fn, (const uint8_t *)valid.data(), valid.size());
+  dump_tree_to_test_case(seed_tree, fn.c_str());
+  tree_free(seed_tree);
 
   EXPECT_EQ(afl_custom_queue_new_entry(mutator->data,
                                        (const uint8_t *)fn.c_str(), nullptr),
             0);
-  EXPECT_EQ(tree_file_text(tree_out_dir + "/seed_1"), seed_text);
+  // A parse of this entry gives another tree file
+  EXPECT_EQ(file_bytes(tree_fn), tree_file);
   expect_no_tree_file(tree_out_dir + "/" + name);
+
+}
+
+// A tree file with the full name of a new entry can be left from an old run in
+// the same output folder. If its tree does not give the bytes of the entry, the
+// callback parses the entry and replaces the file.
+TEST_F(CustomMutatorTest, QueueNewEntryReplacesAWrongTreeFile) {
+
+  random_set_seed(1234);
+  const string valid = valid_test_case();
+  tree_t      *old_tree = tree_unlike(valid);
+  const string name = "id:000001,src:000000,time:1,execs:1,op:havoc,+cov";
+  write_tree_to_file(old_tree, (tree_out_dir + "/" + name).c_str());
+  tree_free(old_tree);
+
+  const string fn = queue_dir + "/" + name;
+  write_test_case(fn, (const uint8_t *)valid.data(), valid.size());
+  const string orig = queue_dir + "/id:000000,time:0,execs:0,orig:seed_0";
+
+  EXPECT_EQ(
+      afl_custom_queue_new_entry(mutator->data, (const uint8_t *)fn.c_str(),
+                                 (const uint8_t *)orig.c_str()),
+      0);
+  EXPECT_EQ(tree_file_text(tree_out_dir + "/" + name), valid);
 
 }
 
@@ -877,6 +923,9 @@ TEST_F(CustomMutatorTest, QueueNewEntryWithoutOriginalKeepsTheCurrentTree) {
   string mutated((const char *)buf, buf_size);
   // The rules stage holds a node of the current tree
   ASSERT_NE(mutator->data->cur_rules_mutation_node, nullptr);
+  // afl_custom_describe names the stage of this output
+  uint8_t described_stage = mutator->data->described_stage;
+  ASSERT_NE(described_stage, UINT8_MAX);
 
   const string fn_new = queue_dir + "/keep_cur_new";
   write_test_case(fn_new, (const uint8_t *)mutated.data(), mutated.size());
@@ -888,6 +937,7 @@ TEST_F(CustomMutatorTest, QueueNewEntryWithoutOriginalKeepsTheCurrentTree) {
   // Stop here on a failure. The next steps would read a freed tree.
   ASSERT_STREQ((const char *)mutator->data->filename_cur, fn.c_str());
   ASSERT_EQ(string(mutator->data->tree_fn_cur), tree_fn_cur);
+  ASSERT_EQ(mutator->data->described_stage, described_stage);
   for (uint32_t i = 1; i < count; ++i) {
 
     afl_custom_fuzz(mutator->data, nullptr, 0, &buf, nullptr, 0, 4096);

@@ -220,6 +220,14 @@ static bool file_has_bytes(const char *fn, const uint8_t *buf, size_t len) {
 
 }
 
+/* Return true if the bytes of "tree" are the bytes of the file "fn" */
+static bool tree_gives_file(tree_t *tree, const char *fn) {
+
+  return tree_to_buf(tree) &&
+         file_has_bytes(fn, tree->data_buf, tree->data_len);
+
+}
+
 /* Set "tree_fn" (a PATH_MAX buffer) to the tree file of the queue entry "fn".
   The tree file is in the "trees" folder next to the "queue" or "_resume"
   folder of the entry. Create the "trees" folder if it does not exist. Set an
@@ -295,14 +303,23 @@ static bool get_tree_fn(const char *fn, char *tree_fn) {
 
 }
 
-/* Get the tree of the queue entry "fn". Read the tree file "tree_fn". If there
-  is no tree file, parse the entry and write its tree file. An empty "tree_fn"
-  means no tree file. Return NULL if the parser rejects the entry. */
+/* Get the tree of the queue entry "fn". Read the tree file "tree_fn". With
+  "check_bytes", use the tree file only if its tree gives the bytes of the
+  entry. Without a usable tree file, parse the entry and write its tree file.
+  An empty "tree_fn" means no tree file. Return NULL if the parser rejects the
+  entry. */
 static tree_t *load_entry_tree(my_mutator_t *data, const char *fn,
-                               const char *tree_fn) {
+                               const char *tree_fn, bool check_bytes) {
 
   tree_t *tree = NULL;
   if (tree_fn[0]) tree = read_tree_from_file(tree_fn);
+  if (tree && check_bytes && !tree_gives_file(tree, fn)) {
+
+    tree_free(tree);
+    tree = NULL;
+
+  }
+
   if (tree) {
 
     tree_get_size(tree);
@@ -339,7 +356,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   // Add the subtrees of the entry to the chunk store. If the parser rejected
   // the entry, keep it in the queue without a tree, so that the other AFL++
   // stages still fuzz it.
-  data->tree_cur = load_entry_tree(data, fn, data->tree_fn_cur);
+  data->tree_cur = load_entry_tree(data, fn, data->tree_fn_cur, false);
   if (data->tree_cur) chunk_store_add_tree(data->tree_cur);
   return 1;
 
@@ -927,11 +944,11 @@ uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
                                    __attribute__((unused))
                                    const uint8_t *filename_orig_queue) {
 
-  /* AFL++ gives no original file name for an initial entry, and for a find in
-    an IJON round (AFL++ 5.03c and later). So the code does not use it. The
-    code never changes `data->tree_cur`, because the fuzz stage or the trim
-    loop can still use it (issue #57). It loads the new entry into a separate
-    tree. */
+  /* AFL++ gives no original file name for an initial entry, for a find while
+    no entry is current, and for a find in an IJON round (AFL++ 5.03c and
+    later). So the code does not use it. The code never changes
+    `data->tree_cur`, because the fuzz stage or the trim loop can still use it
+    (issue #57). It loads the new entry into a separate tree. */
   const char *fn = (const char *)filename_new_queue;
 
   /* `data->mutated_tree` is the last output of `afl_custom_fuzz`. It is the
@@ -940,8 +957,7 @@ uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
     `max_size` can cut the output. */
   tree_t *tree = data->mutated_tree;
   data->mutated_tree = NULL;
-  if (tree && (!tree_to_buf(tree) ||
-               !file_has_bytes(fn, tree->data_buf, tree->data_len))) {
+  if (tree && !tree_gives_file(tree, fn)) {
 
     tree_free(tree);
     tree = NULL;
@@ -961,8 +977,10 @@ uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
 
   } else {
 
-    // Read the tree file (for example of a seed), or parse the entry
-    tree = load_entry_tree(data, fn, data->new_tree_fn);
+    /* Read the tree file (for example of a seed), or parse the entry. The
+      trees folder can hold a file with this name from an old run in the same
+      output folder, so check its bytes. */
+    tree = load_entry_tree(data, fn, data->new_tree_fn, true);
     if (unlikely(!tree)) return 0;
 
   }
