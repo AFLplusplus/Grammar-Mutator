@@ -226,7 +226,7 @@ The mutator reads these environment variables:
 | `SPLICING_MUTATION_STEPS` | The number of splicing mutations (default 1000) |
 | `RULES_MUTATION_STEPS` | The maximum number of rules mutations (default: no limit) |
 | `TRIMMING_STEPS` | The maximum number of trimming steps (default: no limit) |
-| `PARSE_TIME_BUDGET` | `0` removes the time limit for the parse of a test case with a `.g4` grammar. Any other value keeps the limit. |
+| `PARSE_TIME_BUDGET_MS` | The smallest time limit in ms for the parse of a test case (default 50). `0` removes the limit. See [Parse Time Limit and Ambiguous Grammars](doc/customizing-grammars.md#parse-time-limit-and-ambiguous-grammars). |
 
 By default, the rules mutation tries every other rule at every nonterminal node of the tree.
 With `RULES_MUTATION_STEPS`, it tries at most that many of these node and rule pairs.

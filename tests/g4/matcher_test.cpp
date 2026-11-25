@@ -103,6 +103,7 @@ DECLARE_GRAMMAR(nomatch)
 DECLARE_GRAMMAR(reserved)
 DECLARE_GRAMMAR(superclass)
 DECLARE_GRAMMAR(spin)
+DECLARE_GRAMMAR(ambig)
 DECLARE_GRAMMAR(handmade)
 DECLARE_GRAMMAR(bom)
 
@@ -755,6 +756,53 @@ void budget_checks_the_clock_in_prediction() {
 
 }
 
+// The item count of the long "ambig" list. Without the clock check in the
+// closure step, its parse takes far longer than the upper bound of the test.
+constexpr size_t AMBIG_ITEMS = 24;
+
+// "[0,0,...,0]" with n items
+std::string ambig_input(size_t n) {
+
+  std::string input = "[0";
+  for (size_t i = 1; i < n; ++i) input += ",0";
+  return input + "]";
+
+}
+
+void budget_checks_the_clock_in_the_closure() {
+
+  // The "ambig" grammar has two ways to read each list, so the prediction of
+  // a long list does a large amount of closure work. That work has no rule
+  // entry and no LA() call, so only the clock check in the closure step can
+  // stop the parse near the deadline.
+  round_trip(t_ambig::grammar, ambig_input(3));
+
+  // After the warm-up at 200 ns per token, the limit is the 50 ms floor
+  Budget budget(parse_budget_create());
+  CHECK(budget != nullptr);
+  if (!budget) return;
+  for (int i = 0; i < PARSE_BUDGET_WARMUP; ++i) {
+
+    parse_budget_record(budget.get(), 200000, 1000);
+
+  }
+
+  g4::Limits limits;
+  limits.budget = budget.get();
+  auto   start = std::chrono::steady_clock::now();
+  Result result = parse(t_ambig::grammar, ambig_input(AMBIG_ITEMS), limits);
+  double limited = seconds_since(start);
+  CHECK_STATUS(result, PARSE_LIMIT);
+  CHECK(!result.tree);
+  CHECK(limited >= 0.04);
+  CHECK(limited < 2.5);
+  std::printf("    limited %.3f s\n", limited);
+
+  // The grammar still works after the stop
+  round_trip(t_ambig::grammar, ambig_input(3));
+
+}
+
 void tokens_outside_the_input() {
 
   // The rule: the tokens must be in input order, must not overlap, and must
@@ -1066,6 +1114,8 @@ const Test TESTS[] = {
     {"budget_stops_a_slow_parse", budget_stops_a_slow_parse},
     {"budget_checks_the_clock_in_prediction",
      budget_checks_the_clock_in_prediction},
+    {"budget_checks_the_clock_in_the_closure",
+     budget_checks_the_clock_in_the_closure},
     {"budget_records_success", budget_records_success},
     {"random_bytes", random_bytes},
     {"tables_without_parser_names", tables_without_parser_names},

@@ -9,7 +9,7 @@ extern "C" {
 
 #endif
 
-// The minimum time limit of one parse: 50 ms
+// The default smallest time limit of one parse: 50 ms (PARSE_TIME_BUDGET_MS)
 #define PARSE_BUDGET_MIN_NS UINT64_C(50000000)
 // The limit is this factor times the median parse speed
 #define PARSE_BUDGET_FACTOR UINT64_C(50)
@@ -27,9 +27,18 @@ parse_budget_t *parse_budget_create(void);
 // Free a budget. NULL is allowed.
 void parse_budget_free(parse_budget_t *budget);
 
+// Set the smallest time limit in ns (default PARSE_BUDGET_MIN_NS). NULL is
+// allowed.
+void parse_budget_set_min_ns(parse_budget_t *budget, uint64_t min_ns);
+
 // Return the time limit in ns for a parse of "tokens" tokens.
 // Return 0 for "no limit" (warm-up).
 uint64_t parse_budget_limit_ns(const parse_budget_t *budget, size_t tokens);
+
+// Return the deadline of a parse that starts at "start_ns" with the time limit
+// "limit_ns". Return 0 (no deadline) for a limit of 0, and UINT64_MAX if the
+// sum is too large.
+uint64_t parse_budget_deadline_ns(uint64_t start_ns, uint64_t limit_ns);
 
 // Record one successful parse. A token count of 0 counts as 1.
 void parse_budget_record(parse_budget_t *budget, uint64_t elapsed_ns,

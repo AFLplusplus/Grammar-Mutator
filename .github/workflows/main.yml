@@ -193,6 +193,31 @@ jobs:
         cd ./build
         make test_memcheck
 
+  # The parse time limit of a JSON grammar build stops a slow parse. The test
+  # grammar is ambiguous, so the parse time of a long list grows exponentially.
+  json-parse-limit:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        bash .github/workflows/setup-deps.sh
+    - name: Build the ambiguous test grammar
+      run: |
+        cmake -S . -B build -DANTLR_JAR_LOCATION=$(realpath antlr-4.13.2-complete.jar) -DGRAMMAR_FILE=$(realpath tests/json/ambiguous_list.json)
+        cmake --build build --parallel $(nproc)
+    - name: Check the parse time limit
+      run: BUILD_DIR=build tests/json/test_parse_limit.sh ambiguous
+    # A stopped parse must free its memory. The runtime does not free one
+    # prediction set on an exception, so the shim does it (parse_clock.h).
+    - name: Check the parse time limit under Valgrind
+      run: |
+        VALGRIND="valgrind --leak-check=full --errors-for-leak-kinds=definite --error-exitcode=99" \
+          BUILD_DIR=build tests/json/test_parse_limit.sh ambiguous
+
   make-build:
     needs: changes
     if: needs.changes.outputs.code == 'true'

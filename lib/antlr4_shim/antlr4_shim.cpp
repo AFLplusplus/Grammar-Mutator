@@ -23,6 +23,7 @@
 #include <GrammarParser.h>
 
 #include "antlr4_shim.h"
+#include "parse_clock.h"
 
 using namespace antlr4;
 
@@ -75,12 +76,15 @@ node_t *node_from_parse_tree(antlr4::tree::ParseTree *t) {
 }
 
 tree_t *tree_parse(const uint8_t *data_buf, size_t data_size,
-                   parse_budget_t * /* budget: the JSON shim ignores it */,
-                   parse_status_t *status) {
-  node_t *root;
+                   parse_budget_t *budget, parse_status_t *status) {
+  node_t  *root;
+  uint64_t start = parse_budget_now_ns();
+  uint64_t elapsed = 0;
+  size_t   token_count = 0;
 
   // A returned tree means PARSE_OK, even if ANTLR recovered from errors.
-  // NULL means PARSE_SYNTAX_ERROR.
+  // NULL means PARSE_SYNTAX_ERROR, or PARSE_LIMIT if the time limit stopped
+  // the parse.
   if (status) *status = PARSE_SYNTAX_ERROR;
 
   /**
@@ -96,14 +100,29 @@ tree_t *tree_parse(const uint8_t *data_buf, size_t data_size,
     // Disable lexer error output
     lexer.removeErrorListener(&ConsoleErrorListener::INSTANCE);
 
-    CommonTokenStream tokens(&lexer);
+    parse_clock::TimedTokenStream tokens(&lexer);
     tokens.fill();
+
+    // The time limit of the parse (none in the warm-up of the budget)
+    parse_clock::Clock clock;
+    if (budget) {
+      clock.deadline = parse_budget_deadline_ns(
+          start, parse_budget_limit_ns(budget, tokens.size()));
+    }
+
+    tokens.clock = &clock;
 
     GrammarParser parser(&tokens);
     // Disable parser error output
     parser.removeErrorListener(&ConsoleErrorListener::INSTANCE);
+    parse_clock::ClockListener clock_listener(clock);
+    parser.addParseListener(&clock_listener);
+    parse_clock::install_timed_simulator(parser, clock);
 
     antlr4::tree::ParseTree *parse_tree = parser.entry();
+    elapsed = parse_budget_now_ns() - start;
+    token_count = tokens.size();
+    tokens.clock = nullptr;
     if (!parse_tree->children.size()) {
 #ifdef DEBUG_BUILD
       fprintf(stderr, "ANTLR4 parsing error: No child nodes\n");
@@ -112,6 +131,9 @@ tree_t *tree_parse(const uint8_t *data_buf, size_t data_size,
     }
 
     root = node_from_parse_tree(parse_tree->children[0]);
+  } catch (const parse_clock::StopParse &) {
+    if (status) *status = PARSE_LIMIT;
+    return nullptr;
   } catch (std::exception &e) {
 #ifdef DEBUG_BUILD
     fprintf(stderr, "ANTLR4 parsing error: %s\n", e.what());
@@ -128,6 +150,9 @@ tree_t *tree_parse(const uint8_t *data_buf, size_t data_size,
     node_free(root);
     return nullptr;
   }
+
+  // Record the speed of a successful parse
+  if (budget) parse_budget_record(budget, elapsed, token_count);
 
   tree_t *tree = tree_create();
   tree->root = root;

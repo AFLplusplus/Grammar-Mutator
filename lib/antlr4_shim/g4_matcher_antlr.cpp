@@ -34,15 +34,14 @@
 
 #include "g4_matcher.h"
 #include "g4_matcher_internal.h"
+#include "parse_clock.h"
 
 namespace g4 {
 
 namespace {
 
-// The exception that stops a parse at the depth limit or at the deadline. It
-// does not derive from antlr4::RecognitionException, so the generated rule
-// code does not catch it.
-struct StopParse {};
+// The exception that stops a parse at the depth limit or at the deadline
+using parse_clock::StopParse;
 
 // -- ANTLR glue --------------------------------------------------------------
 
@@ -83,20 +82,8 @@ class Guard : public antlr4::tree::ParseTreeListener {
 
   }
 
-  // The deadline (parse_budget_now_ns), or 0 for no deadline
-  uint64_t deadline = 0;
-
-  void check_clock() {
-
-    // Do not throw while the stack unwinds for a different exception.
-    if (deadline && std::uncaught_exceptions() == 0 &&
-        parse_budget_now_ns() > deadline) {
-
-      throw StopParse();
-
-    }
-
-  }
+  // The deadline of the parse
+  parse_clock::Clock clock;
 
   void enterEveryRule(antlr4::ParserRuleContext *) override {
 
@@ -106,7 +93,7 @@ class Guard : public antlr4::tree::ParseTreeListener {
 
     }
 
-    check_clock();
+    clock.check();
 
   }
 
@@ -128,27 +115,6 @@ class Guard : public antlr4::tree::ParseTreeListener {
  private:
   size_t max_depth_;
   size_t depth_ = 0;
-
-};
-
-// A token stream that reads the clock once every 1,024 LA() calls. The
-// prediction code can run a long time inside one rule.
-class TimedTokenStream : public antlr4::CommonTokenStream {
-
- public:
-  using antlr4::CommonTokenStream::CommonTokenStream;
-
-  Guard *guard = nullptr;
-
-  size_t LA(ssize_t i) override {
-
-    if (guard && (++calls_ & 1023) == 0) guard->check_clock();
-    return antlr4::CommonTokenStream::LA(i);
-
-  }
-
- private:
-  size_t calls_ = 0;
 
 };
 
@@ -208,7 +174,7 @@ tree_t *parse_here(const Grammar &grammar, const uint8_t *buf, size_t len,
   std::unique_ptr<antlr4::Lexer> lexer = grammar.make_lexer(&chars);
   lexer->removeErrorListeners();
   lexer->addErrorListener(&lexer_errors);
-  TimedTokenStream tokens(lexer.get());
+  parse_clock::TimedTokenStream tokens(lexer.get());
   tokens.fill();
   if (lexer_errors.errors) {
 
@@ -221,21 +187,22 @@ tree_t *parse_here(const Grammar &grammar, const uint8_t *buf, size_t len,
   Guard guard(limits.max_rule_depth);
   if (limits.budget) {
 
-    uint64_t limit = parse_budget_limit_ns(limits.budget, tokens.size());
-    if (limit) guard.deadline = start + limit;
+    guard.clock.deadline = parse_budget_deadline_ns(
+        start, parse_budget_limit_ns(limits.budget, tokens.size()));
 
   }
 
-  tokens.guard = &guard;
+  tokens.clock = &guard.clock;
   ErrorCounter                    parser_errors;
   std::unique_ptr<antlr4::Parser> parser = grammar.make_parser(&tokens);
   parser->removeErrorListeners();
   parser->addErrorListener(&parser_errors);
   parser->setErrorHandler(std::make_shared<antlr4::BailErrorStrategy>());
   parser->addParseListener(&guard);
+  parse_clock::install_timed_simulator(*parser, guard.clock);
   antlr4::ParserRuleContext *root_ctx = grammar.parse_start(*parser);
   uint64_t                   elapsed = parse_budget_now_ns() - start;
-  tokens.guard = nullptr;
+  tokens.clock = nullptr;
   if (parser_errors.errors || has_trailing_tokens(tokens, root_ctx)) {
 
     status = PARSE_SYNTAX_ERROR;

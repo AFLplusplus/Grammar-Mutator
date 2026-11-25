@@ -55,6 +55,27 @@ TEST(ParseBudget, LimitHasAMinimum) {
 
 }
 
+TEST(ParseBudget, SetMinNsSetsTheFloor) {
+
+  parse_budget_t *b = fill(32, 1);
+  EXPECT_EQ(parse_budget_limit_ns(b, 10), 50000000u);
+  parse_budget_set_min_ns(b, 200000000);
+  EXPECT_EQ(parse_budget_limit_ns(b, 10), 200000000u);
+  // The floor does not cut a larger limit
+  EXPECT_EQ(parse_budget_limit_ns(b, 10000000), 50ull * 1 * 10000000);
+  parse_budget_set_min_ns(nullptr, 1);
+  parse_budget_free(b);
+
+}
+
+TEST(ParseBudget, DeadlineSaturates) {
+
+  EXPECT_EQ(parse_budget_deadline_ns(100, 50), 150u);
+  EXPECT_EQ(parse_budget_deadline_ns(100, 0), 0u);
+  EXPECT_EQ(parse_budget_deadline_ns(UINT64_MAX - 5, 10), UINT64_MAX);
+
+}
+
 TEST(ParseBudget, MedianIgnoresOneOutlier) {
 
   parse_budget_t *b = fill(31, 1000);
