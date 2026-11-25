@@ -220,33 +220,32 @@ static bool file_has_bytes(const char *fn, const uint8_t *buf, size_t len) {
 
 }
 
-// For each interesting test case in the queue
-uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
+/* Return true if the bytes of "tree" are the bytes of the file "fn" */
+static bool tree_gives_file(tree_t *tree, const char *fn) {
 
-  const char *fn = (const char *)filename;
-  data->filename_cur = filename;
-  if (data->tree_cur) {
+  return tree_to_buf(tree) &&
+         file_has_bytes(fn, tree->data_buf, tree->data_len);
 
-    // Clear the previous tree
-    tree_free(data->tree_cur);
+}
 
-  }
+/* Set "tree_fn" (a PATH_MAX buffer) to the tree file of the queue entry "fn".
+  The tree file is in the "trees" folder next to the "queue" or "_resume"
+  folder of the entry. Create the "trees" folder if it does not exist. Set an
+  empty name if the entry is in another folder. Return false on an error. */
+static bool get_tree_fn(const char *fn, char *tree_fn) {
 
-  data->tree_cur = NULL;
-  data->described_stage = UINT8_MAX;
+  tree_fn[0] = '\0';
 
-  // Figure out where the "trees" folder is stashed!
-  // Strip off the file portion of the filename:
+  // Strip off the file portion of the filename
   const char *slash_basename = strrchr(fn, '/');
   if (unlikely(!slash_basename)) {
 
     // Should not reach here
-    fprintf(stderr, "No folder in filename (afl_custom_queue_get)\n");
-    return 0;
+    fprintf(stderr, "No folder in filename (get_tree_fn)\n");
+    return false;
 
   }
 
-  // Obtain the name of the test case
   // At the initialization stage of afl-fuzz, there will be an "orig:" tag in
   // the filename. If so, we will look for dumped tree files with the same name,
   // as our grammar generator will assign the same name for generated test cases
@@ -273,9 +272,9 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   if (unlikely(!last_dir)) {
 
     // Should not reach here
-    fprintf(stderr, "No parent folder in filename (afl_custom_queue_get)\n");
+    fprintf(stderr, "No parent folder in filename (get_tree_fn)\n");
     free(tree_out_dir);
-    return 0;
+    return false;
 
   }
 
@@ -283,69 +282,82 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   if (strcmp(last_dir, "/queue") != 0 && strcmp(last_dir, "/_resume") != 0) {
 
     free(tree_out_dir);
-    tree_out_dir = NULL;
-    data->tree_fn_cur[0] = '\0';
+    return true;
 
-  } else {
+  }
 
-    // Copy "/trees" (including the null) to replace the old folder name
-    memcpy(last_dir, "/trees", 7);
+  // Copy "/trees" (including the null) to replace the old folder name
+  memcpy(last_dir, "/trees", 7);
 
-    // Set up the (expected) tree filename
-    snprintf(data->tree_fn_cur, PATH_MAX - 1, "%s/%s", tree_out_dir, use_name);
+  if (!create_directory(tree_out_dir)) {
 
-    // Check if we need to create the tree output directory
-    if (unlikely(data->tree_out_dir_exist == 0)) {
-
-      // Check whether the directory exists
-      if (!create_directory(tree_out_dir)) {
-
-        // error
-        perror("Cannot create the output directory (afl_custom_queue_get)");
-        free(tree_out_dir);
-        return 0;
-
-      }
-
-    }
-
+    perror("Cannot create the output directory (get_tree_fn)");
     free(tree_out_dir);
+    return false;
 
   }
 
-  if (strlen(data->tree_fn_cur)) {
+  snprintf(tree_fn, PATH_MAX - 1, "%s/%s", tree_out_dir, use_name);
+  free(tree_out_dir);
+  return true;
 
-    // Read the corresponding serialized tree from file
-    data->tree_cur = read_tree_from_file(data->tree_fn_cur);
-    if (data->tree_cur) {
+}
 
-      // We already had this tree in the trees folder, so compute its size and
-      // then we're done!
-      tree_get_size(data->tree_cur);
-      chunk_store_add_tree(data->tree_cur);
-      return 1;
+/* Get the tree of the queue entry "fn". Read the tree file "tree_fn". With
+  "check_bytes", use the tree file only if its tree gives the bytes of the
+  entry. Without a usable tree file, parse the entry and write its tree file.
+  An empty "tree_fn" means no tree file. Return NULL if the parser rejects the
+  entry. */
+static tree_t *load_entry_tree(my_mutator_t *data, const char *fn,
+                               const char *tree_fn, bool check_bytes) {
 
-    }
+  tree_t *tree = NULL;
+  if (tree_fn[0]) tree = read_tree_from_file(tree_fn);
+  if (tree && check_bytes && !tree_gives_file(tree, fn)) {
+
+    tree_free(tree);
+    tree = NULL;
 
   }
 
-  // try to parse the test case
-  data->tree_cur = parse_entry(data, fn);
+  if (tree) {
+
+    tree_get_size(tree);
+    return tree;
+
+  }
+
+  tree = parse_entry(data, fn);
+  if (!tree) return NULL;
+
+  tree_get_size(tree);
+  if (tree_fn[0]) write_tree_to_file(tree, tree_fn);
+  return tree;
+
+}
+
+// For each interesting test case in the queue
+uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
+
+  const char *fn = (const char *)filename;
+  data->filename_cur = filename;
   if (data->tree_cur) {
 
-    // Now that we've parsed it, cache the info from this test case in
-    // our trees folder and in the chunk store
-    tree_get_size(data->tree_cur);
-    if (strlen(data->tree_fn_cur))
-      write_tree_to_file(data->tree_cur, data->tree_fn_cur);
-    chunk_store_add_tree(data->tree_cur);
-    return 1;
+    // Clear the previous tree
+    tree_free(data->tree_cur);
 
   }
 
-  // The parser rejected the entry. Keep it in the queue without a tree, so
-  // that the other AFL++ stages still fuzz it.
+  data->tree_cur = NULL;
+  data->described_stage = UINT8_MAX;
 
+  if (!get_tree_fn(fn, data->tree_fn_cur)) return 0;
+
+  // Add the subtrees of the entry to the chunk store. If the parser rejected
+  // the entry, keep it in the queue without a tree, so that the other AFL++
+  // stages still fuzz it.
+  data->tree_cur = load_entry_tree(data, fn, data->tree_fn_cur, false);
+  if (data->tree_cur) chunk_store_add_tree(data->tree_cur);
   return 1;
 
 }
@@ -929,82 +941,53 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
 // Save interesting mutated test cases
 uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
                                    const uint8_t *filename_new_queue,
+                                   __attribute__((unused))
                                    const uint8_t *filename_orig_queue) {
 
-  // If this is an initial case, then we will get called with a null
-  // "filename_orig_queue".
-  if (unlikely(!filename_orig_queue)) {
-
-    // In that situation, we can skip it here and let afl_custom_queue_get()
-    // import the data later, or we can prefetch it here to ensure that it gets
-    // into our splicing data set (chunk_store) asap. Choosing the second option
-    // for now, but if this is inefficient we can just return instead of calling
-    // afl_custom_queue_get().
-    afl_custom_queue_get(data, filename_new_queue);
-    return 0;
-
-  }
-
-  // NOTE: Unlike afl_custom_queue_get(), this function should ALWAYS have
-  // /queue/ as the last
-  //       directory in its filename, so the following simplified parsing is
-  //       acceptable.
+  /* AFL++ gives no original file name for an initial entry, for a find while
+    no entry is current, and for a find in an IJON round (AFL++ 5.03c and
+    later). So the code does not use it. The code never changes
+    `data->tree_cur`, because the fuzz stage or the trim loop can still use it
+    (issue #57). It loads the new entry into a separate tree. */
   const char *fn = (const char *)filename_new_queue;
-  snprintf(data->new_tree_fn, PATH_MAX - 1, "%s", fn);
-  char *found = strrstr(data->new_tree_fn, "/queue/");
-  if (unlikely(!found)) {
-
-    // Should not reach here
-    fprintf(stderr,
-            "Invalid filename_new_queue (afl_custom_queue_new_entry)\n");
-    return 0;
-
-  }
-
-  // Replace "queue" with "trees"
-  memcpy(found, "/trees", 6);
 
   /* `data->mutated_tree` is the last output of `afl_custom_fuzz`. It is the
     tree of the new entry only if it gives the bytes of the queued file.
     Another AFL++ stage (for example cmplog or havoc) can find the entry, and
     `max_size` can cut the output. */
   tree_t *tree = data->mutated_tree;
+  data->mutated_tree = NULL;
+  if (tree && !tree_gives_file(tree, fn)) {
+
+    tree_free(tree);
+    tree = NULL;
+
+  }
+
+  if (unlikely(!get_tree_fn(fn, data->new_tree_fn))) {
+
+    tree_free(tree);
+    return 0;
+
+  }
+
   if (tree) {
 
-    // Without the bytes of the tree, parse the test case
-    if (!tree_to_buf(tree) ||
-        !file_has_bytes(fn, tree->data_buf, tree->data_len)) {
+    if (data->new_tree_fn[0]) write_tree_to_file(tree, data->new_tree_fn);
 
-      tree_free(tree);
-      tree = NULL;
-      data->mutated_tree = NULL;
+  } else {
 
-    }
-
-  }
-
-  if (unlikely(!tree)) {
-
-    /* The test case does not come from `afl_custom_fuzz`. For example, AFL++
-      5.03c and later add trimmed test cases during trimming. Do not call
-      `afl_custom_queue_get`, because it replaces `data->tree_cur` while the
-      trimming loop still uses it (issue #57). Parse the test case into a
-      separate tree. */
-    tree = parse_entry(data, fn);
+    /* Read the tree file (for example of a seed), or parse the entry. The
+      trees folder can hold a file with this name from an old run in the same
+      output folder, so check its bytes. */
+    tree = load_entry_tree(data, fn, data->new_tree_fn, true);
     if (unlikely(!tree)) return 0;
-    tree_get_size(tree);
 
   }
-
-  // Write the tree to the file
-  write_tree_to_file(tree, data->new_tree_fn);
 
   // Store all subtrees in the newly added tree
   chunk_store_add_tree(tree);
-
-  /* Once the test case is added into the queue, we will clear `mutated_tree` */
   tree_free(tree);
-  data->mutated_tree = NULL;
 
   // The queue file is not changed
   return 0;

@@ -39,8 +39,6 @@ typedef struct my_mutator {
 
   afl_t *afl;
 
-  bool tree_out_dir_exist;
-
   // The parse time budget. NULL if PARSE_TIME_BUDGET=0.
   parse_budget_t *budget;
   // The entries that the parser rejected in this run. The keys are the entry
