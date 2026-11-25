@@ -213,8 +213,8 @@ static node_t *node_at_same_place(const node_t *node, node_t *clone_root) {
 
   node_t *cur = clone_root;
   for (i = 0; i < depth && cur; ++i)
-    cur = positions[i] < cur->subnode_count ? cur->subnodes[positions[i]]
-                                            : NULL;
+    cur =
+        positions[i] < cur->subnode_count ? cur->subnodes[positions[i]] : NULL;
 
   free(positions);
   return cur;
@@ -253,7 +253,8 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n, size_t max_growth) {
   if (unlikely(!mutated_tree)) return NULL;
 
   // Use the same edge in the copy
-  picked_edge.parent = node_at_same_place(picked_edge.parent, mutated_tree->root);
+  picked_edge.parent =
+      node_at_same_place(picked_edge.parent, mutated_tree->root);
   if (unlikely(!picked_edge.parent)) {
 
     tree_free(mutated_tree);

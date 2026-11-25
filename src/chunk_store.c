@@ -269,6 +269,20 @@ void chunk_store_add_tree(tree_t *tree) {
 
   if (!tree || !tree->root) return;
 
+  // A known tree adds nothing, so check its hash before the copy. A new tree
+  // is hashed again when the store takes the copy.
+  size_t        count;
+  hash_entry_t *entries = hash_subtree(tree->root, &count);
+  if (entries) {
+
+    char root_hash[16 + 1];
+    uint64_to_hex(entries[0].hash, root_hash);
+    bool known = map_get(&seen_chunks, root_hash) != NULL;
+    free(entries);
+    if (known) return;
+
+  }
+
   // Clone the tree and then hand it off to the chunk_store
   chunk_store_take_node(node_clone(tree->root));
 
