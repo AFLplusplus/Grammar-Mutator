@@ -44,16 +44,23 @@ struct Clock {
   // The deadline, or 0 for no deadline
   uint64_t deadline = 0;
 
-  // Throw StopParse after the deadline. Do not throw while the stack unwinds
-  // for a different exception.
+  // While this is above 0, check() does not throw, because a throw at that
+  // point leaks memory in the runtime (see TimedSimulator).
+  mutable int quiet = 0;
+
+  // Return true after the deadline. Return false while the stack unwinds for
+  // a different exception.
+  bool due() const {
+
+    return deadline && std::uncaught_exceptions() == 0 &&
+           parse_budget_now_ns() > deadline;
+
+  }
+
+  // Throw StopParse after the deadline, unless the clock is quiet
   void check() const {
 
-    if (deadline && std::uncaught_exceptions() == 0 &&
-        parse_budget_now_ns() > deadline) {
-
-      throw StopParse();
-
-    }
+    if (quiet == 0 && due()) throw StopParse();
 
   }
 
@@ -113,7 +120,13 @@ class TimedTokenStream : public antlr4::CommonTokenStream {
 };
 
 // A prediction simulator that reads the clock once every 256 calls of the
-// closure step
+// closure step.
+//
+// The runtime's execATNWithFullContext keeps the configuration set of the
+// previous step in a raw pointer, and does not free it if an exception passes.
+// So in that function, the clock checks of LA() and of rule entries are quiet.
+// The closure step still throws, and computeReachSet then frees that set
+// before the exception goes on.
 class TimedSimulator : public antlr4::atn::ParserATNSimulator {
 
  public:
@@ -131,12 +144,60 @@ class TimedSimulator : public antlr4::atn::ParserATNSimulator {
   }
 
  protected:
+  size_t execATNWithFullContext(antlr4::dfa::DFA            &dfa,
+                                antlr4::dfa::DFAState       *D,
+                                antlr4::atn::ATNConfigSet   *s0,
+                                antlr4::TokenStream         *input,
+                                size_t                       startIndex,
+                                antlr4::ParserRuleContext   *outerContext)
+      override {
+
+    // Keep the start set of an outer call, and restore it on every exit
+    struct Scope {
+
+      TimedSimulator            *sim;
+      antlr4::atn::ATNConfigSet *saved_s0;
+      ~Scope() {
+
+        sim->full_ctx_s0_ = saved_s0;
+        --sim->clock_.quiet;
+
+      }
+
+    } scope{this, full_ctx_s0_};
+
+    full_ctx_s0_ = s0;
+    ++clock_.quiet;
+    return antlr4::atn::ParserATNSimulator::execATNWithFullContext(
+        dfa, D, s0, input, startIndex, outerContext);
+
+  }
+
+  std::unique_ptr<antlr4::atn::ATNConfigSet> computeReachSet(
+      antlr4::atn::ATNConfigSet *closure, size_t t, bool fullCtx) override {
+
+    try {
+
+      return antlr4::atn::ParserATNSimulator::computeReachSet(closure, t,
+                                                              fullCtx);
+
+    } catch (const StopParse &) {
+
+      // In execATNWithFullContext, "closure" is the start set (the caller owns
+      // it) or the set of the previous step (nobody frees it after a throw)
+      if (fullCtx && full_ctx_s0_ && closure != full_ctx_s0_) delete closure;
+      throw;
+
+    }
+
+  }
+
   void closure_(Ref<antlr4::atn::ATNConfig> const &config,
                 antlr4::atn::ATNConfigSet        *configs,
                 antlr4::atn::ATNConfig::Set &closureBusy, bool collectPredicates,
                 bool fullCtx, int depth, bool treatEofAsEpsilon) override {
 
-    if ((++calls_ & 255) == 0) clock_.check();
+    if ((++calls_ & 255) == 0 && clock_.due()) throw StopParse();
     antlr4::atn::ParserATNSimulator::closure_(config, configs, closureBusy,
                                               collectPredicates, fullCtx, depth,
                                               treatEofAsEpsilon);
@@ -144,8 +205,9 @@ class TimedSimulator : public antlr4::atn::ParserATNSimulator {
   }
 
  private:
-  const Clock &clock_;
-  size_t       calls_ = 0;
+  const Clock               &clock_;
+  size_t                     calls_ = 0;
+  antlr4::atn::ATNConfigSet *full_ctx_s0_ = nullptr;
 
 };
 
