@@ -252,10 +252,13 @@ tree_t *random_recursive_mutation(tree_t *tree, uint8_t n, size_t max_growth) {
   tree_t *mutated_tree = tree_clone(tree);
   if (unlikely(!mutated_tree)) return NULL;
 
-  // Use the same edge in the copy
+  // Use the same edge in the copy. If memory ran out during the copy, a node of
+  // the copy can have no subnodes, so check the tail too.
   picked_edge.parent =
       node_at_same_place(picked_edge.parent, mutated_tree->root);
-  if (unlikely(!picked_edge.parent)) {
+  if (unlikely(!picked_edge.parent ||
+               offset >= picked_edge.parent->subnode_count ||
+               !picked_edge.parent->subnodes[offset])) {
 
     tree_free(mutated_tree);
     return NULL;
