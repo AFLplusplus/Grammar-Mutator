@@ -534,9 +534,10 @@ static void skip_tried_trimming_steps(my_mutator_t *data) {
           ? data->total_subtree_trimming_steps - new_node_size
           : 0;
 
-  // Avoid repeating work by skipping edges that we have already tried.
+  // Avoid repeating work by skipping edges that we have already tried. The
+  // list owns its edges, so free them.
   for (uint32_t i = 0; i < data->finished_recursive_trimming_edges; ++i)
-    list_pop_front(data->tree_cur->recursion_edge_list);
+    free(list_pop_front(data->tree_cur->recursion_edge_list));
   size_t new_edge_size = data->tree_cur->recursion_edge_list->size;
 
   // Set our progress equal to the remaining un-tested edges in the list:
