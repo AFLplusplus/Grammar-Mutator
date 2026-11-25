@@ -164,8 +164,13 @@ Other frequent causes:
   plain `"` in the characters of a string.
 - Two rules that match the same text, for example `"-" <digits>` and
   `"-" <onenine> <digits>`.
+- Two alternatives that start with the same rule that can be empty, for
+  example whitespace in `"[" <ws> "]"` and `"[" <elements> "]"` when each
+  element starts with `<ws>`. Then the parse time grows with the square of
+  the whitespace length. Give each piece of whitespace one rule that owns it.
 
 No tool checks a grammar for ambiguity yet. To find a slow rule, parse large
 inputs, for example lists with many items, and compare the times. The
-`benchmark-<name> single <file>` program in `src/benchmark/` prints the parse
-time of one file.
+`benchmark-<name> single <file>` program prints the parse time of one file.
+It is in `src/benchmark/` after a make build, and in `<build>/src/benchmark/`
+after a CMake build.
