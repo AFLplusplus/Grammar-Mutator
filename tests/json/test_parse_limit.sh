@@ -4,7 +4,9 @@
 # Usage: tests/json/test_parse_limit.sh <grammar name>
 # Run it from the repository root after a build of
 # tests/json/ambiguous_list.json. Its grammar name is "ambiguous". Set
-# BUILD_DIR for CMake.
+# BUILD_DIR for CMake. Set VALGRIND to a Valgrind command to run the check
+# under it, for example
+# VALGRIND="valgrind --leak-check=full --errors-for-leak-kinds=definite --error-exitcode=99".
 set -eu
 
 if [ $# -ne 1 ]; then
@@ -31,7 +33,8 @@ ${CC:-cc} -I include -I third_party/rxi_map -o "$work/parse_limit_check" \
 
 # Keep the messages of the mutator in a file
 status=0
-"$work/parse_limit_check" "$work/out" 2>"$work/stderr.txt" || status=$?
+# shellcheck disable=SC2086
+${VALGRIND:-} "$work/parse_limit_check" "$work/out" 2>"$work/stderr.txt" || status=$?
 cat "$work/stderr.txt" >&2
 
 # The mutator warns once per run when the limit stops a parse

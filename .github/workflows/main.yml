@@ -211,6 +211,12 @@ jobs:
         cmake --build build --parallel $(nproc)
     - name: Check the parse time limit
       run: BUILD_DIR=build tests/json/test_parse_limit.sh ambiguous
+    # A stopped parse must free its memory. The runtime does not free one
+    # prediction set on an exception, so the shim does it (parse_clock.h).
+    - name: Check the parse time limit under Valgrind
+      run: |
+        VALGRIND="valgrind --leak-check=full --errors-for-leak-kinds=definite --error-exitcode=99" \
+          BUILD_DIR=build tests/json/test_parse_limit.sh ambiguous
 
   make-build:
     needs: changes
