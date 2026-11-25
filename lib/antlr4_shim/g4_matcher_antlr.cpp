@@ -187,8 +187,8 @@ tree_t *parse_here(const Grammar &grammar, const uint8_t *buf, size_t len,
   Guard guard(limits.max_rule_depth);
   if (limits.budget) {
 
-    uint64_t limit = parse_budget_limit_ns(limits.budget, tokens.size());
-    if (limit) guard.clock.deadline = start + limit;
+    guard.clock.deadline = parse_budget_deadline_ns(
+        start, parse_budget_limit_ns(limits.budget, tokens.size()));
 
   }
 

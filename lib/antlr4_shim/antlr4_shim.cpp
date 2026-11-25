@@ -106,8 +106,8 @@ tree_t *tree_parse(const uint8_t *data_buf, size_t data_size,
     // The time limit of the parse (none in the warm-up of the budget)
     parse_clock::Clock clock;
     if (budget) {
-      uint64_t limit = parse_budget_limit_ns(budget, tokens.size());
-      if (limit) clock.deadline = start + limit;
+      clock.deadline = parse_budget_deadline_ns(
+          start, parse_budget_limit_ns(budget, tokens.size()));
     }
 
     tokens.clock = &clock;

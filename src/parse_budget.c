@@ -100,6 +100,13 @@ uint64_t parse_budget_limit_ns(const parse_budget_t *budget, size_t tokens) {
 
 }
 
+uint64_t parse_budget_deadline_ns(uint64_t start_ns, uint64_t limit_ns) {
+
+  if (!limit_ns) return 0;
+  return limit_ns > UINT64_MAX - start_ns ? UINT64_MAX : start_ns + limit_ns;
+
+}
+
 void parse_budget_record(parse_budget_t *budget, uint64_t elapsed_ns,
                          size_t tokens) {
 

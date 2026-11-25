@@ -68,6 +68,14 @@ TEST(ParseBudget, SetMinNsSetsTheFloor) {
 
 }
 
+TEST(ParseBudget, DeadlineSaturates) {
+
+  EXPECT_EQ(parse_budget_deadline_ns(100, 50), 150u);
+  EXPECT_EQ(parse_budget_deadline_ns(100, 0), 0u);
+  EXPECT_EQ(parse_budget_deadline_ns(UINT64_MAX - 5, 10), UINT64_MAX);
+
+}
+
 TEST(ParseBudget, MedianIgnoresOneOutlier) {
 
   parse_budget_t *b = fill(31, 1000);

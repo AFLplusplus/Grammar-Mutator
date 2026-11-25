@@ -35,6 +35,11 @@ void parse_budget_set_min_ns(parse_budget_t *budget, uint64_t min_ns);
 // Return 0 for "no limit" (warm-up).
 uint64_t parse_budget_limit_ns(const parse_budget_t *budget, size_t tokens);
 
+// Return the deadline of a parse that starts at "start_ns" with the time limit
+// "limit_ns". Return 0 (no deadline) for a limit of 0, and UINT64_MAX if the
+// sum is too large.
+uint64_t parse_budget_deadline_ns(uint64_t start_ns, uint64_t limit_ns);
+
 // Record one successful parse. A token count of 0 counts as 1.
 void parse_budget_record(parse_budget_t *budget, uint64_t elapsed_ns,
                          size_t tokens);

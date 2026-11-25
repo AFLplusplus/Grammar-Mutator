@@ -1218,6 +1218,37 @@ TEST(CustomMutatorEnv, ParseTimeBudgetMs) {
 
 }
 
+// The largest PARSE_TIME_BUDGET_MS must not stop every parse: the deadline
+// saturates and does not wrap around.
+TEST(CustomMutatorEnv, LargestParseTimeBudgetKeepsTheParse) {
+
+  const char *old = getenv("PARSE_TIME_BUDGET_MS");
+  string      saved = old ? old : "";
+  setenv("PARSE_TIME_BUDGET_MS", "18446744073709", 1);  // UINT64_MAX / 1000000
+
+  my_mutator_t *data = afl_custom_init(nullptr, 0);
+  ASSERT_NE(data, nullptr);
+  ASSERT_NE(data->budget, nullptr);
+  for (int i = 0; i < PARSE_BUDGET_WARMUP; ++i)
+    parse_budget_record(data->budget, 1000, 1000);
+
+  ASSERT_TRUE(create_directory("largest_budget"));
+  ASSERT_TRUE(create_directory("largest_budget/queue"));
+  const string fn = "largest_budget/queue/entry";
+  string       valid = valid_test_case();
+  write_test_case(fn, (const uint8_t *)valid.data(), valid.size());
+  EXPECT_EQ(afl_custom_queue_get(data, (const uint8_t *)fn.c_str()), 1);
+  EXPECT_NE(data->tree_cur, nullptr);
+  afl_custom_deinit(data);
+  remove_directory("largest_budget");
+
+  if (old)
+    setenv("PARSE_TIME_BUDGET_MS", saved.c_str(), 1);
+  else
+    unsetenv("PARSE_TIME_BUDGET_MS");
+
+}
+
 int main(int argc, char **argv) {
 
   ::testing::InitGoogleTest(&argc, argv);
