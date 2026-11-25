@@ -18,7 +18,8 @@
    The parser reads the clock at each rule entry, in every 1,024th LA() call,
    and in every 256th call of the closure step of the prediction. With an
    ambiguous grammar, the closure step can do a large amount of work without a
-   rule entry or an LA() call.
+   rule entry or an LA() call. In the full-context prediction of the ANTLR
+   4.13.2 runtime, only the closure step reads the clock (see TimedSimulator).
  */
 
 #ifndef __PARSE_CLOCK_H__
@@ -122,11 +123,12 @@ class TimedTokenStream : public antlr4::CommonTokenStream {
 // A prediction simulator that reads the clock once every 256 calls of the
 // closure step.
 //
-// The runtime's execATNWithFullContext keeps the configuration set of the
-// previous step in a raw pointer, and does not free it if an exception passes.
+// execATNWithFullContext of the ANTLR 4.13.2 runtime keeps the configuration
+// set of the previous step in a raw pointer, and does not free it if an
+// exception passes.
 // So in that function, the clock checks of LA() and of rule entries are quiet.
 // The closure step still throws, and computeReachSet then frees that set
-// before the exception goes on.
+// before the exception (or any other exception) goes on.
 class TimedSimulator : public antlr4::atn::ParserATNSimulator {
 
  public:
@@ -181,7 +183,7 @@ class TimedSimulator : public antlr4::atn::ParserATNSimulator {
       return antlr4::atn::ParserATNSimulator::computeReachSet(closure, t,
                                                               fullCtx);
 
-    } catch (const StopParse &) {
+    } catch (...) {
 
       // In execATNWithFullContext, "closure" is the start set (the caller owns
       // it) or the set of the previous step (nobody frees it after a throw)
