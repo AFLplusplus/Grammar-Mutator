@@ -96,11 +96,9 @@ custom mutator does not change it. The other AFL++ stages change it, unless
 `AFL_CUSTOM_MUTATOR_ONLY` is set. With `AFL_CUSTOM_MUTATOR_ONLY=1`, AFL++ does
 not fuzz the entry at all. The mutator does not parse it again in the same run.
 
-The mutator also stops a parse that takes too long. The time limit is 50 ×
-the token count × the median time per token of the earlier parses. The
-minimum is 50 ms. The limit starts after 32 successful parses. Set
-`PARSE_TIME_BUDGET=0` to remove the limit. `grammar_parser-<name>` has no
-time limit.
+The mutator also stops a parse that takes too long. See
+[Parse Time Limit and Ambiguous Grammars](#parse-time-limit-and-ambiguous-grammars).
+`grammar_parser-<name>` has no time limit.
 
 A grammar with action code or a `superClass` needs its C++ base classes. Set
 `G4_SUPPORT_DIR` to the `Cpp/` folder of the grammar in grammars-v4 (CMake: a
@@ -119,3 +117,55 @@ make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascr
   whole.
 - A token that only grammar code makes (such as `INDENT` in a Python grammar)
   is not supported.
+
+## Parse Time Limit and Ambiguous Grammars
+
+The mutator parses each queue entry that has no tree file. It stops a parse
+that takes too long. This applies to JSON grammars and to `.g4` grammars.
+
+The time limit is 50 × the token count × the median time per token of the
+earlier parses. The limit is at least `PARSE_TIME_BUDGET_MS` milliseconds
+(default 50). Set `PARSE_TIME_BUDGET_MS=0` to remove the limit. The limit
+starts after 32 successful parses, so the first 32 parses have no limit.
+
+When the limit stops a parse, the entry has no tree. The custom mutator does
+not change the entry. The other AFL++ stages still fuzz it, unless
+`AFL_CUSTOM_MUTATOR_ONLY` is set. The mutator prints this warning once per
+run:
+
+```
+[grammar mutator] warning: a parse passed the time limit, so the entry has no tree. Set PARSE_TIME_BUDGET_MS to a larger number of ms, or to 0 for no limit.
+```
+
+An ambiguous grammar is a frequent cause of a slow parse. A grammar is
+ambiguous if one input has more than one parse tree. Then the parse time can
+grow exponentially with the length of the input. The limit stops such a
+parse, but the entry then has no tree.
+
+For example, this list rule repeats a rule that holds the full list again:
+
+```json
+"<elements>": [["<element>", "<symbol-1-1>"]],
+"<symbol-1>": [[",", "<elements>"]],
+"<symbol-1-1>": [[], ["<symbol-1>", "<symbol-1-1>"]]
+```
+
+So the list `0,0,0` has many parse trees. With this rule, a list of 22 items
+took 6 s to parse, and a list of 40 items did not finish. Make the repeated
+part hold one item:
+
+```json
+"<symbol-1>": [[",", "<element>"]]
+```
+
+Other frequent causes:
+
+- A character set that also holds the end mark of its token, for example a
+  plain `"` in the characters of a string.
+- Two rules that match the same text, for example `"-" <digits>` and
+  `"-" <onenine> <digits>`.
+
+No tool checks a grammar for ambiguity yet. To find a slow rule, parse large
+inputs, for example lists with many items, and compare the times. The
+`benchmark-<name> single <file>` program in `src/benchmark/` prints the parse
+time of one file.

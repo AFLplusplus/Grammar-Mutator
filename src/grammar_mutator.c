@@ -50,9 +50,39 @@ size_t default_rules_mutation_steps = SIZE_MAX;
 // env: TRIMMING_STEPS
 size_t default_trimming_steps = SIZE_MAX;
 
-// Use the parse time budget unless PARSE_TIME_BUDGET is exactly "0".
-// env: PARSE_TIME_BUDGET
-static bool parse_time_budget_on = true;
+// The smallest time limit of a parse in ns. 0 turns the limit off.
+// env: PARSE_TIME_BUDGET_MS (a whole number of ms, default 50)
+static uint64_t parse_time_budget_min_ns = PARSE_BUDGET_MIN_NS;
+
+// Read PARSE_TIME_BUDGET_MS. Unset or empty: the default. Digits only: that
+// number of ms (0 turns the limit off). Anything else: a warning and the
+// default.
+static uint64_t parse_time_budget_from_env(void) {
+
+  const char *ptr = getenv("PARSE_TIME_BUDGET_MS");
+  if (!ptr || !*ptr) return PARSE_BUDGET_MIN_NS;
+
+  const uint64_t max_ms = UINT64_MAX / 1000000;
+  uint64_t       ms = 0;
+  for (const char *p = ptr; *p; ++p) {
+
+    uint64_t digit = (uint64_t)(*p - '0');
+    if (*p < '0' || *p > '9' || ms > (max_ms - digit) / 10) {
+
+      fprintf(stderr,
+              "[grammar mutator] warning: PARSE_TIME_BUDGET_MS must be a "
+              "whole number of ms. The mutator uses 50.\n");
+      return PARSE_BUDGET_MIN_NS;
+
+    }
+
+    ms = ms * 10 + digit;
+
+  }
+
+  return ms * 1000000;
+
+}
 
 static void load_env_configs() {
 
@@ -78,8 +108,7 @@ static void load_env_configs() {
 
   }
 
-  ptr = getenv("PARSE_TIME_BUDGET");
-  parse_time_budget_on = !(ptr && strcmp(ptr, "0") == 0);
+  parse_time_budget_min_ns = parse_time_budget_from_env();
 
 }
 
@@ -103,12 +132,14 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
   data->described_stage = UINT8_MAX;
   map_init(&data->rejected);
 
-  if (parse_time_budget_on) {
+  if (parse_time_budget_min_ns) {
 
     data->budget = parse_budget_create();
     // Without a budget, the parser runs without a time limit
     if (!data->budget)
       perror("Cannot create the parse budget (afl_custom_init)");
+    else
+      parse_budget_set_min_ns(data->budget, parse_time_budget_min_ns);
 
   }
 
@@ -167,7 +198,18 @@ static tree_t *parse_entry(my_mutator_t *data, const char *fn) {
   if (tree) return tree;
 
   // Print each warning once per run, not once per entry.
-  static bool warned_thread = false, warned_rejected = false;
+  static bool warned_thread = false, warned_rejected = false,
+              warned_limit = false;
+
+  if (status == PARSE_LIMIT && !warned_limit) {
+
+    warned_limit = true;
+    fprintf(stderr,
+            "[grammar mutator] warning: a parse passed the time limit, so the "
+            "entry has no tree. Set PARSE_TIME_BUDGET_MS to a larger number of "
+            "ms, or to 0 for no limit.\n");
+
+  }
 
   if (status == PARSE_THREAD_ERROR && !warned_thread) {
 

@@ -1140,36 +1140,79 @@ TEST_F(CustomMutatorTest, QueueNewEntryOfTheFuzzOutput) {
 
 }
 
-TEST(CustomMutatorEnv, ParseTimeBudgetOff) {
+// The floor of the time limit of "data" after the warm-up, in ns. A parse
+// speed of 1 ns per token makes the floor the limit of a 1-token parse.
+static uint64_t budget_floor_ns(my_mutator_t *data) {
 
-  const char *old = getenv("PARSE_TIME_BUDGET");
-  string      saved = old ? old : "";
+  for (int i = 0; i < PARSE_BUDGET_WARMUP; ++i)
+    parse_budget_record(data->budget, 1000, 1000);
+  return parse_budget_limit_ns(data->budget, 1);
 
+}
+
+TEST(CustomMutatorEnv, ParseTimeBudgetMs) {
+
+  const char *names[] = {"PARSE_TIME_BUDGET_MS", "PARSE_TIME_BUDGET"};
+  string      saved[2];
+  bool        had[2];
+  for (int i = 0; i < 2; ++i) {
+
+    const char *value = getenv(names[i]);
+    had[i] = value != nullptr;
+    saved[i] = value ? value : "";
+
+  }
+
+  unsetenv("PARSE_TIME_BUDGET");
+
+  // A NULL value means unset. A floor of 0 means no budget.
+  struct Case {
+
+    const char *value;
+    uint64_t    floor_ns;
+
+  };
+
+  const Case cases[] = {{"0", 0},       {"200", 200000000}, {nullptr, 50000000},
+                        {"", 50000000}, {"abc", 50000000},  {"12ms", 50000000}};
+  for (const Case &c : cases) {
+
+    const char *label = c.value ? c.value : "(unset)";
+    if (c.value)
+      setenv("PARSE_TIME_BUDGET_MS", c.value, 1);
+    else
+      unsetenv("PARSE_TIME_BUDGET_MS");
+    my_mutator_t *data = afl_custom_init(nullptr, 0);
+    ASSERT_NE(data, nullptr) << label;
+    if (c.floor_ns == 0) {
+
+      EXPECT_EQ(data->budget, nullptr) << label;
+
+    } else {
+
+      EXPECT_NE(data->budget, nullptr) << label;
+      if (data->budget) EXPECT_EQ(budget_floor_ns(data), c.floor_ns) << label;
+
+    }
+
+    afl_custom_deinit(data);
+
+  }
+
+  // The old name has no effect
+  unsetenv("PARSE_TIME_BUDGET_MS");
   setenv("PARSE_TIME_BUDGET", "0", 1);
   my_mutator_t *data = afl_custom_init(nullptr, 0);
   ASSERT_NE(data, nullptr);
-  EXPECT_EQ(data->budget, nullptr);
-  afl_custom_deinit(data);
-
-  setenv("PARSE_TIME_BUDGET", "1", 1);
-  data = afl_custom_init(nullptr, 0);
-  ASSERT_NE(data, nullptr);
   EXPECT_NE(data->budget, nullptr);
   afl_custom_deinit(data);
 
-  unsetenv("PARSE_TIME_BUDGET");
-  data = afl_custom_init(nullptr, 0);
-  ASSERT_NE(data, nullptr);
-  EXPECT_NE(data->budget, nullptr);
-  afl_custom_deinit(data);
+  for (int i = 0; i < 2; ++i) {
 
-  if (old) {
-
-    setenv("PARSE_TIME_BUDGET", saved.c_str(), 1);
-
-  } else {
-
-    unsetenv("PARSE_TIME_BUDGET");
+    if (had[i])
+      setenv(names[i], saved[i].c_str(), 1);
+    else
+      unsetenv(names[i]);
 
   }
 

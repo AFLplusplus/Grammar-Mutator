@@ -33,14 +33,29 @@ struct parse_budget {
   size_t filled;
   // number of records since the start
   size_t records;
+  // the smallest limit in ns
+  uint64_t min_ns;
 
 };
 
 parse_budget_t *parse_budget_create(void) {
 
   parse_budget_t *budget = (parse_budget_t *)calloc(1, sizeof(parse_budget_t));
-  if (!budget) perror("parse_budget_create (calloc)");
+  if (!budget) {
+
+    perror("parse_budget_create (calloc)");
+    return NULL;
+
+  }
+
+  budget->min_ns = PARSE_BUDGET_MIN_NS;
   return budget;
+
+}
+
+void parse_budget_set_min_ns(parse_budget_t *budget, uint64_t min_ns) {
+
+  if (budget) budget->min_ns = min_ns;
 
 }
 
@@ -81,7 +96,7 @@ uint64_t parse_budget_limit_ns(const parse_budget_t *budget, size_t tokens) {
 
   }
 
-  return limit < PARSE_BUDGET_MIN_NS ? PARSE_BUDGET_MIN_NS : limit;
+  return limit < budget->min_ns ? budget->min_ns : limit;
 
 }
 

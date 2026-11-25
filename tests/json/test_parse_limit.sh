@@ -33,4 +33,11 @@ ${CC:-cc} -I include -I third_party/rxi_map -o "$work/parse_limit_check" \
 status=0
 "$work/parse_limit_check" "$work/out" 2>"$work/stderr.txt" || status=$?
 cat "$work/stderr.txt" >&2
+
+# The mutator warns once per run when the limit stops a parse
+count=$(grep -c "a parse passed the time limit" "$work/stderr.txt" || true)
+if [ "$status" -eq 0 ] && [ "$count" -ne 1 ]; then
+  echo "[-] the stopped-parse warning appears $count times, not once" >&2
+  status=1
+fi
 exit $status
