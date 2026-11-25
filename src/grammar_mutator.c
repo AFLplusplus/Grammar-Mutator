@@ -918,7 +918,8 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
 
   }
 
-  tree_get_size(tree);
+  // The output tree keeps the node sizes of `tree_cur`, which can be stale.
+  // Nothing reads them: a tree gets new sizes when it becomes `tree_cur`.
   data->mutated_tree = tree;
   mutated_size = tree->data_len <= max_size ? tree->data_len : max_size;
 
