@@ -95,6 +95,61 @@ TEST(TreeMutationTest, RandomRecursiveMutation) {
 
 }
 
+// The picked edge is below the root, next to a NULL subnode. The mutation finds
+// the same place in its copy of the tree.
+TEST(TreeMutationTest, RandomRecursiveMutationBelowTheRoot) {
+
+  random_set_seed(0);
+
+  auto tree = tree_create();
+  auto root = node_create(2);
+  auto node1 = node_create(1);
+  node_init_subnodes(node1, 3);
+  node_set_subnode(node1, 0, node_create_with_val(0, "{", 1));
+  node_set_subnode(node1, 1, node_create_with_val(1, "123", 3));
+  node_set_subnode(node1, 2, node_create_with_val(0, "}", 1));
+  node_init_subnodes(root, 4);
+  node_set_subnode(root, 0, node_create_with_val(0, "(", 1));
+  node_set_subnode(root, 2, node1);
+  node_set_subnode(root, 3, node_create_with_val(0, ")", 1));
+  tree->root = root;
+  tree_get_size(tree);
+
+  tree_t *mutated_tree = random_recursive_mutation(tree, 1, SIZE_MAX);
+  ASSERT_NE(mutated_tree, nullptr);
+  tree_to_buf(mutated_tree);
+  EXPECT_MEMEQ("({{{123}}})", mutated_tree->data_buf, mutated_tree->data_len);
+  tree_to_buf(tree);
+  EXPECT_MEMEQ("({123})", tree->data_buf, tree->data_len);
+
+  tree_free(tree);
+  tree_free(mutated_tree);
+
+}
+
+// A tree without sizes has no edge to pick. The mutation gives a copy.
+TEST(TreeMutationTest, RecursiveMutationOfATreeWithoutSizesGivesACopy) {
+
+  auto tree = tree_create();
+  auto node1 = node_create(1);
+  node_init_subnodes(node1, 3);
+  node_set_subnode(node1, 0, node_create_with_val(0, "{", 1));
+  node_set_subnode(node1, 1, node_create_with_val(1, "123", 3));
+  node_set_subnode(node1, 2, node_create_with_val(0, "}", 1));
+  tree->root = node1;
+  node1->non_term_size = 0;
+  node1->recursion_edge_size = 0;
+
+  tree_t *mutated_tree = random_recursive_mutation(tree, 1, SIZE_MAX);
+  ASSERT_NE(mutated_tree, nullptr);
+  EXPECT_NE(mutated_tree, tree);
+  EXPECT_TRUE(tree_equal(mutated_tree, tree));
+
+  tree_free(tree);
+  tree_free(mutated_tree);
+
+}
+
 TEST(TreeMutationTest, SplicingMutation) {
 
   random_set_seed(0);  // Fix the random seed
