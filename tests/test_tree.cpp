@@ -17,6 +17,7 @@
  */
 
 #include <dirent.h>
+#include <unistd.h>
 
 #include <cstdlib>
 #include <cstring>
@@ -717,6 +718,27 @@ TEST_F(TreeTest, EmptyTestCaseFile) {
   memcpy(&after, &status, sizeof(after));
   EXPECT_NE(after, sentinel);
   if (t) tree_free(t);
+  remove(fn);
+
+}
+
+// An empty tree file gives no tree, and a failed read keeps no file
+// descriptor open.
+TEST_F(TreeTest, ReadTreeFromAnEmptyFileKeepsNoDescriptor) {
+
+  const char *fn = "empty_tree_file";
+  FILE       *f = fopen(fn, "wb");
+  ASSERT_NE(f, nullptr);
+  fclose(f);
+
+  int before = dup(0);
+  close(before);
+  for (int i = 0; i < 64; ++i)
+    EXPECT_EQ(read_tree_from_file(fn), nullptr);
+  int after = dup(0);
+  close(after);
+  EXPECT_EQ(after, before);
+
   remove(fn);
 
 }

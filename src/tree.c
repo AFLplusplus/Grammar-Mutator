@@ -969,28 +969,39 @@ tree_t *read_tree_from_file(const char *filename) {
 
     // error, no file info
     perror("Cannot get file information");
+    close(fd);
     return NULL;
 
   }
 
-  size_t   tree_file_size = info.st_size;
+  // An empty tree file holds no tree. Do not map 0 bytes.
+  size_t tree_file_size = info.st_size;
+  if (tree_file_size == 0) {
+
+    close(fd);
+    return NULL;
+
+  }
+
   uint8_t *tree_buf = (uint8_t *)mmap(0, tree_file_size, PROT_READ | PROT_WRITE,
                                       MAP_PRIVATE, fd, 0);
   if (unlikely(tree_buf == MAP_FAILED)) {
 
     perror("Cannot map the tree file to the memory");
+    close(fd);
     return NULL;
 
   }
 
   close(fd);
 
-  // Deserialize the data to recover the tree
+  // Deserialize the data to recover the tree. A failure sets no errno, so do
+  // not use perror.
   tree = tree_deserialize(tree_buf, tree_file_size);
   munmap(tree_buf, tree_file_size);
   if (unlikely(!tree)) {
 
-    perror("Cannot deserialize the data");
+    fprintf(stderr, "Cannot deserialize the tree file %s\n", filename);
     return NULL;
 
   }
