@@ -186,37 +186,88 @@ static size_t node_data_len(node_t *node) {
 
 }
 
+// Return the node at the place of "node" in a copy of its tree. The function
+// finds the position of "node" and of each parent in the parent's subnodes, and
+// follows the same positions down from "clone_root". Return NULL if the copy
+// has no node at that place, or if memory runs out.
+static node_t *node_at_same_place(const node_t *node, node_t *clone_root) {
+
+  size_t depth = 0;
+  for (const node_t *cur = node; cur->parent; cur = cur->parent)
+    ++depth;
+  if (!depth) return clone_root;
+
+  uint32_t *positions = malloc(depth * sizeof(uint32_t));
+  if (unlikely(!positions)) return NULL;
+
+  size_t i = depth;
+  for (const node_t *cur = node; cur->parent; cur = cur->parent) {
+
+    const node_t *parent = cur->parent;
+    uint32_t      k = 0;
+    while (k < parent->subnode_count && parent->subnodes[k] != cur)
+      ++k;
+    positions[--i] = k;
+
+  }
+
+  node_t *cur = clone_root;
+  for (i = 0; i < depth && cur; ++i)
+    cur =
+        positions[i] < cur->subnode_count ? cur->subnodes[positions[i]] : NULL;
+
+  free(positions);
+  return cur;
+
+}
+
 tree_t *random_recursive_mutation(tree_t *tree, uint8_t n, size_t max_growth) {
 
   if (unlikely(!tree)) return NULL;
 
-  tree_t *mutated_tree = tree_clone(tree);
-  if (unlikely(!mutated_tree)) return NULL;
-
-  edge_t picked_edge = node_pick_recursion_edge(mutated_tree->root);
+  // Pick the edge and check the growth on the original tree. A failed check
+  // then costs no copy of the tree.
+  edge_t picked_edge = node_pick_recursion_edge(tree->root);
   if (picked_edge.parent == NULL || picked_edge.subnode == NULL) {
 
-    // no recursion edge, return the original one
-    return mutated_tree;
+    // no recursion edge, return a copy of the original one
+    return tree_clone(tree);
 
   }
 
-  node_t *parent = picked_edge.parent;
-  node_t *tail = picked_edge.subnode;
-  size_t  offset = picked_edge.subnode_offset;
-  size_t  num = 1 << n;
+  size_t offset = picked_edge.subnode_offset;
+  size_t num = 1 << n;
 
   // Every repetition adds the parent without the tail to the input. Check it
   // before the repetitions are built, which may need much memory.
-  size_t parent_len = node_data_len(parent);
-  size_t tail_len = node_data_len(tail);
+  size_t parent_len = node_data_len(picked_edge.parent);
+  size_t tail_len = node_data_len(picked_edge.subnode);
   if (parent_len == SIZE_MAX || tail_len == SIZE_MAX ||
       (parent_len - tail_len) * num > max_growth) {
+
+    return NULL;
+
+  }
+
+  tree_t *mutated_tree = tree_clone(tree);
+  if (unlikely(!mutated_tree)) return NULL;
+
+  // Use the same edge in the copy. If memory ran out during the copy, a node of
+  // the copy can have no subnodes, so check the tail too.
+  picked_edge.parent =
+      node_at_same_place(picked_edge.parent, mutated_tree->root);
+  if (unlikely(!picked_edge.parent ||
+               offset >= picked_edge.parent->subnode_count ||
+               !picked_edge.parent->subnodes[offset])) {
 
     tree_free(mutated_tree);
     return NULL;
 
   }
+
+  picked_edge.subnode = picked_edge.parent->subnodes[offset];
+  node_t *parent = picked_edge.parent;
+  node_t *tail = picked_edge.subnode;
 
   // detach the tail
   tail->parent = NULL;
