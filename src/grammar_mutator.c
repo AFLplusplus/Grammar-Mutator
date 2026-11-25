@@ -956,10 +956,11 @@ uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
   /* `data->mutated_tree` is the last output of `afl_custom_fuzz`. It is the
     tree of the new entry only if it gives the bytes of the queued file.
     Another AFL++ stage (for example cmplog or havoc) can find the entry, and
-    `max_size` can cut the output. */
+    `max_size` can cut the output. `afl_custom_fuzz` built the bytes of this
+    tree, and nothing changed the tree after that, so use them. */
   tree_t *tree = data->mutated_tree;
   data->mutated_tree = NULL;
-  if (tree && !tree_gives_file(tree, fn)) {
+  if (tree && !file_has_bytes(fn, tree->data_buf, tree->data_len)) {
 
     tree_free(tree);
     tree = NULL;
