@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <filesystem>
 
 #include "gtest/gtest.h"
 
@@ -74,8 +75,18 @@ static bool path_exists(const char *path) {
 
 }
 
+// Remove the folders of a test, also after a failed or stopped run. It does
+// not follow a symbolic link.
+static void remove_test_folders() {
+
+  for (const char *name : {"rd_ok", "rd_missing", "rd_inside", "rd_outside"})
+    std::filesystem::remove_all(name);
+
+}
+
 TEST(UtilsTest, RemoveDirectoryReturnsTrueOnSuccess) {
 
+  remove_test_folders();
   ASSERT_EQ(mkdir("rd_ok", 0700), 0);
   ASSERT_EQ(mkdir("rd_ok/a", 0700), 0);
   ASSERT_EQ(mkdir("rd_ok/a/b", 0700), 0);
@@ -83,11 +94,13 @@ TEST(UtilsTest, RemoveDirectoryReturnsTrueOnSuccess) {
 
   EXPECT_TRUE(remove_directory("rd_ok"));
   EXPECT_FALSE(path_exists("rd_ok"));
+  remove_test_folders();
 
 }
 
 TEST(UtilsTest, RemoveDirectoryReturnsFalseForAMissingPath) {
 
+  remove_test_folders();
   EXPECT_FALSE(remove_directory("rd_missing"));
 
 }
@@ -96,6 +109,7 @@ TEST(UtilsTest, RemoveDirectoryReturnsFalseForAMissingPath) {
 // the files of its target stay. A dangling link is removed too.
 TEST(UtilsTest, RemoveDirectoryDoesNotFollowALink) {
 
+  remove_test_folders();
   ASSERT_EQ(mkdir("rd_outside", 0700), 0);
   touch_file("rd_outside/keep");
   ASSERT_EQ(mkdir("rd_inside", 0700), 0);
@@ -106,7 +120,6 @@ TEST(UtilsTest, RemoveDirectoryDoesNotFollowALink) {
   EXPECT_FALSE(path_exists("rd_inside"));
   EXPECT_TRUE(path_exists("rd_outside/keep"));
 
-  unlink("rd_outside/keep");
-  rmdir("rd_outside");
+  remove_test_folders();
 
 }
