@@ -1,0 +1,7 @@
+{
+    "<start>": [["[", "<elements>", "]"]],
+    "<elements>": [["<item>", "<more>"]],
+    "<more>": [[], ["<next>", "<more>"]],
+    "<next>": [[",", "<elements>"]],
+    "<item>": [["0"], ["1"]]
+}
