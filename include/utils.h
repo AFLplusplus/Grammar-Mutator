@@ -21,8 +21,9 @@ extern "C" {
 bool create_directory(const char *path);
 
 /**
- * Thie function removes the directory and recursively deletes all files and
- * subdirectories under this directory.
+ * Remove the directory and all files and subdirectories under it. A symbolic
+ * link under the directory is removed. The function does not enter it, so the
+ * files of its target stay.
  * @param  path The directory path
  * @return      True, if everything is successfully removed; otherwise, False.
  */

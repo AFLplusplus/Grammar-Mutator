@@ -312,7 +312,8 @@ bool tree_get_non_terminal_nodes(tree_t *tree);
 /**
  * Read/Deserialize a tree from a file
  * @param filename The path to the tree file
- * @return         The deserialized tree
+ * @return         The deserialized tree. NULL if the file is missing or empty,
+ *                 or does not hold a tree.
  */
 tree_t *read_tree_from_file(const char *filename);
 
