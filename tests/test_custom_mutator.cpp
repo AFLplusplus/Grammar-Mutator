@@ -422,6 +422,63 @@ TEST_F(CustomMutatorTest, TrimmingWithSizesLargerThanTheLists) {
 
 }
 
+// A successful recursive trim step after a failed one removes the tried edge
+// from the new edge list. The trim must free that edge.
+TEST_F(CustomMutatorTest, TrimFreesTheSkippedRecursionEdges) {
+
+  // A small tree has no recursion edges. Take the first tree with 3 or more.
+  random_set_seed(1234);
+  tree_t *tree = nullptr;
+  for (int i = 0; i < 100; ++i) {
+
+    tree_free(tree);
+    tree = gen_init__(1000);
+    if (tree_get_recursion_edges(tree) && tree->recursion_edge_list->size >= 3)
+      break;
+
+  }
+
+  ASSERT_GE(tree->recursion_edge_list->size, 3u);
+  const string fn = queue_dir + "/trim_skip_edges";
+  dump_tree_to_test_case(tree, fn.c_str());
+  write_tree_to_file(tree, (tree_out_dir + "/trim_skip_edges").c_str());
+  ASSERT_EQ(afl_custom_queue_get(mutator->data, (const uint8_t *)fn.c_str()),
+            1);
+  ASSERT_GT(afl_custom_init_trim(mutator->data, nullptr, 0), 0);
+
+  // Fail each subtree step
+  uint8_t *buf = nullptr;
+  while (mutator->data->cur_trimming_stage == 0) {
+
+    afl_custom_trim(mutator->data, &buf);
+    afl_custom_post_trim(mutator->data, 0);
+
+  }
+
+  ASSERT_EQ(mutator->data->cur_trimming_stage, 1);
+  ASSERT_GE(mutator->data->total_recursive_trimming_steps, 2u);
+
+  // The first recursive step fails
+  afl_custom_trim(mutator->data, &buf);
+  ASSERT_NE(buf, nullptr);
+  afl_custom_post_trim(mutator->data, 0);
+
+  // The next step succeeds. The trimmed tree still has recursion edges.
+  afl_custom_trim(mutator->data, &buf);
+  ASSERT_NE(buf, nullptr);
+  tree_t *trimmed = mutator->data->trimmed_tree;
+  ASSERT_TRUE(tree_get_recursion_edges(trimmed));
+  size_t new_edges = trimmed->recursion_edge_list->size;
+  ASSERT_GE(new_edges, 1u);
+  afl_custom_post_trim(mutator->data, 1);
+
+  // The tried edge is not in the new list
+  EXPECT_EQ(mutator->data->tree_cur->recursion_edge_list->size, new_edges - 1);
+
+  tree_free(tree);
+
+}
+
 // A failed size walk sets the root sizes to 0. The fuzz stages compute the
 // sizes again, so the random and splicing stages find a node.
 TEST_F(CustomMutatorTest, FuzzingWithStaleRootSizes) {
