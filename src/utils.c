@@ -67,11 +67,12 @@ bool remove_directory(const char *path) {
 
         struct stat info;
 
+        // lstat: remove a symbolic link, and do not enter its target
         snprintf(buf, len, "%s/%s", path, p->d_name);
-        if (!stat(buf, &info)) {
+        if (!lstat(buf, &info)) {
 
           if (S_ISDIR(info.st_mode))
-            r2 = remove_directory(buf);
+            r2 = remove_directory(buf) ? 0 : -1;
           else
             r2 = unlink(buf);
 
@@ -91,9 +92,7 @@ bool remove_directory(const char *path) {
 
   if (!r) r = rmdir(path);
 
-  if (!r) return false;
-
-  return true;
+  return r == 0;
 
 }
 
