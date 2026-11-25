@@ -14,6 +14,12 @@
 
 #include "utils.h"
 
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <cstdio>
+#include <filesystem>
+
 #include "gtest/gtest.h"
 
 TEST(UtilsTest, HashBytesIsStableAndNotZero) {
@@ -49,5 +55,71 @@ TEST(UtilsTest, HashSetGrows) {
     EXPECT_FALSE(hash_set_add(set, i * 0x9e3779b97f4a7c15ULL));
   EXPECT_EQ(hash_set_size(set), 10000u);
   hash_set_free(set);
+
+}
+
+// Write a short file
+static void touch_file(const char *fn) {
+
+  FILE *f = fopen(fn, "wb");
+  ASSERT_NE(f, nullptr);
+  fputs("x", f);
+  fclose(f);
+
+}
+
+static bool path_exists(const char *path) {
+
+  struct stat info;
+  return lstat(path, &info) == 0;
+
+}
+
+// Remove the folders of a test, also after a failed or stopped run. It does
+// not follow a symbolic link.
+static void remove_test_folders() {
+
+  for (const char *name : {"rd_ok", "rd_missing", "rd_inside", "rd_outside"})
+    std::filesystem::remove_all(name);
+
+}
+
+TEST(UtilsTest, RemoveDirectoryReturnsTrueOnSuccess) {
+
+  remove_test_folders();
+  ASSERT_EQ(mkdir("rd_ok", 0700), 0);
+  ASSERT_EQ(mkdir("rd_ok/a", 0700), 0);
+  ASSERT_EQ(mkdir("rd_ok/a/b", 0700), 0);
+  touch_file("rd_ok/a/f");
+
+  EXPECT_TRUE(remove_directory("rd_ok"));
+  EXPECT_FALSE(path_exists("rd_ok"));
+  remove_test_folders();
+
+}
+
+TEST(UtilsTest, RemoveDirectoryReturnsFalseForAMissingPath) {
+
+  remove_test_folders();
+  EXPECT_FALSE(remove_directory("rd_missing"));
+
+}
+
+// A symbolic link in the folder is removed. The function does not enter it, so
+// the files of its target stay. A dangling link is removed too.
+TEST(UtilsTest, RemoveDirectoryDoesNotFollowALink) {
+
+  remove_test_folders();
+  ASSERT_EQ(mkdir("rd_outside", 0700), 0);
+  touch_file("rd_outside/keep");
+  ASSERT_EQ(mkdir("rd_inside", 0700), 0);
+  ASSERT_EQ(symlink("../rd_outside", "rd_inside/link"), 0);
+  ASSERT_EQ(symlink("../rd_nothing", "rd_inside/dangling"), 0);
+
+  EXPECT_TRUE(remove_directory("rd_inside"));
+  EXPECT_FALSE(path_exists("rd_inside"));
+  EXPECT_TRUE(path_exists("rd_outside/keep"));
+
+  remove_test_folders();
 
 }

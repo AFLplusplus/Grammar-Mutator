@@ -17,9 +17,12 @@
  */
 
 #include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -718,6 +721,33 @@ TEST_F(TreeTest, EmptyTestCaseFile) {
   EXPECT_NE(after, sentinel);
   if (t) tree_free(t);
   remove(fn);
+
+}
+
+// An empty tree file and a folder give no tree, and each failed read keeps no
+// file descriptor open. With the folder, open succeeds and mmap fails.
+TEST_F(TreeTest, FailedTreeFileReadsKeepNoDescriptor) {
+
+  const char *empty = "empty_tree_file";
+  const char *folder = "tree_file_folder";
+  std::filesystem::remove_all(folder);
+  FILE *f = fopen(empty, "wb");
+  ASSERT_NE(f, nullptr);
+  fclose(f);
+  ASSERT_EQ(mkdir(folder, 0700), 0);
+
+  int before = dup(0);
+  close(before);
+  for (int i = 0; i < 64; ++i)
+    EXPECT_EQ(read_tree_from_file(empty), nullptr);
+  for (int i = 0; i < 4; ++i)
+    EXPECT_EQ(read_tree_from_file(folder), nullptr);
+  int after = dup(0);
+  close(after);
+  EXPECT_EQ(after, before);
+
+  remove(empty);
+  rmdir(folder);
 
 }
 

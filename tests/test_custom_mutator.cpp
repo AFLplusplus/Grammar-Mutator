@@ -22,8 +22,6 @@
 
 #include <string>
 
-#include <sys/stat.h>
-
 #include "custom_mutator.h"
 #include "f1_c_fuzz.h"
 #include "tree.h"
@@ -859,10 +857,7 @@ TEST_F(CustomMutatorTest, QueueNewEntryOfAnInvalidCaseWritesNoTree) {
 // file and creates the trees folder. It does not change the current tree.
 TEST_F(CustomMutatorTest, QueueNewEntryWithoutOriginalWritesTheTreeFile) {
 
-  // `remove_directory` returns false on success, so check the folder instead
-  remove_directory(tree_out_dir.c_str());
-  struct stat info;
-  ASSERT_NE(stat(tree_out_dir.c_str(), &info), 0);
+  ASSERT_TRUE(remove_directory(tree_out_dir.c_str()));
   const string fn = queue_dir + "/new_init";
   string       valid = valid_test_case();
   write_test_case(fn, (const uint8_t *)valid.data(), valid.size());
