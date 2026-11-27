@@ -100,12 +100,15 @@ class ReportTest(unittest.TestCase):
 
     def test_time_table(self) -> None:
         out = self.render()
-        self.assertIn("| 0 | 131 | 3 | 9.0 | 1.0 | – | 2.1 | 0.5 |", out)
-        self.assertIn("| 244 | 344 | 175 | 4,641 | 5.7 | 15 | 6.5 | 5.7 |", out)
+        self.assertIn("| ruby | 0 | 131 | 3 | 9.0 | 1.0 | – | 2.1 | 0.5 |", out)
+        self.assertIn("| ruby | 244 | 344 | 175 | 4,641 | 5.7 | 15 | 6.5 | 5.7 |", out)
+        self.assertIn("| javascript | a.js | 635 | 19 | 31 | 7.8 | 23 | 69 | 10 |", out)
+        # one table for all grammars: the javascript row comes first
+        self.assertLess(out.index("| javascript | a.js | 635"), out.index("| ruby | 0 | 131"))
 
     def test_missing_stage_and_elapsed(self) -> None:
         out = self.render()
-        self.assertIn("| 0 | 0.0 | 0.0 | 66.5 | 25.0 | – | – | 46.2 | 22.9 |", out)
+        self.assertIn("| ruby | 0 | 0.0 | 0.0 | 66.5 | 25.0 | – | – | 46.2 | 22.9 |", out)
         self.assertIn("| ruby | run | `-e 2 -n 5000 -t 2000` | 300 | 300 | – |", out)
 
     def test_wall_time_seconds(self) -> None:
@@ -114,12 +117,13 @@ class ReportTest(unittest.TestCase):
             self.render(),
         )
 
-    def test_chunk_store(self) -> None:
+    def test_memory_table(self) -> None:
         out = self.render()
         self.assertIn(
-            "- Chunk store: 365,859 chunks from 1,013 trees. The fill took 22.9 s.", out
+            "| Grammar | Chunks | Trees | Fill time | Peak memory |", out
         )
-        self.assertIn("- Peak memory: 855,632 KB.", out)
+        self.assertIn("| javascript | 365,859 | 1,013 | 22.9 s | 855,632 KB |", out)
+        self.assertIn("| ruby | 2,302 | 300 | 1.2 s | 9,600 KB |", out)
 
     def test_digest_table(self) -> None:
         self.assertIn(
@@ -138,14 +142,18 @@ class ReportTest(unittest.TestCase):
         marks = [
             "## Platform",
             "## Runs",
-            "## javascript",
-            "## ruby",
+            "## Time per output",
+            "## Duplicates",
+            "## Memory",
             "## Digests",
             "Compare results only",
         ]
         positions = [out.index(m) for m in marks]
         self.assertEqual(positions, sorted(positions))
         self.assertTrue(out.endswith("no recursive stage.\n"))
+        # no section for each grammar
+        self.assertNotIn("## ruby", out)
+        self.assertNotIn("## javascript", out)
 
     def test_keeps_text_outside_markers(self) -> None:
         generated = self.render()
@@ -222,14 +230,14 @@ class ReportTest(unittest.TestCase):
 
     def test_short_times_in_ms(self) -> None:
         out = self.render()
-        self.assertIn("The fill took 22.9 s.", out)
+        self.assertIn("| 22.9 s |", out)
         self.assertEqual(report.seconds(34.4), "34.4 ms")
         self.assertEqual(report.seconds(999.9), "999.9 ms")
         self.assertEqual(report.seconds(1000.0), "1.0 s")
         self.assertEqual(report.seconds(132400.0), "132.4 s")
         fast = RUBY_RUN.replace("fill_ms=1234.5", "fill_ms=34.4")
         write(self.dir, "ruby-run.txt", fast)
-        self.assertIn("The fill took 34.4 ms.", self.render())
+        self.assertIn("| ruby | 2,302 | 300 | 34.4 ms | 9,600 KB |", self.render())
 
     def test_repeated_records(self) -> None:
         cases = {
@@ -372,7 +380,7 @@ class ReportTest(unittest.TestCase):
             "Warning: ruby-run.txt comes from a build without optimization.", out
         )
         self.assertLess(out.index("## Runs"), out.index("Warning:"))
-        self.assertLess(out.index("Warning:"), out.index("## javascript"))
+        self.assertLess(out.index("Warning:"), out.index("## Time per output"))
 
     def test_help_and_unknown_option(self) -> None:
         out = io.StringIO()
@@ -407,6 +415,30 @@ class ReportTest(unittest.TestCase):
         before = readme.read_bytes()
         self.assertEqual(run_main([str(self.dir), "--check"]), 1)
         self.assertEqual(readme.read_bytes(), before)
+
+    def test_empty_tables(self) -> None:
+        (self.dir / "ruby-digest.txt").unlink()
+        out = self.render()
+        self.assertIn("## Digests\n\nNo digest in this result.\n", out)
+        for name in ("ruby-run.txt", "javascript-run.txt"):
+            (self.dir / name).unlink()
+        write(self.dir, "ruby-digest.txt", RUBY_DIGEST)
+        out = self.render()
+        for heading in ("Time per output", "Duplicates", "Memory"):
+            self.assertIn(f"## {heading}\n", out)
+        self.assertEqual(out.count("No run in this result."), 3)
+
+    def test_template_has_only_named_fields(self) -> None:
+        import string
+
+        names = [f[1] for f in string.Formatter().parse(report.REPORT) if f[1]]
+        self.assertEqual(
+            sorted(names),
+            sorted(
+                ["platform", "runs", "warnings", "times", "rates", "memory",
+                 "digests", "note"]
+            ),
+        )
 
     def test_usage(self) -> None:
         self.assertEqual(run_main([]), 2)

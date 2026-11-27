@@ -42,8 +42,71 @@ NOTE = (
     "The duplicate rates go up with the number of steps. "
     "Compare results only at the same options and on the same platform. "
     "– means that the raw file has no record for the cell. "
-    "An entry without a recursion edge has no recursive stage.\n"
+    "An entry without a recursion edge has no recursive stage."
 )
+
+# The generated part. Each field is a finished table or text block. A table
+# holds the rows of all grammars, so that the layout does not change with the
+# number of grammars.
+REPORT = """\
+## Platform
+
+```
+{platform}
+```
+
+## Runs
+
+{runs}
+
+{warnings}## Time per output
+
+Time in µs for each output, for each stage.
+
+{times}
+
+## Duplicates
+
+Duplicate outputs and outputs equal to the seed, in percent.
+
+{rates}
+
+## Memory
+
+{memory}
+
+## Digests
+
+{digests}
+
+{note}
+"""
+
+# A new README.md: the parts to write by hand, then the generated part.
+SKELETON = """\
+# Benchmark result of {title}
+
+## What it measured
+
+{placeholder}
+
+## Build
+
+{placeholder}
+
+## Seeds
+
+{placeholder}
+
+## Commands
+
+{placeholder}
+
+{block}
+"""
+
+NO_RUN = "No run in this result."
+NO_DIGEST = "No digest in this result."
 
 USAGE = "usage: report.py RESULT_DIR [--check]\n       report.py -h | --help"
 
@@ -327,7 +390,9 @@ def load_result(folder: Path) -> Result:
         else:
             result.digests.append(build_digest(path, records))
     if platform_name is None:
-        raise ReportError(f"{folder}: no platform file (a file that starts with 'date:')")
+        raise ReportError(
+            f"{folder}: no platform file (a file that starts with 'date:')"
+        )
     if not result.runs and not result.digests:
         raise ReportError(f"{folder}: no run file and no digest file")
     return result
@@ -353,105 +418,124 @@ def seconds(ms: float | None) -> str:
     return f"{ms / 1000.0:.1f} s"
 
 
-def table(header: list, rows: list) -> list:
-    lines = ["| " + " | ".join(header) + " |"]
-    lines.append("|" + "---|" * len(header))
-    for row in rows:
-        lines.append("| " + " | ".join(row) + " |")
-    return lines
+def table(header: list, rows: list, empty: str = "") -> str:
+    """A Markdown table. Without rows, the text EMPTY."""
+    if not rows:
+        return empty
+    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+    lines += ["| " + " | ".join(row) + " |" for row in rows]
+    return "\n".join(lines)
 
 
-def render_run(run: Run) -> list:
-    out = [f"## {run.grammar}", ""]
-    header = ["Entry", "Bytes", "Nodes"]
-    header += [STAGE_TITLES[s] for s in STAGES] + ["Trim (µs/step)"]
+def run_rows(result: Result) -> list:
+    files = [(r.grammar, 0, "run", r) for r in result.runs]
+    files += [(d.grammar, 1, "digest", d) for d in result.digests]
+    files.sort(key=lambda f: (f[0], f[1]))
+    return [
+        [
+            grammar,
+            mode,
+            f"`{item.options}`",
+            count(item.seeds),
+            count(item.trees),
+            seconds(item.wall_ms),
+        ]
+        for grammar, _, mode, item in files
+    ]
+
+
+def time_rows(runs: list) -> list:
     rows = []
-    for e in run.entries:
-        row = [e.name, count(e.bytes), count(e.nodes)]
-        for s in STAGES:
-            rec = e.stages.get(s)
-            row.append(MISSING if rec is None else us(rec.number("us_per_output")))
-        row.append(MISSING if e.trim_us is None else us(e.trim_us))
-        rows.append(row)
-    out += ["Time in µs for each output, for each stage.", ""]
-    out += table(header, rows) + [""]
+    for run in runs:
+        for e in run.entries:
+            row = [run.grammar, e.name, count(e.bytes), count(e.nodes)]
+            for s in STAGES:
+                rec = e.stages.get(s)
+                row.append(MISSING if rec is None else us(rec.number("us_per_output")))
+            row.append(MISSING if e.trim_us is None else us(e.trim_us))
+            rows.append(row)
+    return rows
 
-    header = ["Entry"]
-    for s in STAGES:
-        header += [f"{STAGE_TITLES[s]} dup %", f"{STAGE_TITLES[s]} same %"]
+
+def rate_rows(runs: list) -> list:
     rows = []
-    for e in run.entries:
-        row = [e.name]
-        for s in STAGES:
-            rec = e.stages.get(s)
-            if rec is None:
-                row += [MISSING, MISSING]
-            else:
-                row += [rec.text("dup_pct"), rec.text("same_pct")]
-        rows.append(row)
-    out += ["Duplicate outputs and outputs equal to the seed, in percent.", ""]
-    out += table(header, rows) + [""]
+    for run in runs:
+        for e in run.entries:
+            row = [run.grammar, e.name]
+            for s in STAGES:
+                rec = e.stages.get(s)
+                if rec is None:
+                    row += [MISSING, MISSING]
+                else:
+                    row += [rec.text("dup_pct"), rec.text("same_pct")]
+            rows.append(row)
+    return rows
 
-    out.append(
-        f"- Chunk store: {count(run.store_chunks)} chunks from "
-        f"{count(run.store_seeds)} trees. The fill took {seconds(run.fill_ms)}."
-    )
-    out.append(f"- Peak memory: {count(run.peak_kb)} KB.")
-    out.append("")
-    return out
+
+def memory_rows(runs: list) -> list:
+    return [
+        [
+            run.grammar,
+            count(run.store_chunks),
+            count(run.store_seeds),
+            seconds(run.fill_ms),
+            f"{count(run.peak_kb)} KB",
+        ]
+        for run in runs
+    ]
+
+
+def digest_rows(digests: list) -> list:
+    return [
+        [
+            d.grammar,
+            f"`{d.options}`",
+            count(d.outputs),
+            count(d.new_entries),
+            count(d.trims),
+            f"`{d.hash}`",
+        ]
+        for d in digests
+    ]
 
 
 def render(result: Result) -> str:
     """Return the generated part, without the marker lines."""
-    out = []
-    out += ["## Platform", "", "```", result.platform, "```", ""]
-
-    files = [(r.grammar, 0, r.name, "run", r) for r in result.runs]
-    files += [(d.grammar, 1, d.name, "digest", d) for d in result.digests]
-    files.sort(key=lambda f: (f[0], f[1]))
-    rows = []
-    for grammar, _, name, mode, item in files:
-        rows.append(
-            [
-                grammar,
-                mode,
-                f"`{item.options}`",
-                count(item.seeds),
-                count(item.trees),
-                seconds(item.wall_ms),
-            ]
-        )
-    out += ["## Runs", ""]
-    out += table(["Grammar", "Mode", "Options", "Seeds", "Trees", "Wall time"], rows)
-    out.append("")
-    for name in sorted(result.unoptimized):
-        out += [f"Warning: {name} comes from a build without optimization.", ""]
-
-    for run in sorted(result.runs, key=lambda r: r.grammar):
-        out += render_run(run)
-
-    if result.digests:
-        rows = []
-        for d in sorted(result.digests, key=lambda d: d.grammar):
-            rows.append(
-                [
-                    d.grammar,
-                    f"`{d.options}`",
-                    count(d.outputs),
-                    count(d.new_entries),
-                    count(d.trims),
-                    f"`{d.hash}`",
-                ]
-            )
-        out += ["## Digests", ""]
-        out += table(
+    runs = sorted(result.runs, key=lambda r: r.grammar)
+    digests = sorted(result.digests, key=lambda d: d.grammar)
+    stage_titles = [STAGE_TITLES[s] for s in STAGES]
+    rate_titles = []
+    for title in stage_titles:
+        rate_titles += [f"{title} dup %", f"{title} same %"]
+    warnings = "".join(
+        f"Warning: {name} comes from a build without optimization.\n\n"
+        for name in sorted(result.unoptimized)
+    )
+    return REPORT.format(
+        platform=result.platform,
+        runs=table(
+            ["Grammar", "Mode", "Options", "Seeds", "Trees", "Wall time"],
+            run_rows(result),
+        ),
+        warnings=warnings,
+        times=table(
+            ["Grammar", "Entry", "Bytes", "Nodes"] + stage_titles + ["Trim (µs/step)"],
+            time_rows(runs),
+            NO_RUN,
+        ),
+        rates=table(["Grammar", "Entry"] + rate_titles, rate_rows(runs), NO_RUN),
+        memory=table(
+            ["Grammar", "Chunks", "Trees", "Fill time", "Peak memory"],
+            memory_rows(runs),
+            NO_RUN,
+        ),
+        digests=table(
             ["Grammar", "Options", "Outputs", "New entries", "Trim steps", "Hash"],
-            rows,
-        )
-        out.append("")
-
-    out.append(NOTE.rstrip("\n"))
-    return "\n".join(out) + "\n"
+            digest_rows(digests),
+            NO_DIGEST,
+        ),
+        note=NOTE,
+    )
 
 
 def update_readme(
@@ -464,11 +548,7 @@ def update_readme(
     """
     block = f"{START_MARKER}\n\n{generated}\n{END_MARKER}"
     if text is None:
-        parts = [f"# Benchmark result of {title}\n"]
-        for heading in ("What it measured", "Build", "Seeds", "Commands"):
-            parts.append(f"## {heading}\n\n{PLACEHOLDER}\n")
-        parts.append(block + "\n")
-        return "\n".join(parts)
+        return SKELETON.format(title=title, placeholder=PLACEHOLDER, block=block)
     starts = text.count(START_MARKER)
     ends = text.count(END_MARKER)
     if starts != 1 or ends != 1:

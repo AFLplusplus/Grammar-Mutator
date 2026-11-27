@@ -80,55 +80,46 @@ power: Now drawing from 'AC Power'
 | ruby | run | `-e 5 -n 5000 -t 2000` | 300 | 300 | 445.9 ms |
 | ruby | digest | `-n 1000 -t 100` | 300 | 300 | 10.5 s |
 
-## javascript
+## Time per output
 
 Time in µs for each output, for each stage.
 
-| Entry | Bytes | Nodes | Rules | Random | Recursive | Splice | Trim (µs/step) |
-|---|---|---|---|---|---|---|---|
-| regression-test-issue-1821.js | 635 | 19 | 30 | 7.6 | – | 74 | 11 |
-| regression-test-issue-3880.js | 767 | 263 | 37 | 15 | 23 | 60 | 9.4 |
-| regression-test-issue-739.js | 985 | 632 | 52 | 31 | 41 | 64 | 23 |
-| try-pattern.js | 2,077 | 1,972 | 108 | 83 | 92 | 127 | 85 |
-| test_suite_11.js | 78,546 | 121,574 | 4,645 | 4,616 | 4,689 | 4,906 | 5,152 |
+| Grammar | Entry | Bytes | Nodes | Rules | Random | Recursive | Splice | Trim (µs/step) |
+|---|---|---|---|---|---|---|---|---|
+| javascript | regression-test-issue-1821.js | 635 | 19 | 30 | 7.6 | – | 74 | 11 |
+| javascript | regression-test-issue-3880.js | 767 | 263 | 37 | 15 | 23 | 60 | 9.4 |
+| javascript | regression-test-issue-739.js | 985 | 632 | 52 | 31 | 41 | 64 | 23 |
+| javascript | try-pattern.js | 2,077 | 1,972 | 108 | 83 | 92 | 127 | 85 |
+| javascript | test_suite_11.js | 78,546 | 121,574 | 4,645 | 4,616 | 4,689 | 4,906 | 5,152 |
+| ruby | 0 | 131 | 3 | 6.0 | 0.9 | – | 1.8 | 1.0 |
+| ruby | 199 | 150 | 19 | 1.2 | 1.0 | 5.5 | 1.6 | 0.8 |
+| ruby | 196 | 167 | 35 | 1.1 | 1.3 | 12 | 1.9 | 1.1 |
+| ruby | 134 | 194 | 70 | 2.1 | 2.3 | 13 | 2.9 | 2.2 |
+| ruby | 244 | 344 | 175 | 5.4 | 5.6 | 15 | 6.4 | 5.5 |
+
+## Duplicates
 
 Duplicate outputs and outputs equal to the seed, in percent.
 
-| Entry | Rules dup % | Rules same % | Random dup % | Random same % | Recursive dup % | Recursive same % | Splice dup % | Splice same % |
-|---|---|---|---|---|---|---|---|---|
-| regression-test-issue-1821.js | 1.3 | 0.0 | 40.1 | 12.8 | – | – | 19.6 | 6.7 |
-| regression-test-issue-3880.js | 0.6 | 0.3 | 41.5 | 13.6 | 97.0 | 0.1 | 15.8 | 11.1 |
-| regression-test-issue-739.js | 0.7 | 0.7 | 31.1 | 12.7 | 94.5 | 0.0 | 11.9 | 8.2 |
-| try-pattern.js | 0.7 | 0.6 | 25.6 | 14.6 | 88.3 | 0.0 | 10.4 | 7.9 |
-| test_suite_11.js | 0.7 | 0.7 | 15.7 | 15.4 | 4.7 | 0.0 | 8.6 | 8.6 |
+| Grammar | Entry | Rules dup % | Rules same % | Random dup % | Random same % | Recursive dup % | Recursive same % | Splice dup % | Splice same % |
+|---|---|---|---|---|---|---|---|---|---|
+| javascript | regression-test-issue-1821.js | 1.3 | 0.0 | 40.1 | 12.8 | – | – | 19.6 | 6.7 |
+| javascript | regression-test-issue-3880.js | 0.6 | 0.3 | 41.5 | 13.6 | 97.0 | 0.1 | 15.8 | 11.1 |
+| javascript | regression-test-issue-739.js | 0.7 | 0.7 | 31.1 | 12.7 | 94.5 | 0.0 | 11.9 | 8.2 |
+| javascript | try-pattern.js | 0.7 | 0.6 | 25.6 | 14.6 | 88.3 | 0.0 | 10.4 | 7.9 |
+| javascript | test_suite_11.js | 0.7 | 0.7 | 15.7 | 15.4 | 4.7 | 0.0 | 8.6 | 8.6 |
+| ruby | 0 | 0.0 | 0.0 | 66.7 | 49.8 | – | – | 85.3 | 0.3 |
+| ruby | 199 | 0.0 | 2.6 | 78.6 | 28.3 | 99.7 | 0.0 | 67.2 | 22.7 |
+| ruby | 196 | 0.4 | 0.5 | 75.5 | 26.4 | 99.5 | 0.0 | 62.6 | 18.4 |
+| ruby | 134 | 0.3 | 0.3 | 70.9 | 25.2 | 99.4 | 0.1 | 55.3 | 16.6 |
+| ruby | 244 | 0.3 | 0.3 | 66.0 | 28.8 | 98.1 | 0.0 | 46.2 | 22.9 |
 
-- Chunk store: 365,859 chunks from 1,013 trees. The fill took 22.9 s.
-- Peak memory: 850,544 KB.
+## Memory
 
-## ruby
-
-Time in µs for each output, for each stage.
-
-| Entry | Bytes | Nodes | Rules | Random | Recursive | Splice | Trim (µs/step) |
-|---|---|---|---|---|---|---|---|
-| 0 | 131 | 3 | 6.0 | 0.9 | – | 1.8 | 1.0 |
-| 199 | 150 | 19 | 1.2 | 1.0 | 5.5 | 1.6 | 0.8 |
-| 196 | 167 | 35 | 1.1 | 1.3 | 12 | 1.9 | 1.1 |
-| 134 | 194 | 70 | 2.1 | 2.3 | 13 | 2.9 | 2.2 |
-| 244 | 344 | 175 | 5.4 | 5.6 | 15 | 6.4 | 5.5 |
-
-Duplicate outputs and outputs equal to the seed, in percent.
-
-| Entry | Rules dup % | Rules same % | Random dup % | Random same % | Recursive dup % | Recursive same % | Splice dup % | Splice same % |
-|---|---|---|---|---|---|---|---|---|
-| 0 | 0.0 | 0.0 | 66.7 | 49.8 | – | – | 85.3 | 0.3 |
-| 199 | 0.0 | 2.6 | 78.6 | 28.3 | 99.7 | 0.0 | 67.2 | 22.7 |
-| 196 | 0.4 | 0.5 | 75.5 | 26.4 | 99.5 | 0.0 | 62.6 | 18.4 |
-| 134 | 0.3 | 0.3 | 70.9 | 25.2 | 99.4 | 0.1 | 55.3 | 16.6 |
-| 244 | 0.3 | 0.3 | 66.0 | 28.8 | 98.1 | 0.0 | 46.2 | 22.9 |
-
-- Chunk store: 2,302 chunks from 300 trees. The fill took 28.1 ms.
-- Peak memory: 9,488 KB.
+| Grammar | Chunks | Trees | Fill time | Peak memory |
+|---|---|---|---|---|
+| javascript | 365,859 | 1,013 | 22.9 s | 850,544 KB |
+| ruby | 2,302 | 300 | 28.1 ms | 9,488 KB |
 
 ## Digests
 
