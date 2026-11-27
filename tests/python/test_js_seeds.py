@@ -16,7 +16,9 @@ Run them with `make test-python`.
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -77,6 +79,163 @@ class RewriteNativesTest(unittest.TestCase):
         for src in UNCHANGED:
             with self.subTest(src=src):
                 self.assertEqual(get_seeds.rewrite_natives(src), src)
+
+
+class Test262RulesTest(unittest.TestCase):
+    def test_negative_phase(self) -> None:
+        def src(phase: str) -> str:
+            return (
+                "/*---\nnegative:\n  phase: %s\n  type: SyntaxError\n---*/\n" % phase
+            )
+
+        drop = get_seeds.test262_drop_reason
+        self.assertEqual(drop(src("parse"), "a.js"), "negative-parse")
+        self.assertEqual(drop(src("resolution"), "a.js"), "negative-resolution")
+        self.assertIsNone(drop(src("runtime"), "a.js"))
+
+    def test_flags_and_fixture(self) -> None:
+        drop = get_seeds.test262_drop_reason
+        self.assertEqual(drop("/*---\nflags: [module]\n---*/", "a.js"), "module")
+        self.assertEqual(
+            drop("/*---\nflags:\n  - module\n---*/", "a.js"), "module"
+        )
+        self.assertIsNone(drop("/*---\nflags: [raw]\n---*/", "a.js"))
+        self.assertEqual(drop("", "x_FIXTURE.js"), "fixture")
+
+    def test_only_strict(self) -> None:
+        strict = get_seeds.test262_only_strict
+        self.assertTrue(strict("/*---\nflags: [onlyStrict]\n---*/"))
+        self.assertTrue(strict("/*---\nflags: [async, onlyStrict]\n---*/"))
+        self.assertFalse(strict("/*---\nflags: [noStrict]\n---*/"))
+        self.assertFalse(strict("var x;"))
+
+
+class DropReasonTest(unittest.TestCase):
+    def test_paths(self) -> None:
+        drop = get_seeds.drop_reason
+        self.assertEqual(drop("mjsunit", "mjsunit.js", b""), "harness")
+        self.assertEqual(drop("jstests", "mozilla/ecma/shell.js", b""), "harness")
+        self.assertEqual(drop("jstests", "mozilla/ecma/browser.js", b""), "harness")
+        self.assertEqual(drop("jstests", "stress/resources/x.js", b""), "resources")
+
+    def test_size(self) -> None:
+        drop = get_seeds.drop_reason
+        self.assertIsNone(drop("jstests", "stress/a.js", b"x" * 1048576))
+        self.assertEqual(
+            drop("jstests", "stress/a.js", b"x" * 1048577), "too-large"
+        )
+
+
+class SeedNameTest(unittest.TestCase):
+    def test_names(self) -> None:
+        name = get_seeds.seed_name
+        self.assertEqual(
+            name("test262", "built-ins/Array/a b.js"), "test262_built-ins_Array_a_b.js"
+        )
+        self.assertEqual(name("jstests", "stress/\u00e9.js"), "jstests_stress___.js")
+
+    def test_long_names(self) -> None:
+        a = get_seeds.seed_name("test262", "a" * 300 + "/x.js")
+        b = get_seeds.seed_name("test262", "a" * 300 + "/y.js")
+        for n in (a, b):
+            self.assertLessEqual(len(n.encode()), 255)
+            self.assertTrue(n.endswith(".js"))
+        self.assertNotEqual(a, b)
+
+    def test_unique(self) -> None:
+        self.assertEqual(
+            get_seeds.unique_names(["a.js", "a.js", "b.js", "a.js"]),
+            ["a.js", "a_2.js", "b.js", "a_3.js"],
+        )
+
+
+class BuildSeedsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.tmp = Path(self._tmp.name)
+
+    def write(self, root: str, rel: str, data: bytes) -> None:
+        path = self.tmp / root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def test_test262(self) -> None:
+        self.write("t262", "built-ins/a.js", b"var a;\n")
+        self.write(
+            "t262",
+            "language/b.js",
+            b"/*---\nnegative:\n  phase: parse\n  type: SyntaxError\n---*/\n",
+        )
+        strict = b"/*---\nflags: [onlyStrict]\n---*/\nvar c;\n"
+        self.write("t262", "language/c.js", strict)
+        out = self.tmp / "seeds"
+        summary = get_seeds.build_seeds({"test262": self.tmp / "t262"}, out)
+        self.assertEqual(len(list((out / "test262").iterdir())), 2)
+        self.assertEqual(
+            (out / "test262" / "test262_language_c.js").read_bytes(),
+            b'"use strict";\n' + strict,
+        )
+        self.assertEqual(summary.files["test262"], 3)
+        self.assertEqual(summary.seeds["test262"], 2)
+        self.assertEqual(summary.dropped["test262"], Counter({"negative-parse": 1}))
+
+    def test_mjsunit(self) -> None:
+        self.write("mj", "a.js", b"// \xff\xfe\n%Foo(x);\n")
+        out = self.tmp / "seeds"
+        get_seeds.build_seeds({"mjsunit": self.tmp / "mj"}, out)
+        self.assertEqual(
+            (out / "mjsunit" / "mjsunit_a.js").read_bytes(),
+            b'// \xff\xfe\n__v8native("Foo")(x);\n',
+        )
+
+    def test_non_empty_folder(self) -> None:
+        self.write("mj", "a.js", b"")
+        out = self.tmp / "seeds"
+        out.mkdir()
+        (out / "x").write_bytes(b"")
+        with self.assertRaises(SystemExit) as ctx:
+            get_seeds.build_seeds({"mjsunit": self.tmp / "mj"}, out)
+        self.assertIn(str(out), str(ctx.exception))
+
+    def test_deterministic(self) -> None:
+        self.write("jt", "stress/a b.js", b"var a;")
+        self.write("jt", "stress/a_b.js", b"var b;")
+        roots = {"jstests": self.tmp / "jt"}
+        get_seeds.build_seeds(roots, self.tmp / "one")
+        get_seeds.build_seeds(roots, self.tmp / "two")
+
+        def snap(d: Path) -> dict:
+            return {p.name: p.read_bytes() for p in (d / "jstests").iterdir()}
+
+        self.assertEqual(snap(self.tmp / "one"), snap(self.tmp / "two"))
+        self.assertEqual(len(snap(self.tmp / "one")), 2)
+
+    def test_exclude(self) -> None:
+        self.write("mj", "a.js", b"var a;")
+        summary = get_seeds.build_seeds(
+            {"mjsunit": self.tmp / "mj"},
+            self.tmp / "seeds",
+            frozenset({"mjsunit/a.js"}),
+        )
+        self.assertEqual(summary.seeds["mjsunit"], 0)
+        self.assertEqual(summary.dropped["mjsunit"], Counter({"slow-parse": 1}))
+
+    def test_write_summary(self) -> None:
+        summary = get_seeds.BuildSummary(
+            files=Counter({"test262": 3}),
+            seeds=Counter({"test262": 2}),
+            dropped={"test262": Counter({"negative-parse": 1})},
+        )
+        suites = tuple(s for s in get_seeds.SUITES if s.name == "test262")
+        path = self.tmp / "SUMMARY.txt"
+        get_seeds.write_summary(path, suites, summary)
+        text = path.read_text()
+        self.assertIn("test262", text)
+        self.assertIn(suites[0].commit, text)
+        self.assertIn("negative-parse", text)
+        self.assertRegex(text, r"files\D*3")
+        self.assertRegex(text, r"seeds\D*2")
 
 
 if __name__ == "__main__":
