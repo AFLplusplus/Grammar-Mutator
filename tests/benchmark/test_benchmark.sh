@@ -234,7 +234,9 @@ status=0
 "$bench" parse "$work"/seeds/* >&- 2> /dev/null || status=$?
 [ "$status" -eq 1 ] || fail "parse with a closed stdout: expected exit 1, got $status"
 # run and digest: /dev/full gives ENOSPC on each write (Linux only)
+checked="parse"
 if [ -w /dev/full ]; then
+  checked="parse, run, digest"
   mkdir "$work/tmp-full"
   for mode in "run -e 1 -n 5 -t 5" "digest -n 5 -t 5"; do
     status=0
@@ -249,7 +251,7 @@ if [ -w /dev/full ]; then
 else
   echo "[*] no /dev/full: the write error checks of run and digest are skipped"
 fi
-echo "[+] a failed write to stdout gives exit 1"
+echo "[+] a failed write to stdout gives exit 1 ($checked)"
 
 # a closed pipe (SIGPIPE) ends the run, with the same cleanup. The run prints
 # a record after each entry, so a write comes after head has left. The run
