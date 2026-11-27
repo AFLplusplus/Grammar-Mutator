@@ -340,13 +340,15 @@ static long peak_rss_kb(void) {
 #endif
 }
 
-// Say if a trim step is a success. NULL means every step fails.
-typedef bool (*trim_rule_t)(size_t step);
+// Say if a trim step is a success. It gets the output of the trim step.
+typedef bool (*trim_rule_t)(void *ctx, size_t step, const uint8_t *out,
+                            size_t len);
 
-// Run all trim steps of the current entry, as AFL++ does. Return false if a
-// trim step gives no output.
-static bool trim_entry(my_mutator_t *data, trim_rule_t rule, size_t *steps,
-                       double *elapsed_us) {
+// Run all trim steps of the current entry, as AFL++ does. A NULL rule means
+// that every step fails. The rule call is not in the timed part. Return false
+// if a trim step gives no output.
+static bool trim_entry(my_mutator_t *data, trim_rule_t rule, void *ctx,
+                       size_t *steps, double *elapsed_us) {
   *steps = 0;
   *elapsed_us = 0;
   int32_t max = afl_custom_init_trim(data, NULL, 0);
@@ -354,12 +356,15 @@ static bool trim_entry(my_mutator_t *data, trim_rule_t rule, size_t *steps,
   while (cur < max) {
     uint8_t *out = NULL;
     double   begin = now_us();
-    afl_custom_trim(data, &out);
+    size_t   len = afl_custom_trim(data, &out);
+    *elapsed_us += now_us() - begin;
     if (!out) {
       fprintf(stderr, "A trim step gave no output\n");
       return false;
     }
-    cur = afl_custom_post_trim(data, rule ? rule(*steps) : 0);
+    int success = rule ? rule(ctx, *steps, out, len) : 0;
+    begin = now_us();
+    cur = afl_custom_post_trim(data, success);
     *elapsed_us += now_us() - begin;
     ++*steps;
   }
@@ -452,7 +457,7 @@ static bool measure_entry(my_mutator_t *data, const char *queue,
 
   size_t trim_steps;
   double trim_us;
-  if (!trim_entry(data, NULL, &trim_steps, &trim_us)) return false;
+  if (!trim_entry(data, NULL, NULL, &trim_steps, &trim_us)) return false;
   printf("trim entry=");
   print_value(stdout, name);
   printf(" steps=%zu us_per_step=%.1f\n", trim_steps,
