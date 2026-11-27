@@ -15,6 +15,7 @@ Run them with `make test-python`.
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -85,7 +86,8 @@ class Test262RulesTest(unittest.TestCase):
     def test_negative_phase(self) -> None:
         def src(phase: str) -> str:
             return (
-                "/*---\nnegative:\n  phase: %s\n  type: SyntaxError\n---*/\n" % phase
+                "/*---\nnegative:\n  phase: %s\n  type: SyntaxError\n"
+                "---*/\n" % phase
             )
 
         drop = get_seeds.test262_drop_reason
@@ -95,12 +97,23 @@ class Test262RulesTest(unittest.TestCase):
 
     def test_flags_and_fixture(self) -> None:
         drop = get_seeds.test262_drop_reason
-        self.assertEqual(drop("/*---\nflags: [module]\n---*/", "a.js"), "module")
+        self.assertEqual(
+            drop("/*---\nflags: [module]\n---*/", "a.js"), "module"
+        )
         self.assertEqual(
             drop("/*---\nflags:\n  - module\n---*/", "a.js"), "module"
         )
         self.assertIsNone(drop("/*---\nflags: [raw]\n---*/", "a.js"))
         self.assertEqual(drop("", "x_FIXTURE.js"), "fixture")
+
+    def test_crlf(self) -> None:
+        drop = get_seeds.test262_drop_reason
+        neg = "/*---\r\nnegative:\r\n  phase: parse\r\n  type: X\r\n---*/\r\n"
+        self.assertEqual(drop(neg, "a.js"), "negative-parse")
+        mod = "/*---\r\nflags:\r\n  - module\r\n---*/\r\n"
+        self.assertEqual(drop(mod, "a.js"), "module")
+        strict = "/*---\r\nflags: [onlyStrict]\r\n---*/\r\n"
+        self.assertTrue(get_seeds.test262_only_strict(strict))
 
     def test_only_strict(self) -> None:
         strict = get_seeds.test262_only_strict
@@ -114,9 +127,11 @@ class DropReasonTest(unittest.TestCase):
     def test_paths(self) -> None:
         drop = get_seeds.drop_reason
         self.assertEqual(drop("mjsunit", "mjsunit.js", b""), "harness")
-        self.assertEqual(drop("jstests", "mozilla/ecma/shell.js", b""), "harness")
-        self.assertEqual(drop("jstests", "mozilla/ecma/browser.js", b""), "harness")
-        self.assertEqual(drop("jstests", "stress/resources/x.js", b""), "resources")
+        for rel in ("mozilla/ecma/shell.js", "mozilla/ecma/browser.js"):
+            self.assertEqual(drop("jstests", rel, b""), "harness")
+        self.assertEqual(
+            drop("jstests", "stress/resources/x.js", b""), "resources"
+        )
 
     def test_size(self) -> None:
         drop = get_seeds.drop_reason
@@ -130,9 +145,12 @@ class SeedNameTest(unittest.TestCase):
     def test_names(self) -> None:
         name = get_seeds.seed_name
         self.assertEqual(
-            name("test262", "built-ins/Array/a b.js"), "test262_built-ins_Array_a_b.js"
+            name("test262", "built-ins/Array/a b.js"),
+            "test262_built-ins_Array_a_b.js",
         )
-        self.assertEqual(name("jstests", "stress/\u00e9.js"), "jstests_stress___.js")
+        self.assertEqual(
+            name("jstests", "stress/\u00e9.js"), "jstests_stress___.js"
+        )
 
     def test_long_names(self) -> None:
         a = get_seeds.seed_name("test262", "a" * 300 + "/x.js")
@@ -141,6 +159,18 @@ class SeedNameTest(unittest.TestCase):
             self.assertLessEqual(len(n.encode()), 255)
             self.assertTrue(n.endswith(".js"))
         self.assertNotEqual(a, b)
+        rel = "a" * 300 + "/x.js"
+        digest = hashlib.sha1(rel.encode("utf-8", "surrogateescape"))
+        self.assertTrue(a.endswith("_%s.js" % digest.hexdigest()[:8]))
+
+    def test_unique_long(self) -> None:
+        name = "x" * 252 + ".js"
+        self.assertEqual(len(name), 255)
+        names = get_seeds.unique_names([name, name, name])
+        self.assertEqual(len(set(names)), 3)
+        for n in names:
+            self.assertLessEqual(len(n.encode()), 255)
+            self.assertTrue(n.endswith(".js"))
 
     def test_unique(self) -> None:
         self.assertEqual(
@@ -178,7 +208,9 @@ class BuildSeedsTest(unittest.TestCase):
         )
         self.assertEqual(summary.files["test262"], 3)
         self.assertEqual(summary.seeds["test262"], 2)
-        self.assertEqual(summary.dropped["test262"], Counter({"negative-parse": 1}))
+        self.assertEqual(
+            summary.dropped["test262"], Counter({"negative-parse": 1})
+        )
 
     def test_mjsunit(self) -> None:
         self.write("mj", "a.js", b"// \xff\xfe\n%Foo(x);\n")
@@ -209,7 +241,24 @@ class BuildSeedsTest(unittest.TestCase):
             return {p.name: p.read_bytes() for p in (d / "jstests").iterdir()}
 
         self.assertEqual(snap(self.tmp / "one"), snap(self.tmp / "two"))
-        self.assertEqual(len(snap(self.tmp / "one")), 2)
+        self.assertEqual(
+            snap(self.tmp / "one"),
+            {
+                "jstests_stress_a_b.js": b"var a;",
+                "jstests_stress_a_b_2.js": b"var b;",
+            },
+        )
+
+    def test_harness_and_too_large(self) -> None:
+        self.write("mj", "mjsunit.js", b"var h;")
+        self.write("mj", "a.js", b"var a;")
+        self.write("t262", "built-ins/big.js", b"x" * 1048577)
+        roots = {"mjsunit": self.tmp / "mj", "test262": self.tmp / "t262"}
+        summary = get_seeds.build_seeds(roots, self.tmp / "seeds")
+        self.assertEqual(summary.dropped["mjsunit"], Counter({"harness": 1}))
+        self.assertEqual(summary.dropped["test262"], Counter({"too-large": 1}))
+        self.assertEqual(summary.seeds["mjsunit"], 1)
+        self.assertEqual(summary.seeds["test262"], 0)
 
     def test_exclude(self) -> None:
         self.write("mj", "a.js", b"var a;")

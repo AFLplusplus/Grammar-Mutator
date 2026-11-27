@@ -149,14 +149,22 @@ SUITES: tuple[Suite, ...] = (
 EXCLUDE: frozenset[str] = frozenset()
 
 _FRONT_MATTER = re.compile(r"/\*---(.*?)---\*/", re.DOTALL)
-_PHASE = re.compile(r"^[ \t]*negative:[ \t]*\n(?:[ \t]+[^\n]*\n)*?[ \t]+phase:[ \t]*(\w+)", re.M)
+_PHASE = re.compile(
+    r"^[ \t]*negative:[ \t]*\n(?:[ \t]+[^\n]*\n)*?[ \t]+phase:[ \t]*(\w+)",
+    re.M,
+)
 _FLAGS_FLOW = re.compile(r"^[ \t]*flags:[ \t]*\[([^\]]*)\]", re.M)
-_FLAGS_BLOCK = re.compile(r"^[ \t]*flags:[ \t]*\n((?:[ \t]+-[^\n]*\n?)+)", re.M)
+_FLAGS_BLOCK = re.compile(
+    r"^[ \t]*flags:[ \t]*\n((?:[ \t]+-[^\n]*\n?)+)", re.M
+)
 
 
 def _front_matter(text: str) -> str:
     match = _FRONT_MATTER.search(text)
-    return match.group(1) + "\n" if match else ""
+    if not match:
+        return ""
+    # Use one line ending, so that CRLF files work too.
+    return match.group(1).replace("\r\n", "\n").replace("\r", "\n") + "\n"
 
 
 def _flags(text: str) -> list[str]:
@@ -204,7 +212,8 @@ def drop_reason(suite: str, rel: str, data: bytes) -> str | None:
     if suite == "mjsunit" and rel == "mjsunit.js":
         return "harness"
     if suite == "jstests":
-        if rel.startswith("mozilla/") and parts[-1] in ("shell.js", "browser.js"):
+        base = parts[-1]
+        if rel.startswith("mozilla/") and base in ("shell.js", "browser.js"):
             return "harness"
         if "resources" in parts:
             return "resources"
@@ -216,27 +225,29 @@ def drop_reason(suite: str, rel: str, data: bytes) -> str | None:
     return None
 
 
-def seed_name(suite: str, rel: str) -> str:
-    """Return the seed file name of the file `rel` of `suite`."""
-    raw = rel.encode("utf-8", errors="surrogateescape")
-    safe = "".join(
-        chr(b) if chr(b) in _NAME_CHARS else "_" for b in raw
-    )
-    name = "%s_%s" % (suite, safe)
-    if len(name) > MAX_NAME_BYTES:
-        digest = hashlib.sha1(rel.encode("utf-8", errors="surrogateescape")).hexdigest()
-        tail = "_%s.js" % digest[:8]
-        name = name[: MAX_NAME_BYTES - len(tail)] + tail
-    return name
-
-
 _NAME_CHARS = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
 )
 
 
+def seed_name(suite: str, rel: str) -> str:
+    """Return the seed file name of the file `rel` of `suite`."""
+    raw = rel.encode("utf-8", errors="surrogateescape")
+    safe = "".join(chr(b) if chr(b) in _NAME_CHARS else "_" for b in raw)
+    name = "%s_%s" % (suite, safe)
+    if len(name) > MAX_NAME_BYTES:
+        digest = hashlib.sha1(raw).hexdigest()
+        tail = "_%s.js" % digest[:8]
+        name = name[: MAX_NAME_BYTES - len(tail)] + tail
+    return name
+
+
 def unique_names(names: list[str]) -> list[str]:
-    """Make every name unique. A repeated name gets `_2`, `_3`, ... before `.js`."""
+    """Make every name unique.
+
+    A repeated name gets `_2`, `_3`, ... before `.js`. A name stays within
+    255 bytes: the code cuts the stem before it adds the suffix.
+    """
     seen: set[str] = set()
     counts: Counter = Counter()
     result: list[str] = []
@@ -246,7 +257,8 @@ def unique_names(names: list[str]) -> list[str]:
             counts[name] += 1
             stem = name[:-3] if name.endswith(".js") else name
             ext = ".js" if name.endswith(".js") else ""
-            candidate = "%s_%d%s" % (stem, counts[name] + 1, ext)
+            tail = "_%d%s" % (counts[name] + 1, ext)
+            candidate = stem[: MAX_NAME_BYTES - len(tail)] + tail
         seen.add(candidate)
         result.append(candidate)
     return result
@@ -314,13 +326,16 @@ def build_seeds(
     return summary
 
 
-def write_summary(path: Path, suites: tuple[Suite, ...], summary: BuildSummary) -> None:
+def write_summary(
+    path: Path, suites: tuple[Suite, ...], summary: BuildSummary
+) -> None:
     """Write the counts of a build to a text file."""
     lines: list[str] = []
     for suite in suites:
         lines.append("%s %s" % (suite.name, suite.commit))
         lines.append("  files: %d" % summary.files[suite.name])
         lines.append("  seeds: %d" % summary.seeds[suite.name])
-        for reason, count in sorted(summary.dropped.get(suite.name, {}).items()):
+        dropped = summary.dropped.get(suite.name, {})
+        for reason, count in sorted(dropped.items()):
             lines.append("  dropped %s: %d" % (reason, count))
     path.write_text("\n".join(lines) + "\n")
