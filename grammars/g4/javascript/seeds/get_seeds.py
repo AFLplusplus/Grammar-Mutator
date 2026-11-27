@@ -34,18 +34,24 @@ _PREFIX_WORDS = frozenset(
     "return typeof void throw await case in of new delete".split()
 )
 _NATIVE = re.compile(r"%([A-Za-z_$][A-Za-z0-9_$]*)\(")
-_TRAILING_WORD = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*\Z")
+_WORD_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$"
+)
 
 
-def _starts_call(out: str) -> bool:
-    """Return True if a runtime call can follow the text `out`."""
-    stripped = out.rstrip(" \t\r\f\v")
-    if not stripped or stripped[-1] == "\n":
+def _starts_call(text: str, pos: int) -> bool:
+    """Return True if a runtime call can start at `pos` in `text`."""
+    end = pos
+    while end > 0 and text[end - 1] in " \t\f\v":
+        end -= 1
+    if end == 0 or text[end - 1] in "\n\r":
         return True
-    if stripped[-1] in _PREFIX_CHARS:
+    if text[end - 1] in _PREFIX_CHARS:
         return True
-    word = _TRAILING_WORD.search(stripped)
-    return word is not None and word.group() in _PREFIX_WORDS
+    start = end
+    while start > 0 and text[start - 1] in _WORD_CHARS:
+        start -= 1
+    return text[start:end] in _PREFIX_WORDS
 
 
 def rewrite_natives(text: str) -> str:
@@ -77,7 +83,7 @@ def rewrite_natives(text: str) -> str:
             j = length if j < 0 else j + 2
         elif ch == "%":
             match = _NATIVE.match(text, i)
-            if match and _starts_call("".join(out)):
+            if match and _starts_call(text, i):
                 out.append('__v8native("%s")(' % match.group(1))
                 i = match.end()
                 continue

@@ -19,10 +19,9 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(
-    0,
-    str(Path(__file__).resolve().parents[2] / "grammars" / "g4" / "javascript" / "seeds"),
-)
+ROOT = Path(__file__).resolve().parents[2]
+SEEDS_DIR = ROOT / "grammars" / "g4" / "javascript" / "seeds"
+sys.path.insert(0, str(SEEDS_DIR))
 
 import get_seeds
 
@@ -34,6 +33,18 @@ CHANGED = [
     ("return  %Foo(x);", 'return  __v8native("Foo")(x);'),
     ("if (!%IsSmi(x)) {}", 'if (!__v8native("IsSmi")(x)) {}'),
     ("g(a, %_Call(b));", 'g(a, __v8native("_Call")(b));'),
+    ("typeof %Foo(x)", 'typeof __v8native("Foo")(x)'),
+    ("throw %Foo(x)", 'throw __v8native("Foo")(x)'),
+    (
+        "switch (v) { case %Foo(x): break; }",
+        'switch (v) { case __v8native("Foo")(x): break; }',
+    ),
+    ("new %Foo(x)", 'new __v8native("Foo")(x)'),
+    ("{%Foo(x)}", '{__v8native("Foo")(x)}'),
+    ("}\n%Foo(x)", '}\n__v8native("Foo")(x)'),
+    ("%A(1); %B(2);", '__v8native("A")(1); __v8native("B")(2);'),
+    ("// c\n%Foo(x);", '// c\n__v8native("Foo")(x);'),
+    ("\r%Foo(x)", '\r__v8native("Foo")(x)'),
 ]
 
 UNCHANGED = [
@@ -46,6 +57,10 @@ UNCHANGED = [
     "`%Foo(`;",
     "// %Foo(x)\n",
     "/* %Foo(x) */",
+    '"\\"%Foo(',
+    '"%Foo(',
+    "/* %Foo(",
+    "myreturn %Foo(x)",
     "% Foo(x);",  # A space after % is not a runtime call.
 ]
 
