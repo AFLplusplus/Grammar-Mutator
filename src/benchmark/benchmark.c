@@ -476,37 +476,66 @@ static int compare_by_size(const void *a, const void *b) {
   return strcmp(sort_seeds->names[x], sort_seeds->names[y]);
 }
 
+// The setup that the run and digest modes share: the options, the seeds, the
+// work folder with the queue folder, and the mutator. Start with bench_ctx_t
+// ctx = {0}. Always call bench_close, also after a failure of bench_open.
+typedef struct {
+  options_t     opt;
+  const char   *seed_dir;
+  seed_list_t   seeds;
+  char         *work;
+  char         *queue;
+  my_mutator_t *data;
+} bench_ctx_t;
+
+// Open the setup. Return 0 on success, else the exit status of the program.
+static int bench_open(bench_ctx_t *ctx, const char *prog, bool with_entries,
+                      int argc, char **argv) {
+  if (!parse_options(argc, argv, with_entries, &ctx->opt, &ctx->seed_dir))
+    return usage(prog);
+  if (!seed_list_load(ctx->seed_dir, &ctx->seeds)) {
+    fprintf(stderr, "Cannot read the seed folder %s\n", ctx->seed_dir);
+    return 1;
+  }
+  if (ctx->seeds.count == 0) {
+    fprintf(stderr, "No seed file in %s\n", ctx->seed_dir);
+    return 1;
+  }
+  ctx->work = work_create(ctx->seed_dir, &ctx->seeds);
+  if (!ctx->work) return 1;
+  ctx->queue = join_path(ctx->work, "queue");
+  if (!ctx->queue) return 1;
+  set_step_variables(ctx->opt.steps, ctx->opt.trims);
+  ctx->data = afl_custom_init(NULL, (unsigned)ctx->opt.seed);
+  return ctx->data ? 0 : 1;
+}
+
+// Close the setup: stop the mutator and remove the work folder
+static void bench_close(bench_ctx_t *ctx) {
+  if (ctx->data) afl_custom_deinit(ctx->data);
+  free(ctx->queue);
+  if (ctx->work) remove_directory(ctx->work);
+  free(ctx->work);
+  seed_list_free(&ctx->seeds);
+}
+
 // The run mode: measure the mutator on the seeds of a folder
 static int mode_run(const char *prog, int argc, char **argv) {
-  options_t   opt;
-  const char *seed_dir;
-  if (!parse_options(argc, argv, true, &opt, &seed_dir)) return usage(prog);
-
-  seed_list_t seeds;
-  if (!seed_list_load(seed_dir, &seeds)) {
-    fprintf(stderr, "Cannot read the seed folder %s\n", seed_dir);
-    return 1;
+  bench_ctx_t ctx = {0};
+  int         status = bench_open(&ctx, prog, true, argc, argv);
+  if (status != 0) {
+    bench_close(&ctx);
+    return status;
   }
-  if (seeds.count == 0) {
-    fprintf(stderr, "No seed file in %s\n", seed_dir);
-    seed_list_free(&seeds);
-    return 1;
-  }
-  char *work = work_create(seed_dir, &seeds);
-  if (!work) {
-    seed_list_free(&seeds);
-    return 1;
-  }
-  char *queue = join_path(work, "queue");
-  int   status = 1;
-  seed_info_t  *infos = calloc(seeds.count, sizeof(seed_info_t));
-  size_t       *order = calloc(seeds.count, sizeof(size_t));
-  my_mutator_t *data = NULL;
-  if (!queue || !infos || !order) goto done;
-
-  set_step_variables(opt.steps, opt.trims);
-  data = afl_custom_init(NULL, (unsigned)opt.seed);
-  if (!data) goto done;
+  const options_t    opt = ctx.opt;
+  const seed_list_t  seeds = ctx.seeds;
+  const char        *seed_dir = ctx.seed_dir;
+  const char        *queue = ctx.queue;
+  my_mutator_t      *data = ctx.data;
+  status = 1;
+  seed_info_t *infos = calloc(seeds.count, sizeof(seed_info_t));
+  size_t      *order = calloc(seeds.count, sizeof(size_t));
+  if (!infos || !order) goto done;
 
   size_t trees = 0;
   double fill_us = 0;
@@ -556,13 +585,9 @@ static int mode_run(const char *prog, int argc, char **argv) {
   fflush(stdout);
 
 done:
-  if (data) afl_custom_deinit(data);
   free(infos);
   free(order);
-  free(queue);
-  remove_directory(work);
-  free(work);
-  seed_list_free(&seeds);
+  bench_close(&ctx);
   return status;
 }
 
@@ -656,33 +681,18 @@ static bool digest_entry(my_mutator_t *data, const char *work,
 
 // The digest mode: hash all outputs of the mutator, to check a change
 static int mode_digest(const char *prog, int argc, char **argv) {
-  options_t   opt;
-  const char *seed_dir;
-  if (!parse_options(argc, argv, false, &opt, &seed_dir)) return usage(prog);
-
-  seed_list_t seeds;
-  if (!seed_list_load(seed_dir, &seeds)) {
-    fprintf(stderr, "Cannot read the seed folder %s\n", seed_dir);
-    return 1;
+  bench_ctx_t ctx = {0};
+  int         status = bench_open(&ctx, prog, false, argc, argv);
+  if (status != 0) {
+    bench_close(&ctx);
+    return status;
   }
-  if (seeds.count == 0) {
-    fprintf(stderr, "No seed file in %s\n", seed_dir);
-    seed_list_free(&seeds);
-    return 1;
-  }
-  char *work = work_create(seed_dir, &seeds);
-  if (!work) {
-    seed_list_free(&seeds);
-    return 1;
-  }
-  char         *queue = join_path(work, "queue");
-  int           status = 1;
-  my_mutator_t *data = NULL;
-  if (!queue) goto done;
-
-  set_step_variables(opt.steps, opt.trims);
-  data = afl_custom_init(NULL, (unsigned)opt.seed);
-  if (!data) goto done;
+  const seed_list_t  seeds = ctx.seeds;
+  const char        *seed_dir = ctx.seed_dir;
+  const char        *queue = ctx.queue;
+  const char        *work = ctx.work;
+  my_mutator_t      *data = ctx.data;
+  status = 1;
 
   digest_t digest = {FNV_OFFSET, 0, 0, 0};
   size_t   trees = 0;
@@ -716,7 +726,7 @@ static int mode_digest(const char *prog, int argc, char **argv) {
     if (!ok) goto done;
   }
 
-  print_header(stdout, grammar_name(prog), "digest", &opt, seeds.count, trees);
+  print_header(stdout, grammar_name(prog), "digest", &ctx.opt, seeds.count, trees);
   printf("digest outputs=%zu new_entries=%zu trims=%zu hash=%016llx\n",
          digest.outputs, digest.new_entries, digest.trims,
          (unsigned long long)digest.hash);
@@ -724,11 +734,7 @@ static int mode_digest(const char *prog, int argc, char **argv) {
   status = 0;
 
 done:
-  if (data) afl_custom_deinit(data);
-  free(queue);
-  remove_directory(work);
-  free(work);
-  seed_list_free(&seeds);
+  bench_close(&ctx);
   return status;
 }
 
