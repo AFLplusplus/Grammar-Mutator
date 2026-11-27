@@ -45,8 +45,8 @@ bool tree_parser_cache_states(size_t *parser_states, size_t *lexer_states) {
 
   try {
 
-    // Make a lexer and a parser on an empty input. Their simulators refer to the
-    // shared static caches. This changes no cache.
+    // Make a lexer and a parser on an empty input. Their simulators refer to
+    // the shared static caches. This changes no cache.
     antlr4::ANTLRInputStream input("");
     auto lexer = g4build::grammar.make_lexer(&input);
     antlr4::CommonTokenStream tokens(lexer.get());

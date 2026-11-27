@@ -171,8 +171,8 @@ bool tree_parser_cache_states(size_t *parser_states, size_t *lexer_states) {
   if (!parser_states || !lexer_states) return false;
 
   try {
-    // Make a lexer and a parser on an empty input. Their simulators refer to the
-    // shared static caches. This changes no cache.
+    // Make a lexer and a parser on an empty input. Their simulators refer to
+    // the shared static caches. This changes no cache.
     ANTLRInputStream  input("");
     GrammarLexer      lexer(&input);
     CommonTokenStream tokens(&lexer);
