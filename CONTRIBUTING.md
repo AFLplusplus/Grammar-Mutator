@@ -53,6 +53,39 @@ Thank you for your help. This file tells you how to send a change.
 5. Fill in the pull request template. The title must follow
    [Conventional Commits](#commit-messages-and-pull-request-titles).
 
+## Measure a performance change
+
+Use the benchmark program to measure a change that affects speed.
+
+1. Build with optimization. Use make, or CMake with the default
+   `RelWithDebInfo` build type.
+2. Get seeds. For the JavaScript `.g4` grammar, download the JerryScript test
+   files. For any grammar, use the generator.
+
+   ```bash
+   src/benchmark/get-jerryscript-seeds.sh <folder>
+   grammar_generator-<name> <n> <size> <seeds> <trees> <random seed>
+   ```
+
+3. Run the program before and after the change. Use the same machine and the
+   same options. Compare the `stage` and `trim` records.
+
+   ```bash
+   benchmark-<name> run <seed folder>
+   ```
+
+4. If the change must keep the outputs, compare the `digest` record before
+   and after.
+
+   ```bash
+   benchmark-<name> digest <seed folder>
+   ```
+
+5. The program sets the step variables from `-n` and `-t`. It also turns the
+   parse time limit off. So the same command does the same work.
+6. To keep a result as a comparison point, follow
+   [doc/benchmarks/README.md](doc/benchmarks/README.md).
+
 ## Branches
 
 - `stable` is the only long-lived branch. All work goes into `stable`
