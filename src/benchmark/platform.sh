@@ -22,6 +22,22 @@ or_unknown() {
   printf '%s\n' "${1:-unknown}"
 }
 
+# Print the first line of the version of a compiler. The argument is a command
+# with options, for example "gcc -m32". Split it into words without globbing.
+compiler_version() {
+  set -f
+  # shellcheck disable=SC2086
+  set -- $1
+  set +f
+  first_line "$@" --version
+}
+
+# Print the number of physical and logical CPUs, with "unknown" for a missing
+# number. The first argument is the physical count, the second the logical.
+core_counts() {
+  echo "${1:-unknown} physical, ${2:-unknown} logical"
+}
+
 # Print a number of bytes in GiB.
 gib() {
   awk -v b="$1" 'BEGIN { printf "%.1f GiB\n", b / 1073741824 }'
@@ -32,7 +48,9 @@ echo "date: $(date -u +%Y-%m-%d)"
 if [ "$os" = Darwin ]; then
   system="$(sw_vers -productName 2>/dev/null) $(sw_vers -productVersion 2>/dev/null)"
   cpu=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || true)
-  cores=$(sysctl -n hw.physicalcpu 2>/dev/null || true)
+  physical=$(sysctl -n hw.physicalcpu 2>/dev/null || true)
+  logical=$(sysctl -n hw.logicalcpu 2>/dev/null || true)
+  cores=$(core_counts "$physical" "$logical")
   if perf=$(sysctl -n hw.perflevel0.physicalcpu 2>/dev/null) &&
     eff=$(sysctl -n hw.perflevel1.physicalcpu 2>/dev/null); then
     cores="$cores ($perf performance, $eff efficiency)"
@@ -51,7 +69,17 @@ else
   if [ -z "$cpu" ] && [ -r /proc/cpuinfo ]; then
     cpu=$(sed -n 's/^model name[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | head -n 1)
   fi
-  cores=$(nproc 2>/dev/null || true)
+  physical=
+  if command -v lscpu >/dev/null 2>&1; then
+    sockets=$(lscpu 2>/dev/null | sed -n 's/^Socket(s):[[:space:]]*//p' | head -n 1)
+    per_socket=$(lscpu 2>/dev/null | sed -n 's/^Core(s) per socket:[[:space:]]*//p' | head -n 1)
+    case "$sockets$per_socket" in
+      '' | *[!0-9]*) ;;
+      *) physical=$((sockets * per_socket)) ;;
+    esac
+  fi
+  logical=$(nproc 2>/dev/null || true)
+  cores=$(core_counts "$physical" "$logical")
   kb=
   if [ -r /proc/meminfo ]; then
     kb=$(sed -n 's/^MemTotal:[[:space:]]*\([0-9]*\) kB.*/\1/p' /proc/meminfo)
@@ -64,14 +92,14 @@ echo "system: $(or_unknown "$(echo "$system" | sed 's/^ *//;s/ *$//')")"
 echo "kernel: $(first_line uname -sr)"
 echo "machine: $(first_line uname -m)"
 echo "cpu: $(or_unknown "$cpu")"
-echo "cores: $(or_unknown "$cores")"
+echo "cores: $cores"
 if [ -n "${bytes:-}" ]; then
   echo "memory: $(gib "$bytes")"
 else
   echo "memory: unknown"
 fi
-echo "cc: $(first_line "${CC:-cc}" --version)"
-echo "c++: $(first_line "${CXX:-c++}" --version)"
+echo "cc: $(compiler_version "${CC:-cc}")"
+echo "c++: $(compiler_version "${CXX:-c++}")"
 if command -v cmake >/dev/null 2>&1; then
   echo "cmake: $(first_line cmake --version)"
 else
