@@ -4,8 +4,8 @@ This result measures the growth of the ANTLR parse cache.
 
 ## What it measured
 
-- The library and the benchmark program of this pull request's branch, on top
-  of `494f756` on `stable`. It adds the `cache` mode.
+- The library and the benchmark program of the commit that adds this folder,
+  on top of `494f756` on `stable`. It adds the `cache` mode.
 - The seeds and the machine are the same as in the result of
   [2026-11-27](../2026-11-27/README.md).
 - The load average was about 2.5 before the runs and about 1.9 after them.
@@ -16,9 +16,9 @@ This result measures the growth of the ANTLR parse cache.
 The heap number is the whole heap in use. The program reads it after each
 tree is freed. At that point the `cache` mode holds no tree and no chunk
 store. So the growth is memory that the parser cache and the program still
-hold. The growth is measured over the last quarter of the mutants. The heap
-after the seed phase is about 563 MB. Do not compare the growth with this
-base.
+hold. The growth is measured over the last quarter of the mutants. In this
+text, 1 MB is 1,024 KB. The heap after the seed phase is about 550 MB for
+javascript and about 5.2 MB for ruby. The growth comes on top of that base.
 
 - javascript: the heap grows by 70,588 KB per 10,000 parses. At 1,000,000
   parses this is 6,893 MB, more than 100 MB. The parse cache needs a limit.
@@ -136,7 +136,7 @@ No run in this result.
 - javascript: heap growth over the last quarter of the mutants: 70,588 KB per 10,000 parses.
 - ruby: heap growth over the last quarter of the mutants: 50 KB per 10,000 parses.
 
-The parser states and the lexer states only grow. The heap in use is the memory in use after each tree is freed. The growth line feeds the decision on clearing the cache. – means that the heap size is not known.
+The parser states and the lexer states only grow. The heap in use is the memory in use after each tree is freed. The growth line feeds the decision on clearing the cache. In the seeds row, – means that there is no row before it. In other rows, – means that the value is not known.
 
 ## Time per output
 
