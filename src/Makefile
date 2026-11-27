@@ -110,10 +110,10 @@ $(GRAMMAR_PARSER_PROM): $(PARSER_OBJS) $(GRAMMAR_MUTATOR_LIB)
 	$(CXX) $(C_FLAGS) -pthread $(PARSER_OBJS) -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB)
 
 benchmark/benchmark.o: benchmark/benchmark.c
-	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) $(DEP_FLAGS) -o $@ -c $<
+	$(CC) $(C_DEFINES) -I../include -I. -I../third_party/rxi_map $(C_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
 $(BENCH_PROM): $(BENCHMARK_OBJS) $(GRAMMAR_MUTATOR_LIB)
-	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB) -lm
+	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB)
 
 -include $(OBJS:.o=.d)
 

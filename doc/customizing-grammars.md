@@ -171,6 +171,6 @@ Other frequent causes:
 
 No tool checks a grammar for ambiguity yet. To find a slow rule, parse large
 inputs, for example lists with many items, and compare the times. The
-`benchmark-<name> single <file>` program prints the parse time of one file.
+`benchmark-<name> parse <file>...` program prints the parse time of each file.
 It is in `src/benchmark/` after a make build, and in `<build>/src/benchmark/`
 after a CMake build.

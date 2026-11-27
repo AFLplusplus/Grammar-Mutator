@@ -188,6 +188,8 @@ jobs:
       run: |
         cd ./build
         make test
+    - name: Benchmark program
+      run: BUILD_DIR=build tests/benchmark/test_benchmark.sh ruby
     - name: Valgrind memcheck on unit testing
       run: |
         cd ./build
@@ -234,6 +236,8 @@ jobs:
     - name: Unit testing
       run: |
         make -f GNUmakefile test
+    - name: Benchmark program
+      run: tests/benchmark/test_benchmark.sh ruby
     - name: Valgrind memcheck on unit testing
       run: |
         make -f GNUmakefile test_memcheck
