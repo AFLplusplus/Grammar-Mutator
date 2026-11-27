@@ -407,12 +407,17 @@ last_field() {
   grep '^cache ' "$1" | tail -n 1 | sed -n "s/.* $2=\\([-0-9.]*\\).*/\\1/p"
 }
 
-# the same -s gives the same state counts (nothing stops with the ruby seeds)
-capture "$work/c1.txt" "$bench" cache -m 200 -i 50 -s 3 "$work/seeds"
+# the same -s gives the same state counts (the limit is off, so no parse stops)
+capture "$work/c1.txt" env PARSE_TIME_BUDGET_MS=0 "$bench" cache -m 200 -i 50 \
+  -s 3 "$work/seeds"
 [ "$status" -eq 0 ] || fail "cache -s 3: exit $status"
-capture "$work/c2.txt" "$bench" cache -m 200 -i 50 -s 3 "$work/seeds"
+capture "$work/c2.txt" env PARSE_TIME_BUDGET_MS=0 "$bench" cache -m 200 -i 50 \
+  -s 3 "$work/seeds"
 [ "$status" -eq 0 ] || fail "cache -s 3 again: exit $status"
-[ "$(last_field "$work/c1.txt" stopped)" -eq 0 ] || fail "cache: a parse stopped"
+[ "$(last_field "$work/c1.txt" stopped)" -eq 0 ] ||
+  fail "cache: a parse stopped in the first run"
+[ "$(last_field "$work/c2.txt" stopped)" -eq 0 ] ||
+  fail "cache: a parse stopped in the second run"
 cache_states "$work/c1.txt" > "$work/c1.states"
 cache_states "$work/c2.txt" > "$work/c2.states"
 cmp "$work/c1.states" "$work/c2.states" ||
@@ -496,3 +501,26 @@ capture "$work/cw.txt" env PARSE_TIME_BUDGET_MS=abc "$bench" cache -m 10 "$work/
 [ "$(grep -c 'PARSE_TIME_BUDGET_MS' "$work/cw.txt.err")" -eq 1 ] ||
   fail "cache: expected the budget warning once"
 echo "[+] cache warns once about a bad PARSE_TIME_BUDGET_MS"
+
+# SIGKILL cannot be caught: the records must be in the file before it comes.
+# The interval is long, so only the seed record is there and a full buffer
+# cannot hide a missing flush.
+"$bench" cache -m 100000000 -i 100000000 "$work/seeds" \
+  > "$work/ckill.out" 2> /dev/null &
+kill_pid=$!
+tries=0
+while [ "$(grep -c '^cache ' "$work/ckill.out")" -lt 1 ]; do
+  tries=$((tries + 1))
+  if [ "$tries" -gt 100 ]; then
+    kill -9 "$kill_pid" 2> /dev/null || true
+    { wait "$kill_pid" || true; } 2> /dev/null
+    fail "cache: no record in the file after 10 s (no flush?)"
+  fi
+  sleep 0.1
+done
+kill -9 "$kill_pid" 2> /dev/null || true
+{ wait "$kill_pid" || true; } 2> /dev/null
+grep -q '^benchmark ' "$work/ckill.out" || fail "cache: SIGKILL lost the header"
+grep -q '^cache phase=seeds ' "$work/ckill.out" ||
+  fail "cache: SIGKILL lost the seed record"
+echo "[+] cache flushes each record, so SIGKILL keeps them"
