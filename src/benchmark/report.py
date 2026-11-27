@@ -22,6 +22,8 @@ With --check, it writes nothing. It exits with 1 if the file differs.
 
 from __future__ import annotations
 
+import math
+import statistics
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,7 +61,15 @@ REPORT = """\
 
 {runs}
 
-{warnings}## Time per output
+{warnings}## Parse time
+
+The time of the first load of each seed: the parse, the tree file write, and
+the chunk store add, in µs. All seeds count, also the seeds without a tree.
+The first seed in name order also includes the one-time setup of the parser.
+
+{parse}
+
+## Time per output
 
 Time in µs for each output, for each stage.
 
@@ -106,6 +116,14 @@ SKELETON = """\
 """
 
 NO_RUN = "No run in this result."
+
+# The size bands of the parse-time table: (lower limit, upper limit, name)
+SIZE_BANDS = (
+    (0, 1024, "under 1 KB"),
+    (1024, 10 * 1024, "1–10 KB"),
+    (10 * 1024, 100 * 1024, "10–100 KB"),
+    (100 * 1024, math.inf, "100 KB or more"),
+)
 NO_DIGEST = "No digest in this result."
 
 USAGE = "usage: report.py RESULT_DIR [--check]\n       report.py -h | --help"
@@ -159,6 +177,14 @@ class Entry:
 
 
 @dataclass
+class Seed:
+    name: str
+    bytes: int
+    parse_us: float
+    tree: bool
+
+
+@dataclass
 class Run:
     name: str
     grammar: str
@@ -171,6 +197,7 @@ class Run:
     entries: list
     peak_kb: int
     wall_ms: float | None
+    seeds_parsed: list = field(default_factory=list)  # Seed for each seed record
 
 
 @dataclass
@@ -223,14 +250,21 @@ def build_run(path: Path, records: list) -> Run:
     head = records[0]
     entries = []
     by_name = {}
+    seeds = []
     store = None
     peak = None
     wall = None
 
     for rec in records[1:]:
         if rec.kind == "seed":
-            rec.text("name")
-            rec.integer("bytes")
+            seeds.append(
+                Seed(
+                    rec.text("name"),
+                    rec.integer("bytes"),
+                    rec.number("parse_us"),
+                    rec.integer("tree") != 0,
+                )
+            )
         elif rec.kind == "store":
             once(store, rec)
             store = rec
@@ -298,6 +332,7 @@ def build_run(path: Path, records: list) -> Run:
         entries,
         peak,
         wall,
+        seeds,
     )
 
 
@@ -472,6 +507,60 @@ def rate_rows(runs: list) -> list:
     return rows
 
 
+def nearest_rank(values: list, fraction: float) -> float:
+    """The percentile by the nearest-rank method: always one of the values."""
+    ordered = sorted(values)
+    rank = max(1, math.ceil(fraction * len(ordered)))
+    return ordered[rank - 1]
+
+
+def parse_rows(runs: list) -> list:
+    rows = []
+    for run in runs:
+        seeds = run.seeds_parsed
+        if not seeds:
+            continue
+        times = [s.parse_us for s in seeds]
+        slowest = max(seeds, key=lambda s: s.parse_us)
+        per_kb = [s.parse_us / (s.bytes / 1024) for s in seeds if s.bytes > 0]
+        rows.append(
+            [
+                run.grammar,
+                count(len(seeds)),
+                count(sum(1 for s in seeds if not s.tree)),
+                us(statistics.median(times)),
+                us(nearest_rank(times, 0.9)),
+                us(slowest.parse_us),
+                slowest.name,
+                us(statistics.median(per_kb)) if per_kb else MISSING,
+            ]
+        )
+    return rows
+
+
+def size_rows(runs: list) -> list:
+    rows = []
+    for run in runs:
+        for low, high, name in SIZE_BANDS:
+            times = [s.parse_us for s in run.seeds_parsed if low <= s.bytes < high]
+            if times:
+                rows.append(
+                    [run.grammar, name, count(len(times)), us(statistics.median(times))]
+                )
+    return rows
+
+
+def render_parse(runs: list) -> str:
+    """The parse-time tables, or one line if no run file has seed records."""
+    summary = parse_rows(runs)
+    if not summary:
+        return NO_RUN
+    header = ["Grammar", "Seeds", "No tree", "Median", "90th percentile", "Slowest"]
+    header += ["Slowest seed", "Median µs per KB"]
+    sizes = table(["Grammar", "Size", "Seeds", "Median"], size_rows(runs))
+    return table(header, summary) + "\n\n" + sizes
+
+
 def memory_rows(runs: list) -> list:
     return [
         [
@@ -518,6 +607,7 @@ def render(result: Result) -> str:
             run_rows(result),
         ),
         warnings=warnings,
+        parse=render_parse(runs),
         times=table(
             ["Grammar", "Entry", "Bytes", "Nodes"] + stage_titles + ["Trim (µs/step)"],
             time_rows(runs),

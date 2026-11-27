@@ -144,6 +144,7 @@ class ReportTest(unittest.TestCase):
         marks = [
             "## Platform",
             "## Runs",
+            "## Parse time",
             "## Time per output",
             "## Duplicates",
             "## Memory",
@@ -383,7 +384,7 @@ class ReportTest(unittest.TestCase):
         )
         self.assertLess(out.index("## Runs"), out.index("Warning:"))
         self.assertLess(out.index("Warning:"), out.index("## Time per output"))
-        self.assertIn("optimization.\n\n## Time per output", out)
+        self.assertIn("optimization.\n\n## Parse time", out)
         self.assertNotIn("\n\n\n", out)
 
     def test_help_and_unknown_option(self) -> None:
@@ -431,10 +432,43 @@ class ReportTest(unittest.TestCase):
         out = self.render()
         for heading in ("Time per output", "Duplicates", "Memory"):
             self.assertIn(f"## {heading}\n", out)
-        self.assertEqual(out.count("No run in this result."), 3)
+        self.assertEqual(out.count("No run in this result."), 4)
         self.assertNotIn("\n\n\n", out)
         # the Runs table still lists the digest
         self.assertIn("| ruby | digest | `-n 200 -t 20` | 300 | 300 | – |", out)
+
+    def test_parse_summary(self) -> None:
+        seeds = (
+            "seed name=s1 bytes=500 parse_us=100.0 tree=1\n"
+            "seed name=s2 bytes=2048 parse_us=400.0 tree=1\n"
+            "seed name=s3 bytes=20480 parse_us=4000.0 tree=0\n"
+            "seed name=s4 bytes=600 parse_us=200.0 tree=1\n"
+            "seed name=s5 bytes=700 parse_us=300.0 tree=1\n"
+        )
+        run = RUBY_RUN.replace("seed name=0 bytes=131 parse_us=1728.0 tree=1\n", seeds)
+        write(self.dir, "ruby-run.txt", run)
+        out = self.render()
+        section = out[out.index("## Parse time") : out.index("## Time per output")]
+        # median 300; 90th percentile by nearest rank: the 5th of 5 values;
+        # median µs per KB: 100/(500/1024), 400/2, 4000/20, ... → 204.8
+        self.assertIn("| ruby | 5 | 1 | 300 | 4,000 | 4,000 | s3 | 205 |", section)
+        self.assertIn("| ruby | under 1 KB | 3 | 200 |", section)
+        self.assertIn("| ruby | 1–10 KB | 1 | 400 |", section)
+        self.assertIn("| ruby | 10–100 KB | 1 | 4,000 |", section)
+        self.assertNotIn("| ruby | 100 KB or more |", section)
+        # the javascript run has one seed of 755 bytes
+        self.assertIn("| javascript | 1 | 0 | 2,376 | 2,376 | 2,376 | a.js |", section)
+        self.assertIn("| javascript | under 1 KB | 1 | 2,376 |", section)
+        self.assertLess(section.index("| javascript |"), section.index("| ruby |"))
+        self.assertIn("one-time setup of the parser", section)
+        self.assertNotIn("\n\n\n", out)
+
+    def test_nearest_rank(self) -> None:
+        self.assertEqual(report.nearest_rank([5.0], 0.9), 5.0)
+        self.assertEqual(report.nearest_rank([4.0, 1.0, 3.0, 2.0], 0.5), 2.0)
+        values = [float(v) for v in range(1, 11)]
+        self.assertEqual(report.nearest_rank(values, 0.9), 9.0)
+        self.assertEqual(report.nearest_rank(values, 1.0), 10.0)
 
     def test_mixed_grammars(self) -> None:
         # javascript has only a digest, ruby has a run and a digest
@@ -457,6 +491,7 @@ class ReportTest(unittest.TestCase):
             "platform",
             "runs",
             "warnings",
+            "parse",
             "times",
             "rates",
             "memory",

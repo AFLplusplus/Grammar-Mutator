@@ -80,6 +80,24 @@ power: Now drawing from 'AC Power'
 | ruby | run | `-e 5 -n 5000 -t 2000` | 300 | 300 | 445.9 ms |
 | ruby | digest | `-n 1000 -t 100` | 300 | 300 | 10.5 s |
 
+## Parse time
+
+The time of the first load of each seed: the parse, the tree file write, and
+the chunk store add, in µs. All seeds count, also the seeds without a tree.
+The first seed in name order also includes the one-time setup of the parser.
+
+| Grammar | Seeds | No tree | Median | 90th percentile | Slowest | Slowest seed | Median µs per KB |
+|---|---|---|---|---|---|---|---|
+| javascript | 1,035 | 22 | 6,113 | 41,350 | 1,785,336 | regression-test-issue-453.js | 5,298 |
+| ruby | 300 | 0 | 82 | 118 | 1,436 | 0 | 492 |
+
+| Grammar | Size | Seeds | Median |
+|---|---|---|---|
+| javascript | under 1 KB | 529 | 2,382 |
+| javascript | 1–10 KB | 497 | 17,162 |
+| javascript | 10–100 KB | 9 | 170,754 |
+| ruby | under 1 KB | 300 | 82 |
+
 ## Time per output
 
 Time in µs for each output, for each stage.
