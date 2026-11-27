@@ -4,7 +4,9 @@
 # The script downloads JerryScript v3.0.0 and checks its SHA-256. It copies
 # each .js file of tests/jerry/ into DEST, except the files in tests/jerry/fail/.
 # DEST is one flat folder. A "/" in the path below tests/jerry/ becomes "_".
-# DEST must not exist, or it must be empty.
+# DEST must not exist, or it must be empty. The script stops with an error if
+# two paths give the same flat name. After an error, the script removes the
+# files it copied, and also DEST if the script made it.
 set -eu
 
 url=https://github.com/jerryscript-project/jerryscript/archive/refs/tags/v3.0.0.tar.gz
@@ -50,13 +52,35 @@ fi
 mkdir "$work/src"
 tar -xzf "$archive" -C "$work/src"
 jerry=$work/src/jerryscript-3.0.0/tests/jerry
+created=0
+if [ ! -e "$dest" ]; then created=1; fi
 mkdir -p "$dest"
+: >"$work/copied"
+
+# Stop with a message. Remove only what this script made in DEST.
+stop_copy() {
+  echo "[-] $1" >&2
+  if [ "$created" -eq 1 ]; then
+    rm -rf "$dest"
+  else
+    while IFS= read -r copied; do
+      rm -f "$copied"
+    done <"$work/copied"
+  fi
+  exit 1
+}
+
 count=0
 # JerryScript file names have no newline, so a line loop is safe.
 find "$jerry" -type f -name '*.js' ! -path "$jerry/fail/*" | sort >"$work/list"
 while IFS= read -r file; do
   rel=${file#"$jerry"/}
-  cp "$file" "$dest/$(printf '%s' "$rel" | tr '/' '_')"
+  target=$dest/$(printf '%s' "$rel" | tr '/' '_')
+  if [ -e "$target" ]; then
+    stop_copy "Two files give the name $target"
+  fi
+  printf '%s\n' "$target" >>"$work/copied"
+  cp "$file" "$target" || stop_copy "Cannot copy $file to $target"
   count=$((count + 1))
 done <"$work/list"
 echo "[+] $count seeds in $dest"
