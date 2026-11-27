@@ -59,6 +59,8 @@ UNCHANGED = [
     "/* %Foo(x) */",
     '"\\"%Foo(',
     '"%Foo(',
+    '"\\"; %Foo(1)"',
+    "'\\'; %Foo(1)'",
     "/* %Foo(",
     "myreturn %Foo(x)",
     "% Foo(x);",  # A space after % is not a runtime call.
