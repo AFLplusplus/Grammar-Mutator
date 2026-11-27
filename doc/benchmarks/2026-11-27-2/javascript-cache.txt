@@ -1,0 +1,13 @@
+benchmark version=1.2.0 grammar=javascript system=Darwin machine=arm64 optimized=1 mode=cache seed=0 mutants=100000 interval=10000 parse_budget_ms=50 seeds=1035
+cache phase=seeds parses=1035 parser_states=14259 lexer_states=349 heap_kb=562965 rss_kb=740064 us_per_parse=19850.3 trees=1011 not_utf8=0 stopped=2
+cache phase=mutants parses=11035 parser_states=16036 lexer_states=355 heap_kb=628141 rss_kb=771424 us_per_parse=10821.7 trees=1992 not_utf8=7224 stopped=3
+cache phase=mutants parses=21035 parser_states=17511 lexer_states=357 heap_kb=706220 rss_kb=848128 us_per_parse=10024.8 trees=2933 not_utf8=14384 stopped=3
+cache phase=mutants parses=31035 parser_states=18689 lexer_states=359 heap_kb=767546 rss_kb=908016 us_per_parse=10399.6 trees=3867 not_utf8=21576 stopped=3
+cache phase=mutants parses=41035 parser_states=19600 lexer_states=360 heap_kb=806162 rss_kb=945264 us_per_parse=10224.1 trees=4848 not_utf8=28711 stopped=5
+cache phase=mutants parses=51035 parser_states=21422 lexer_states=363 heap_kb=887190 rss_kb=1023520 us_per_parse=11213.2 trees=5777 not_utf8=35989 stopped=8
+cache phase=mutants parses=61035 parser_states=22703 lexer_states=363 heap_kb=935082 rss_kb=1071248 us_per_parse=11677.1 trees=6715 not_utf8=43227 stopped=9
+cache phase=mutants parses=71035 parser_states=24528 lexer_states=363 heap_kb=1011662 rss_kb=1145088 us_per_parse=11244.5 trees=7678 not_utf8=50414 stopped=11
+cache phase=mutants parses=81035 parser_states=25997 lexer_states=364 heap_kb=1075433 rss_kb=1207872 us_per_parse=10936.1 trees=8628 not_utf8=57583 stopped=13
+cache phase=mutants parses=91035 parser_states=27546 lexer_states=365 heap_kb=1159748 rss_kb=1290528 us_per_parse=11044.7 trees=9542 not_utf8=64832 stopped=14
+cache phase=mutants parses=101035 parser_states=28676 lexer_states=365 heap_kb=1216609 rss_kb=1349856 us_per_parse=10431.7 trees=10509 not_utf8=72016 stopped=15
+elapsed wall_ms=324613.0

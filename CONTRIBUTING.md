@@ -76,6 +76,12 @@ Use the benchmark program to measure a change that affects speed. The program
    benchmark-<name> run <seed folder>
    ```
 
+   To measure the growth of the ANTLR parse cache, run the `cache` mode:
+
+   ```bash
+   benchmark-<name> cache -m 100000 <seed folder>
+   ```
+
 4. If the change must keep the outputs, compare the `digest` record before
    and after.
 

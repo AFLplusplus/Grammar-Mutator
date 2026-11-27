@@ -1,0 +1,13 @@
+benchmark version=1.2.0 grammar=ruby system=Darwin machine=arm64 optimized=1 mode=cache seed=0 mutants=100000 interval=10000 parse_budget_ms=50 seeds=300
+cache phase=seeds parses=300 parser_states=25 lexer_states=1963 heap_kb=5363 rss_kb=9088 us_per_parse=45.7 trees=300 not_utf8=0 stopped=0
+cache phase=mutants parses=10300 parser_states=25 lexer_states=2138 heap_kb=5947 rss_kb=10272 us_per_parse=225.2 trees=3183 not_utf8=7117 stopped=0
+cache phase=mutants parses=20300 parser_states=25 lexer_states=2193 heap_kb=6112 rss_kb=10448 us_per_parse=216.3 trees=6106 not_utf8=14194 stopped=0
+cache phase=mutants parses=30300 parser_states=25 lexer_states=2244 heap_kb=6235 rss_kb=10640 us_per_parse=218.9 trees=9026 not_utf8=21274 stopped=0
+cache phase=mutants parses=40300 parser_states=25 lexer_states=2275 heap_kb=6319 rss_kb=10720 us_per_parse=217.3 trees=11999 not_utf8=28301 stopped=0
+cache phase=mutants parses=50300 parser_states=25 lexer_states=2302 heap_kb=6413 rss_kb=10832 us_per_parse=230.1 trees=14903 not_utf8=35397 stopped=0
+cache phase=mutants parses=60300 parser_states=25 lexer_states=2321 heap_kb=6460 rss_kb=10880 us_per_parse=220.2 trees=17842 not_utf8=42458 stopped=0
+cache phase=mutants parses=70300 parser_states=25 lexer_states=2329 heap_kb=6508 rss_kb=10912 us_per_parse=219.9 trees=20769 not_utf8=49531 stopped=0
+cache phase=mutants parses=80300 parser_states=25 lexer_states=2344 heap_kb=6568 rss_kb=10960 us_per_parse=218.9 trees=23655 not_utf8=56645 stopped=0
+cache phase=mutants parses=90300 parser_states=25 lexer_states=2352 heap_kb=6625 rss_kb=11056 us_per_parse=218.1 trees=26574 not_utf8=63726 stopped=0
+cache phase=mutants parses=100300 parser_states=26 lexer_states=2361 heap_kb=6667 rss_kb=11136 us_per_parse=220.4 trees=29482 not_utf8=70818 stopped=0
+elapsed wall_ms=6890.1
