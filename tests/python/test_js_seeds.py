@@ -486,7 +486,8 @@ ADDED_NAMES = {
     "if (new Proxy({}, h).x !== 5) throw 0;"
     "new Proxy({}, allowProxyTraps());",
     "$MAX_ITERATIONS": "if (!($MAX_ITERATIONS > 0)) throw 0;",
-    "TemporalHelpers":
+    "TemporalHelpers": "TemporalHelpers.checkToTemporalCalendarFastPath("
+    "function () { globalThis.th = 1; }); if (globalThis.th !== 1) throw 0;"
     "TemporalHelpers.assertDuration(1, 2); TemporalHelpers.ISO.plainDate();",
     "ctors": "if (ctors.indexOf(Int8Array) < 0) throw 0;"
     "if (ctors.indexOf(BigInt64Array) < 0) throw 0;",
@@ -725,6 +726,14 @@ class ShimsTest(unittest.TestCase):
                 pre = "globalThis.%s = function () { throw 1; };" % name
                 self.assertEqual(self.run_seed("%s(1, 2);" % name, pre), 0)
 
+    def test_added_code_runners_always_replaced(self):
+        for name, arg in (("assertThrowsValue", "function () { r = 1; }"),
+                          ("shouldBeTrue", '"r = 1"')):
+            with self.subTest(name=name):
+                pre = "globalThis.%s = function () { throw 1; };" % name
+                seed = "var r = 0; %s(%s); if (r !== 1) throw 0;" % (name, arg)
+                self.assertEqual(self.run_seed(seed, pre), 0)
+
     def test_nested_sink(self):
         self.assertEqual(
             self.run_seed(
@@ -735,10 +744,28 @@ class ShimsTest(unittest.TestCase):
             0,
         )
 
-    def test_console_if_missing(self):
+    def test_sink_runs_functions_not_strings(self):
+        # A call on a sink runs each function argument. It never runs a
+        # string, and a callback that calls the sink again ends.
         self.assertEqual(
             self.run_seed(
-                'console.log("x"); console.error(1);',
+                "var n = 0;"
+                '$vm.a(function () { n++; }, "n += 10");'
+                'd8.file.execute("n += 100");'
+                "new Sandbox.X(function () { n++; });"
+                "$vm.b(function f() { $vm.b(f); });"
+                '$262.agent.start("n += 1000");'
+                "if (n !== 2) throw 0;"
+            ),
+            0,
+        )
+
+    def test_console_if_missing(self):
+        # console.log() prints a function; it does not call it.
+        self.assertEqual(
+            self.run_seed(
+                'console.log("x"); console.error(1); var c = 0;'
+                "console.log(function () { c++; }); if (c !== 0) throw 0;",
                 "delete globalThis.console;",
             ),
             0,

@@ -157,7 +157,8 @@ SUITES: tuple[Suite, ...] = (
 
 # Entries of the form "<suite>/<rel>" that get the reason `slow-parse`.
 # At the pins above, grammar_parser-javascript takes more than 60 s for each
-# file, alone and with one thread. Array elisions (`[,,,]`) cause most of it.
+# file, alone and with one thread. All of them, except
+# v8-earley-boyer-strict.js, have array elisions (`[,,,]`).
 EXCLUDE: frozenset[str] = frozenset(
     {
         "mjsunit/es6/spread-array-misc.js",

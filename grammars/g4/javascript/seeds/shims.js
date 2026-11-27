@@ -10,9 +10,9 @@
 //
 // Shims for the test files of test262, V8 mjsunit, and WebKit JSTests.
 // The engine runs this file and then one seed, in one global context.
-// A shim never throws, and it runs the code that it gets. The asserts are
-// always replaced. Other names are set only if missing, so jsc and d8 keep
-// their own functions. ES5 syntax only; nothing is declared at top level.
+// A shim never throws, and it runs the code that it gets. This file always
+// replaces the asserts. It sets other names only if missing, so jsc and d8
+// keep their own functions. It uses ES5 syntax and declares no global.
 (function (g) {
   function noop() {}
   function zero() { return 0; }
@@ -35,16 +35,17 @@
     for (var k = 0; k < list.length; k++) missing(list[k], noop);
   }
 
-  // A function proxy. A call does nothing. Each property that `base` does
-  // not have gives the proxy again, so `d8.file.execute()` works.
-  function sink(base) {
+  // A function proxy. A call runs each function argument (no string), unless
+  // `quiet`. A property that `base` does not have gives the proxy again.
+  function sink(base, quiet) {
     try {
-      if (typeof Proxy === "function") {
-        var p = new Proxy(function () { "use strict"; }, {
-          get: function (t, k) { return base && k in base ? base[k] : p; }
-        });
-        return p;
-      }
+      var p = new Proxy(function () {
+        "use strict";
+        for (var j = 0; !quiet && j < arguments.length; j++) {
+          if (typeof arguments[j] === "function") run(arguments[j]);
+        }
+      }, { get: function (t, k) { return base && k in base ? base[k] : p; } });
+      return p;
     } catch (e) {}
     return base || {};
   }
@@ -76,7 +77,7 @@
   }
 
   function toStr(v) {
-    try { return String(v); } catch (e) { return "[object]"; }
+    try { return String(v); } catch (e) {}
   }
 
   // A new global object if the engine can make one, else this global.
@@ -97,7 +98,7 @@
   missingNoops(["print", "gc", "quit", "load", "clearTimeout"]);
   missing("readline", function () { return ""; });
   missing("version", zero);
-  missing("console", sink());
+  missing("console", sink(0, 1));
 
   // test262: assert.
   function assert() {}
@@ -146,10 +147,8 @@
   function eachCtor(cb, list, from) {
     try {
       for (var j = 0; j < list.length; j++) {
-        try {
-          var c = typeof list[j] === "string" ? (from || g)[list[j]] : list[j];
-          if (typeof c === "function") cb(c);
-        } catch (e) {}
+        var c = typeof list[j] === "string" ? (from || g)[list[j]] : list[j];
+        if (typeof c === "function") run(function () { cb(c); });
       }
     } catch (e) {}
   }
@@ -168,7 +167,7 @@
   missing("anyTypedArrayConstructors", ctorList(allNames));
   missing("floatArrayConstructors", ctorList(floatNames));
   missing("typedArrayConstructors", ctorList(taNames));
-  // A resizable buffer, if the engine has them.
+  // A resizable buffer.
   function rab(len, max) {
     try { return new ArrayBuffer(len, { maxByteLength: max }); } catch (e) {}
   }
@@ -184,7 +183,7 @@
     return n;
   });
   missing("ToNumbers", function (a) {
-    try { return [].map.call(a, Number); } catch (e) { return []; }
+    try { return [].map.call(a, Number); } catch (e) {}
   });
   missing("CollectValuesAndResize", function (n, values, buf, after, to) {
     try { if (values.push(n) === after) buf.resize(to); } catch (e) {}
@@ -208,10 +207,7 @@
       gc: g.gc,
       clearKeptObjects: noop,
       agent: sink({ monotonicNow: zero }),
-      detachArrayBuffer: function (ab) {
-        try { if (ab && typeof ab.transfer === "function") ab.transfer(); }
-        catch (e) {}
-      },
+      detachArrayBuffer: function (ab) { try { ab.transfer(); } catch (e) {} },
       evalScript: function (src) { return evalIn(r.global, src); },
       createRealm: function () {
         var o = make262();
