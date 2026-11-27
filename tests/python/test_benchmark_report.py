@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import sys
 import tempfile
 import unittest
@@ -144,7 +145,7 @@ class ReportTest(unittest.TestCase):
         ]
         positions = [out.index(m) for m in marks]
         self.assertEqual(positions, sorted(positions))
-        self.assertTrue(out.endswith("platform.\n"))
+        self.assertTrue(out.endswith("no recursive stage.\n"))
 
     def test_keeps_text_outside_markers(self) -> None:
         generated = self.render()
@@ -279,7 +280,10 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(run_main([str(self.dir), "--check"]), 0)
         self.assertTrue(report.check(self.dir))
         readme = self.dir / "README.md"
-        readme.write_text(readme.read_text().replace("Peak memory", "Peak"))
+        readme.write_text(
+            readme.read_text(encoding="utf-8").replace("Peak memory", "Peak"),
+            encoding="utf-8",
+        )
         self.assertEqual(run_main([str(self.dir), "--check"]), 1)
         self.assertFalse(report.check(self.dir))
 
@@ -288,7 +292,10 @@ class ReportTest(unittest.TestCase):
         folders = [
             readme.parent
             for readme in sorted(root.glob("*/README.md"))
-            if report.START_MARKER in readme.read_text(encoding="utf-8")
+            if any(
+                marker in readme.read_text(encoding="utf-8")
+                for marker in (report.START_MARKER, report.END_MARKER)
+            )
         ]
         self.assertTrue(folders, "no committed result has the report markers")
         for folder in folders:
@@ -297,6 +304,109 @@ class ReportTest(unittest.TestCase):
                     report.check(folder),
                     f"{folder}: README.md differs from report.py output",
                 )
+
+    def test_note_explains_dash(self) -> None:
+        out = self.render()
+        self.assertIn("– means that the raw file has no record for the cell.", out)
+        self.assertIn("An entry without a recursion edge has no recursive stage.", out)
+
+    def test_no_run_or_digest_file(self) -> None:
+        only = Path(self._tmp.name) / "only"
+        only.mkdir()
+        write(only, "platform.txt", PLATFORM)
+        with self.assertRaises(report.ReportError) as ctx:
+            report.load_result(only)
+        self.assertIn("no run file and no digest file", str(ctx.exception))
+        self.assertEqual(run_main([str(only)]), 1)
+        self.assertFalse((only / "README.md").exists())
+
+    def test_no_platform_file(self) -> None:
+        (self.dir / "platform.txt").unlink()
+        with self.assertRaises(report.ReportError) as ctx:
+            report.load_result(self.dir)
+        self.assertIn("no platform file", str(ctx.exception))
+        self.assertEqual(run_main([str(self.dir)]), 1)
+
+    def test_repeated_stage_and_trim(self) -> None:
+        cases = {
+            "stage": "stage entry=0 stage=rules steps=9 us_per_output=9.0"
+            " avg_bytes=140 dup_pct=0.0 same_pct=0.0\n",
+            "trim": "trim entry=244 steps=10 us_per_step=0.5\n",
+        }
+        for kind, line in cases.items():
+            with self.subTest(kind=kind):
+                write(self.dir, "ruby-run.txt", RUBY_RUN + line)
+                with self.assertRaises(report.ReportError) as ctx:
+                    report.load_result(self.dir)
+                self.assertIn("ruby-run.txt:", str(ctx.exception))
+                self.assertIn("more than once", str(ctx.exception))
+                write(self.dir, "ruby-run.txt", RUBY_RUN)
+
+    def test_end_marker_only(self) -> None:
+        write(self.dir, "README.md", "text\n" + report.END_MARKER + "\n")
+        with self.assertRaises(report.ReportError) as ctx:
+            report.check(self.dir)
+        self.assertIn(str(self.dir / "README.md"), str(ctx.exception))
+        self.assertIn("exactly one start marker", str(ctx.exception))
+
+    def test_mixed_platform_fields(self) -> None:
+        for field in ("version", "system", "machine"):
+            with self.subTest(field=field):
+                old = {"version": "1.2.0", "system": "Darwin", "machine": "arm64"}[field]
+                other = JS_RUN.replace(f"{field}={old}", f"{field}=other", 1)
+                write(self.dir, "javascript-run.txt", other)
+                with self.assertRaises(report.ReportError) as ctx:
+                    report.load_result(self.dir)
+                msg = str(ctx.exception)
+                self.assertIn(field, msg)
+                self.assertIn("javascript-run.txt", msg)
+                self.assertIn("ruby-digest.txt", msg)
+                write(self.dir, "javascript-run.txt", JS_RUN)
+
+    def test_warning_without_optimization(self) -> None:
+        self.assertNotIn("Warning:", self.render())
+        slow = RUBY_RUN.replace("optimized=1", "optimized=0", 1)
+        write(self.dir, "ruby-run.txt", slow)
+        out = self.render()
+        self.assertIn(
+            "Warning: ruby-run.txt comes from a build without optimization.", out
+        )
+        self.assertLess(out.index("## Runs"), out.index("Warning:"))
+        self.assertLess(out.index("Warning:"), out.index("## javascript"))
+
+    def test_help_and_unknown_option(self) -> None:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(report.main(["-h"]), 0)
+            self.assertEqual(report.main(["--help"]), 0)
+        self.assertIn("usage: report.py", out.getvalue())
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(report.main(["--bogus"]), 2)
+            self.assertEqual(report.main([str(self.dir), "-x"]), 2)
+        self.assertIn("usage: report.py", err.getvalue())
+
+    @unittest.skipIf(
+        not hasattr(os, "geteuid") or os.geteuid() == 0, "needs a non-root user"
+    )
+    def test_unreadable_readme(self) -> None:
+        readme = self.dir / "README.md"
+        write(self.dir, "README.md", HAND_TEXT)
+        readme.chmod(0)
+        self.addCleanup(readme.chmod, 0o644)
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(report.main([str(self.dir)]), 1)
+            self.assertEqual(report.main([str(self.dir), "--check"]), 1)
+        self.assertIn(f"report.py: {readme}:", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
+
+    def test_check_leaves_file_unchanged(self) -> None:
+        readme = self.dir / "README.md"
+        write(self.dir, "README.md", HAND_TEXT)
+        before = readme.read_bytes()
+        self.assertEqual(run_main([str(self.dir), "--check"]), 1)
+        self.assertEqual(readme.read_bytes(), before)
 
     def test_usage(self) -> None:
         self.assertEqual(run_main([]), 2)
