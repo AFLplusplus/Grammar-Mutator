@@ -86,6 +86,8 @@ Use the benchmark program to measure a change that affects speed. The program
 5. The program sets the step variables from `-n` and `-t`. It also turns the
    parse time limit off, unless you set `PARSE_TIME_BUDGET_MS`. So the same
    command does the same work.
+   Press Ctrl-C to stop a `run` or `digest`. The program then removes its
+   work folder.
 6. To keep a result as a comparison point, follow
    [doc/benchmarks/README.md](doc/benchmarks/README.md).
 

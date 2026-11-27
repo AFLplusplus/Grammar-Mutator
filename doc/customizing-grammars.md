@@ -174,3 +174,5 @@ inputs, for example lists with many items, and compare the times. The
 `benchmark-<name> parse <file>...` program prints the parse time of each file.
 It is in `src/benchmark/` after a make build, and in `<build>/src/benchmark/`
 after a CMake build.
+The first file includes the one-time setup time of the parser. Compare later
+files, or parse the first file twice.
