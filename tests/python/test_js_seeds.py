@@ -394,5 +394,98 @@ class FetchRepoTest(unittest.TestCase):
         self.assertIn("local", out.getvalue())
 
 
+SHIMS = SEEDS_DIR / "shims.js"
+RUNNER = (
+    "const vm = require('vm'), fs = require('fs');"
+    "vm.runInThisContext(fs.readFileSync(process.argv[1], 'utf8'));"
+    "vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));"
+)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node is not installed")
+class ShimsTest(unittest.TestCase):
+    def run_seed(self, source: str) -> int:
+        with tempfile.TemporaryDirectory() as tmp:
+            seed = Path(tmp) / "seed.js"
+            seed.write_text(source)
+            result = subprocess.run(
+                ["node", "-e", RUNNER, str(SHIMS), str(seed)],
+                capture_output=True,
+                timeout=10,
+            )
+        return result.returncode
+
+    def test_size(self):
+        self.assertLess(len(SHIMS.read_bytes()), 10240)
+
+    def test_test262(self):
+        self.assertEqual(
+            self.run_seed(
+                "assert.sameValue(1, 2); assert(false);"
+                "assert.throws(TypeError, function () { globalThis.ran = 1; });"
+                "if (globalThis.ran !== 1) throw 0;"
+            ),
+            0,
+        )
+
+    def test_typed_arrays(self):
+        self.assertEqual(
+            self.run_seed(
+                "testWithTypedArrayConstructors(function (TA) {"
+                " globalThis.n = (globalThis.n || 0) + 1; });"
+                "if (!(globalThis.n > 0)) throw 0;"
+            ),
+            0,
+        )
+
+    def test_262_object(self):
+        self.assertEqual(
+            self.run_seed(
+                "$DONE(); var r = $262.createRealm();"
+                "$262.detachArrayBuffer(new ArrayBuffer(8)); $262.gc();"
+            ),
+            0,
+        )
+
+    def test_mjsunit(self):
+        self.assertEqual(
+            self.run_seed(
+                "assertEquals(1, 2); assertTrue(false);"
+                "assertThrows(function () { globalThis.t = 1; });"
+                "if (globalThis.t !== 1) throw 0;"
+                '__v8native("OptimizeFunctionOnNextCall")(function () {});'
+            ),
+            0,
+        )
+
+    def test_mjsunit_string_code(self):
+        self.assertEqual(
+            self.run_seed(
+                'assertThrows("globalThis.u = 1");'
+                "if (globalThis.u !== 1) throw 0;"
+            ),
+            0,
+        )
+
+    def test_jstests(self):
+        self.assertEqual(
+            self.run_seed(
+                "noInline(function () {}); $vm.anything(1, 2);"
+                "if (numberOfDFGCompiles(function () {}) !== 0) throw 0;"
+                "shouldBe(1, 2);"
+            ),
+            0,
+        )
+
+    def test_let_redeclaration(self):
+        self.assertEqual(self.run_seed("let assertEquals = 1;"), 0)
+
+    def test_function_declaration_replaces_shim(self):
+        self.assertNotEqual(
+            self.run_seed("function assertEquals() { throw 1; } assertEquals();"),
+            0,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
