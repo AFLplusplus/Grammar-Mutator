@@ -55,12 +55,16 @@ in `<build>/src/benchmark/` after a CMake build.
    ```
 
 4. Run the benchmark commands. Save the output of each command in its own
-   file:
+   file. Name each file `<name>-run.txt` or `<name>-digest.txt`, so a result
+   with two grammars keeps both:
 
    ```bash
-   benchmark-<name> run -e 5 -n 5000 -t 2000 jerry-seeds > run.txt
-   benchmark-<name> digest -n 200 -t 20 jerry-seeds > digest.txt
+   benchmark-<name> run -e 5 -n 5000 -t 2000 jerry-seeds > <name>-run.txt
+   benchmark-<name> digest -n 200 -t 20 jerry-seeds > <name>-digest.txt
    ```
+
+   The script reads the grammar and the mode from the first line of each
+   file, not from the file name.
 
 5. Make the result folder `doc/benchmarks/<date>/`. Put the `.txt` files in
    it. Write the hand-written parts of `README.md`, and end them with these
@@ -77,7 +81,8 @@ in `<build>/src/benchmark/` after a CMake build.
    src/benchmark/report.py doc/benchmarks/<date>
    ```
 
-   The script replaces only the text between the markers. Add `--check` to
+   The script replaces only the text between the markers. If `README.md` does
+   not exist, the script writes one with the headings and the markers. Add `--check` to
    see if the file is up to date. `make test-python` checks every committed
    result with the markers. Do not edit the generated part by hand.
 7. Add a line for the folder to the list below.

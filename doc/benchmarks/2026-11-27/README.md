@@ -4,9 +4,9 @@ This result is the comparison point for release 1.2.0.
 
 ## What it measured
 
-- The benchmark program of this branch. It adds the wall-time record
-  (`elapsed`). The library code is the same as release 1.2.0 (`v1.2.0`,
-  `9f8df44`).
+- The benchmark program of pull request #85, on top of `fc77333` on
+  `stable`. It adds the wall-time record (`elapsed`). The library code is the
+  same as release 1.2.0 (`v1.2.0`, `9f8df44`).
 - The load average was about 2 before and after the runs. Other desktop
   programs were open. No build ran at the same time.
 
@@ -137,6 +137,6 @@ Duplicate outputs and outputs equal to the seed, in percent.
 | javascript | `-n 200 -t 20` | 1,613,412 | 1,013 | 36,887 | `14d12669df4be2e1` |
 | ruby | `-n 1000 -t 100` | 2,216,315 | 300 | 13,702 | `fd87045834903cd1` |
 
-The duplicate rates go up with the number of steps. Compare results only at the same options and on the same platform.
+The duplicate rates go up with the number of steps. Compare results only at the same options and on the same platform. – means that the raw file has no record for the cell. An entry without a recursion edge has no recursive stage.
 
 <!-- report.py: end of the generated part -->
