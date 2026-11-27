@@ -24,6 +24,16 @@ on:
   pull_request:
 
 jobs:
+  # Always run. The unit tests also check that the committed benchmark results
+  # match the script. A pull request of only results skips the build jobs.
+  benchmark-report:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Test the benchmark report script
+      run: python3 -m unittest discover -s tests/python -p 'test_benchmark_report.py' -v
+
   # Decide whether the change needs the build jobs. A pull request that changes
   # only documentation skips them. GitHub counts a skipped job as passed, so the
   # required checks (make-build, cmake-build) do not block such a pull request.
