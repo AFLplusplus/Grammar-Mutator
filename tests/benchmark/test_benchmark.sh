@@ -136,3 +136,39 @@ status=0
 [ -z "$(ls -A "$work/tmp")" ] && [ -z "$(ls -A "$work/tmp2")" ] ||
   fail "digest left a work folder behind"
 echo "[+] digest gives a stable hash and leaves no work folder"
+
+# parse time limit: an empty value is the same as unset; a value shows safely
+PARSE_TIME_BUDGET_MS= "$bench" run -e 1 -n 5 -t 5 "$work/seeds" \
+  > "$work/budget1.txt" 2> /dev/null || fail "empty budget: nonzero exit"
+grep '^benchmark ' "$work/budget1.txt" | grep -q ' parse_budget_ms=0 ' ||
+  fail "an empty PARSE_TIME_BUDGET_MS must give parse_budget_ms=0"
+PARSE_TIME_BUDGET_MS="5 0" "$bench" run -e 1 -n 5 -t 5 "$work/seeds" \
+  > "$work/budget2.txt" 2> /dev/null || fail "odd budget: nonzero exit"
+grep '^benchmark ' "$work/budget2.txt" | grep -q ' parse_budget_ms=5?0 ' ||
+  fail "a blank in PARSE_TIME_BUDGET_MS must print as '?'"
+echo "[+] an empty PARSE_TIME_BUDGET_MS turns the limit off; blanks print as ?"
+
+# seeds without a tree: a file that is not UTF-8 gives no tree
+mkdir "$work/notree"
+printf '\377' > "$work/notree/bad1"
+printf '\377\376' > "$work/notree/bad2"
+for mode in run digest; do
+  status=0
+  "$bench" $mode "$work/notree" > /dev/null 2> "$work/err.txt" || status=$?
+  [ "$status" -eq 1 ] || fail "$mode without a tree: expected exit 1, got $status"
+  [ -s "$work/err.txt" ] || fail "$mode without a tree: no message on stderr"
+done
+[ -z "$(ls -A "$work/tmp")" ] || fail "a run without a tree left a work folder"
+echo "[+] run and digest reject seeds without a tree"
+
+# digest: a seed without a tree changes the hash
+mkdir "$work/mixed"
+cp "$work"/seeds/* "$work/mixed/"
+printf '\377' > "$work/mixed/zz-bad"
+dm=$("$bench" digest -n 50 -t 10 "$work/mixed") || fail "digest mixed: exit"
+echo "$dm" | grep '^benchmark ' | grep -q ' seeds=21 trees=20$' ||
+  fail "digest mixed: expected seeds=21 trees=20"
+[ "$(echo "$dm" | grep '^digest ' | sed 's/.*hash=//')" != \
+  "$(echo "$d1" | grep '^digest ' | sed 's/.*hash=//')" ] ||
+  fail "digest: a seed without a tree must change the hash"
+echo "[+] digest counts a seed without a tree"
