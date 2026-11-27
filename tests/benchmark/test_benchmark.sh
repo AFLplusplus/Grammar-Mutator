@@ -228,20 +228,27 @@ kill -TERM "$pid_nohup"
 [ -z "$(ls -A "$work/tmp-nohup")" ] || fail "the nohup run left a work folder"
 echo "[+] a run with SIGHUP ignored goes on after SIGHUP"
 
-# a failed write to stdout gives exit 1 (a closed stdout gives EBADF)
+# a failed write to stdout gives exit 1. parse: a closed stdout gives EBADF
+# (its next open takes fd 1, a read-only file, so this is safe only here).
 status=0
 "$bench" parse "$work"/seeds/* >&- 2> /dev/null || status=$?
 [ "$status" -eq 1 ] || fail "parse with a closed stdout: expected exit 1, got $status"
-mkdir "$work/tmp-closed"
-status=0
-TMPDIR="$work/tmp-closed" "$bench" run -e 1 -n 5 -t 5 "$work/seeds" >&- 2> /dev/null ||
-  status=$?
-[ "$status" -eq 1 ] || fail "run with a closed stdout: expected exit 1, got $status"
-status=0
-TMPDIR="$work/tmp-closed" "$bench" digest -n 5 -t 5 "$work/seeds" >&- 2> /dev/null ||
-  status=$?
-[ "$status" -eq 1 ] || fail "digest with a closed stdout: expected exit 1, got $status"
-[ -z "$(ls -A "$work/tmp-closed")" ] || fail "a failed write left a work folder"
+# run and digest: /dev/full gives ENOSPC on each write (Linux only)
+if [ -w /dev/full ]; then
+  mkdir "$work/tmp-full"
+  for mode in "run -e 1 -n 5 -t 5" "digest -n 5 -t 5"; do
+    status=0
+    # shellcheck disable=SC2086
+    TMPDIR="$work/tmp-full" "$bench" $mode "$work/seeds" > /dev/full \
+      2> "$work/full.err" || status=$?
+    [ "$status" -eq 1 ] || fail "$mode to /dev/full: expected exit 1, got $status"
+    grep -q 'Cannot write the output' "$work/full.err" ||
+      fail "$mode to /dev/full: no message on stderr"
+  done
+  [ -z "$(ls -A "$work/tmp-full")" ] || fail "a failed write left a work folder"
+else
+  echo "[*] no /dev/full: the write error checks of run and digest are skipped"
+fi
 echo "[+] a failed write to stdout gives exit 1"
 
 # a closed pipe (SIGPIPE) ends the run, with the same cleanup. The run prints

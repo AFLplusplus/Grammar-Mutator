@@ -9,6 +9,9 @@
 # after SIGHUP, SIGINT, or SIGTERM, the EXIT trap removes its temporary folder
 # and the files it copied, and also DEST if the script made it. The script
 # never removes a DEST that existed before, also not a symbolic link.
+# SIGINT is the exception if the shell started the script with SIGINT ignored
+# (for example as a background job): POSIX does not let a script trap a signal
+# that is ignored on entry, so no cleanup runs then.
 set -eu
 
 url=https://github.com/jerryscript-project/jerryscript/archive/refs/tags/v3.0.0.tar.gz
