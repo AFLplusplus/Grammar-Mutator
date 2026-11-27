@@ -417,23 +417,31 @@ class FetchRepoTest(unittest.TestCase):
 SHIMS = SEEDS_DIR / "shims.js"
 RUNNER = (
     "const vm = require('vm'), fs = require('fs');"
-    "vm.runInThisContext(fs.readFileSync(process.argv[1], 'utf8'));"
-    "vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));"
+    "process.argv.slice(1).forEach(function (f) {"
+    "vm.runInThisContext(fs.readFileSync(f, 'utf8')); });"
 )
 
 
 @unittest.skipIf(shutil.which("node") is None, "node is not installed")
 class ShimsTest(unittest.TestCase):
-    def run_seed(self, source: str) -> int:
+    def run_full(self, source: str, pre: str = ""):
         with tempfile.TemporaryDirectory() as tmp:
             seed = Path(tmp) / "seed.js"
             seed.write_text(source)
-            result = subprocess.run(
-                ["node", "-e", RUNNER, str(SHIMS), str(seed)],
+            files = [str(SHIMS), str(seed)]
+            if pre:
+                first = Path(tmp) / "pre.js"
+                first.write_text(pre)
+                files.insert(0, str(first))
+            return subprocess.run(
+                ["node", "-e", RUNNER] + files,
                 capture_output=True,
+                text=True,
                 timeout=10,
             )
-        return result.returncode
+
+    def run_seed(self, source: str, pre: str = "") -> int:
+        return self.run_full(source, pre).returncode
 
     def test_size(self):
         self.assertLess(len(SHIMS.read_bytes()), 10240)
@@ -504,6 +512,60 @@ class ShimsTest(unittest.TestCase):
         self.assertNotEqual(
             self.run_seed(
                 "function assertEquals() { throw 1; } assertEquals();"
+            ),
+            0,
+        )
+
+    def test_engine_functions_stay(self):
+        pre = "var m = function () {}; globalThis.print = m;" \
+            "globalThis.setTimeout = m; globalThis.noInline = m;"
+        seed = "if (print !== m || setTimeout !== m || noInline !== m) throw 0;"
+        self.assertEqual(self.run_seed(seed, pre), 0)
+
+    def test_without_proxy(self):
+        self.assertEqual(
+            self.run_seed(
+                'if (typeof $vm !== "object") throw 0;',
+                "delete globalThis.Proxy;",
+            ),
+            0,
+        )
+
+    def test_async_test_runs_function(self):
+        self.assertEqual(
+            self.run_seed(
+                "asyncTest(function () { globalThis.a = 1;"
+                " return Promise.resolve(); });"
+                "if (globalThis.a !== 1) throw 0;"
+            ),
+            0,
+        )
+
+    def test_eval_script(self):
+        self.assertEqual(
+            self.run_seed(
+                '$262.evalScript("globalThis.e = 1");'
+                "if (globalThis.e !== 1) throw 0;"
+                "$262.evalScript({toString: function () { throw 1; }});"
+            ),
+            0,
+        )
+
+    def test_promise_result(self):
+        result = self.run_full(
+            "assertPromiseResult(Promise.resolve(5),"
+            " function (v) { globalThis.v = v; });"
+            "setTimeout(function () {"
+            ' if (globalThis.v === 5) console.log("V-IS-5"); });'
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("V-IS-5", result.stdout)
+
+    def test_error_without_new(self):
+        self.assertEqual(
+            self.run_seed(
+                'Test262Error("x"); MjsUnitAssertionError("y");'
+                "if (globalThis.message !== undefined) throw 0;"
             ),
             0,
         )
