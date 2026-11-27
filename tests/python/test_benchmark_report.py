@@ -1,0 +1,232 @@
+#
+# american fuzzy lop++ - grammar mutator
+# --------------------------------------
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at:
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+"""Unit tests for src/benchmark/report.py.
+
+Run them with `make test-python`.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import io
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "benchmark"))
+
+import report
+
+PLATFORM = "date: 2026-11-27\nsystem: TestOS 1\ncpu: Test CPU\n"
+
+RUBY_RUN = """\
+benchmark version=1.2.0 grammar=ruby system=Darwin machine=arm64 optimized=1 mode=run seed=0 entries=2 steps=5000 trims=2000 parse_budget_ms=0 seeds=300 trees=300
+seed name=0 bytes=131 parse_us=1728.0 tree=1
+store seeds=300 chunks=2302 fill_ms=1234.5
+entry name=0 bytes=131 nodes=3 rules_pairs=9 repick_us=1.0 count_us=1.0
+stage entry=0 stage=rules steps=9 us_per_output=9.0 avg_bytes=140 dup_pct=0.0 same_pct=0.0
+stage entry=0 stage=random steps=5000 us_per_output=1.0 avg_bytes=120 dup_pct=66.5 same_pct=25.0
+stage entry=0 stage=splice steps=5000 us_per_output=2.1 avg_bytes=150 dup_pct=46.2 same_pct=22.9
+trim entry=0 steps=10 us_per_step=0.5
+entry name=244 bytes=344 nodes=175 rules_pairs=500 repick_us=1.0 count_us=1.0
+stage entry=244 stage=rules steps=500 us_per_output=4641.2 avg_bytes=340 dup_pct=0.7 same_pct=0.7
+stage entry=244 stage=random steps=5000 us_per_output=5.7 avg_bytes=330 dup_pct=70.0 same_pct=30.0
+stage entry=244 stage=recursive steps=5000 us_per_output=15.1 avg_bytes=580 dup_pct=98.1 same_pct=0.0
+stage entry=244 stage=splice steps=5000 us_per_output=6.5 avg_bytes=339 dup_pct=46.2 same_pct=22.9
+trim entry=244 steps=102 us_per_step=5.7
+peak rss_kb=9600
+"""
+
+JS_RUN = """\
+benchmark version=1.2.0 grammar=javascript system=Darwin machine=arm64 optimized=1 mode=run seed=0 entries=1 steps=5000 trims=2000 parse_budget_ms=0 seeds=1035 trees=1013
+seed name=a.js bytes=755 parse_us=2376.0 tree=1
+store seeds=1013 chunks=365859 fill_ms=22931.1
+entry name=a.js bytes=635 nodes=19 rules_pairs=79 repick_us=21.0 count_us=1.0
+stage entry=a.js stage=rules steps=79 us_per_output=31.2 avg_bytes=819 dup_pct=1.3 same_pct=0.0
+stage entry=a.js stage=random steps=5000 us_per_output=7.8 avg_bytes=694 dup_pct=40.1 same_pct=12.8
+stage entry=a.js stage=recursive steps=5000 us_per_output=22.7 avg_bytes=981 dup_pct=97.0 same_pct=0.1
+stage entry=a.js stage=splice steps=5000 us_per_output=69.3 avg_bytes=1171 dup_pct=19.6 same_pct=6.7
+trim entry=a.js steps=16 us_per_step=10.1
+peak rss_kb=855632
+elapsed wall_ms=132400.0
+"""
+
+RUBY_DIGEST = """\
+benchmark version=1.2.0 grammar=ruby system=Darwin machine=arm64 optimized=1 mode=digest seed=0 steps=200 trims=20 parse_budget_ms=0 seeds=300 trees=300
+digest outputs=1613412 new_entries=300 trims=13702 hash=fd87045834903cd1
+"""
+
+HAND_TEXT = (
+    "# Title\n\n## Notes\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n"
+    + report.START_MARKER
+    + "\nold\n"
+    + report.END_MARKER
+    + "\n\n## Notes\n\n| c | d |\n|---|---|\n| 3 | 4 |"
+)
+
+
+def write(folder: Path, name: str, text: str) -> None:
+    (folder / name).write_text(text, encoding="utf-8")
+
+
+def run_main(argv: list) -> int:
+    with contextlib.redirect_stderr(io.StringIO()):
+        return report.main(argv)
+
+
+class ReportTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.dir = Path(self._tmp.name) / "2026-11-27"
+        self.dir.mkdir()
+        write(self.dir, "platform.txt", PLATFORM)
+        write(self.dir, "ruby-run.txt", RUBY_RUN)
+        write(self.dir, "javascript-run.txt", JS_RUN)
+        write(self.dir, "ruby-digest.txt", RUBY_DIGEST)
+
+    def render(self) -> str:
+        return report.render(report.load_result(self.dir))
+
+    def test_time_table(self) -> None:
+        out = self.render()
+        self.assertIn("| 0 | 131 | 3 | 9.0 | 1.0 | – | 2.1 | 0.5 |", out)
+        self.assertIn("| 244 | 344 | 175 | 4,641 | 5.7 | 15 | 6.5 | 5.7 |", out)
+
+    def test_missing_stage_and_elapsed(self) -> None:
+        out = self.render()
+        self.assertIn("| 0 | 0.0 | 0.0 | 66.5 | 25.0 | – | – | 46.2 | 22.9 |", out)
+        self.assertIn("| ruby | run | `-e 2 -n 5000 -t 2000` | 300 | 300 | – |", out)
+
+    def test_wall_time_seconds(self) -> None:
+        self.assertIn(
+            "| javascript | run | `-e 1 -n 5000 -t 2000` | 1,035 | 1,013 | 132.4 s |",
+            self.render(),
+        )
+
+    def test_chunk_store(self) -> None:
+        out = self.render()
+        self.assertIn(
+            "- Chunk store: 365,859 chunks from 1,013 trees. The fill took 22.9 s.", out
+        )
+        self.assertIn("- Peak memory: 855,632 KB.", out)
+
+    def test_digest_table(self) -> None:
+        self.assertIn(
+            "| ruby | `-n 200 -t 20` | 1,613,412 | 300 | 13,702 | `fd87045834903cd1` |",
+            self.render(),
+        )
+
+    def test_platform_block(self) -> None:
+        self.assertIn(
+            "## Platform\n\n```\n" + PLATFORM + "```\n",
+            self.render(),
+        )
+
+    def test_order(self) -> None:
+        out = self.render()
+        marks = [
+            "## Platform",
+            "## Runs",
+            "## javascript",
+            "## ruby",
+            "## Digests",
+            "Compare results only",
+        ]
+        positions = [out.index(m) for m in marks]
+        self.assertEqual(positions, sorted(positions))
+        self.assertTrue(out.endswith("platform.\n"))
+
+    def test_keeps_text_outside_markers(self) -> None:
+        generated = self.render()
+        new = report.update_readme(HAND_TEXT, generated, "x")
+        before = HAND_TEXT[: HAND_TEXT.index(report.START_MARKER)]
+        after = HAND_TEXT[HAND_TEXT.index(report.END_MARKER) + len(report.END_MARKER) :]
+        self.assertTrue(new.startswith(before + report.START_MARKER))
+        self.assertTrue(new.endswith(report.END_MARKER + after))
+        self.assertIn("## Platform", new)
+        self.assertNotIn("\nold\n", new)
+
+    def test_second_run_no_change(self) -> None:
+        generated = self.render()
+        once = report.update_readme(HAND_TEXT, generated, "x")
+        self.assertEqual(report.update_readme(once, generated, "x"), once)
+        skeleton = report.update_readme(None, generated, "x")
+        self.assertEqual(report.update_readme(skeleton, generated, "x"), skeleton)
+
+    def test_skeleton(self) -> None:
+        out = report.update_readme(None, self.render(), "2026-11-27")
+        self.assertTrue(out.startswith("# Benchmark result of 2026-11-27\n"))
+        for heading in ("What it measured", "Build", "Seeds", "Commands"):
+            self.assertIn(f"\n## {heading}\n", out)
+        self.assertIn(report.START_MARKER, out)
+        self.assertIn(report.END_MARKER, out)
+        self.assertLess(out.index("## Commands"), out.index(report.START_MARKER))
+
+    def test_errors(self) -> None:
+        empty = Path(self._tmp.name) / "empty"
+        empty.mkdir()
+        with self.assertRaises(report.ReportError):
+            report.load_result(empty)
+        self.assertEqual(run_main([str(empty)]), 1)
+
+        write(self.dir, "other.txt", "hello\n")
+        with self.assertRaises(report.ReportError):
+            report.load_result(self.dir)
+        (self.dir / "other.txt").unlink()
+
+        bad = RUBY_RUN.replace(
+            "stage entry=0 stage=rules steps=9", "stage entry=x stage=rules steps=abc"
+        )
+        write(self.dir, "ruby-run.txt", bad)
+        with self.assertRaises(report.ReportError):
+            report.load_result(self.dir)
+        self.assertEqual(run_main([str(self.dir)]), 1)
+        write(self.dir, "ruby-run.txt", RUBY_RUN)
+
+        write(self.dir, "ruby-run2.txt", RUBY_RUN)
+        with self.assertRaises(report.ReportError) as ctx:
+            report.load_result(self.dir)
+        self.assertIn("ruby-run.txt", str(ctx.exception))
+        self.assertIn("ruby-run2.txt", str(ctx.exception))
+        (self.dir / "ruby-run2.txt").unlink()
+
+        write(self.dir, "platform2.txt", PLATFORM)
+        with self.assertRaises(report.ReportError):
+            report.load_result(self.dir)
+        (self.dir / "platform2.txt").unlink()
+
+        write(self.dir, "README.md", report.START_MARKER + "\n")
+        with self.assertRaises(report.ReportError):
+            report.check(self.dir)
+        self.assertEqual(run_main([str(self.dir)]), 1)
+        both = report.START_MARKER + "\n" + report.START_MARKER + "\n" + report.END_MARKER
+        with self.assertRaises(report.ReportError):
+            report.update_readme(both, "x\n", "x")
+
+    def test_check(self) -> None:
+        self.assertEqual(run_main([str(self.dir), "--check"]), 1)
+        self.assertEqual(run_main([str(self.dir)]), 0)
+        self.assertEqual(run_main([str(self.dir), "--check"]), 0)
+        self.assertTrue(report.check(self.dir))
+        readme = self.dir / "README.md"
+        readme.write_text(readme.read_text().replace("Peak memory", "Peak"))
+        self.assertEqual(run_main([str(self.dir), "--check"]), 1)
+        self.assertFalse(report.check(self.dir))
+
+    def test_usage(self) -> None:
+        self.assertEqual(run_main([]), 2)
+        self.assertEqual(run_main(["a", "b", "c"]), 2)
+
+
+if __name__ == "__main__":
+    unittest.main()
