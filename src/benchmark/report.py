@@ -12,6 +12,7 @@
 """Write the generated part of the README.md of a benchmark result.
 
 Usage: report.py RESULT_DIR [--check]
+       report.py -h | --help
 
 RESULT_DIR holds the raw output files (*.txt) of benchmark-<name> and
 platform.sh. The script writes the tables between two marker lines of
@@ -39,8 +40,12 @@ MISSING = "–"
 
 NOTE = (
     "The duplicate rates go up with the number of steps. "
-    "Compare results only at the same options and on the same platform.\n"
+    "Compare results only at the same options and on the same platform. "
+    "– means that the raw file has no record for the cell. "
+    "An entry without a recursion edge has no recursive stage.\n"
 )
+
+USAGE = "usage: report.py RESULT_DIR [--check]\n       report.py -h | --help"
 
 PLACEHOLDER = "Write this section by hand."
 
@@ -121,9 +126,10 @@ class Digest:
 
 @dataclass
 class Result:
-    platform: str | None = None
+    platform: str = ""
     runs: list = field(default_factory=list)
     digests: list = field(default_factory=list)
+    unoptimized: list = field(default_factory=list)  # names of the raw files
 
 
 def parse_records(name: str, content: str) -> list:
@@ -179,11 +185,21 @@ def build_run(path: Path, records: list) -> Run:
                 raise ReportError(f"{rec.where}: no entry record for '{name}'")
             entry = by_name[name]
             if rec.kind == "trim":
+                if entry.trim_us is not None:
+                    raise ReportError(
+                        f"{rec.where}: the trim record of entry '{name}'"
+                        " is there more than once"
+                    )
                 entry.trim_us = rec.number("us_per_step")
                 continue
             stage = rec.text("stage")
             if stage not in STAGES:
                 raise ReportError(f"{rec.where}: unknown stage '{stage}'")
+            if stage in entry.stages:
+                raise ReportError(
+                    f"{rec.where}: the {stage} stage of entry '{name}'"
+                    " is there more than once"
+                )
             rec.integer("steps")
             for key in ("us_per_output", "dup_pct", "same_pct"):
                 rec.number(key)
@@ -266,6 +282,7 @@ def load_result(folder: Path) -> Result:
     result = Result()
     platform_name = None
     seen = {}
+    shared = {}  # field -> (value, file name)
     for path in files:
         try:
             content = path.read_text(encoding="utf-8")
@@ -288,6 +305,16 @@ def load_result(folder: Path) -> Result:
         grammar = head.text("grammar")
         if mode not in ("run", "digest"):
             raise ReportError(f"{path.name}: the mode '{mode}' is not run or digest")
+        for name in ("version", "system", "machine"):
+            value = head.text(name)
+            if name in shared and shared[name][0] != value:
+                raise ReportError(
+                    f"{path.name}: {name}={value} differs from"
+                    f" {name}={shared[name][0]} in {shared[name][1]}"
+                )
+            shared.setdefault(name, (value, path.name))
+        if head.fields.get("optimized") == "0":
+            result.unoptimized.append(path.name)
         key = (grammar, mode)
         if key in seen:
             raise ReportError(
@@ -299,6 +326,10 @@ def load_result(folder: Path) -> Result:
             result.runs.append(build_run(path, records))
         else:
             result.digests.append(build_digest(path, records))
+    if platform_name is None:
+        raise ReportError(f"{folder}: no platform file (a file that starts with 'date:')")
+    if not result.runs and not result.digests:
+        raise ReportError(f"{folder}: no run file and no digest file")
     return result
 
 
@@ -373,8 +404,7 @@ def render_run(run: Run) -> list:
 def render(result: Result) -> str:
     """Return the generated part, without the marker lines."""
     out = []
-    if result.platform is not None:
-        out += ["## Platform", "", "```", result.platform, "```", ""]
+    out += ["## Platform", "", "```", result.platform, "```", ""]
 
     files = [(r.grammar, 0, r.name, "run", r) for r in result.runs]
     files += [(d.grammar, 1, d.name, "digest", d) for d in result.digests]
@@ -394,6 +424,8 @@ def render(result: Result) -> str:
     out += ["## Runs", ""]
     out += table(["Grammar", "Mode", "Options", "Seeds", "Trees", "Wall time"], rows)
     out.append("")
+    for name in sorted(result.unoptimized):
+        out += [f"Warning: {name} comes from a build without optimization.", ""]
 
     for run in sorted(result.runs, key=lambda r: r.grammar):
         out += render_run(run)
@@ -475,10 +507,17 @@ def check(folder: Path) -> bool:
 
 
 def main(argv: list) -> int:
+    if any(a in ("-h", "--help") for a in argv):
+        print(USAGE)
+        return 0
     args = [a for a in argv if a != "--check"]
     checking = len(args) != len(argv)
-    if len(argv) - len(args) > 1 or len(args) != 1:
-        print("usage: report.py RESULT_DIR [--check]", file=sys.stderr)
+    if (
+        len(argv) - len(args) > 1
+        or len(args) != 1
+        or args[0].startswith("-")
+    ):
+        print(USAGE, file=sys.stderr)
         return 2
     folder = Path(args[0])
     try:
@@ -497,6 +536,12 @@ def main(argv: list) -> int:
             handle.write(wanted)
     except ReportError as exc:
         print(f"report.py: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(
+            f"report.py: {exc.filename or folder}: {exc.strerror or exc}",
+            file=sys.stderr,
+        )
         return 1
     return 0
 
