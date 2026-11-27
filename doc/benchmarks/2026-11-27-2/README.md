@@ -13,11 +13,21 @@ This result measures the growth of the ANTLR parse cache.
 
 ## Result
 
+The heap number is the whole heap in use. The program reads it after each
+tree is freed. At that point the `cache` mode holds no tree and no chunk
+store. So the growth is memory that the parser cache and the program still
+hold. The growth is measured over the last quarter of the mutants. The heap
+after the seed phase is about 563 MB. Do not compare the growth with this
+base.
+
 - javascript: the heap grows by 70,588 KB per 10,000 parses. At 1,000,000
-  parses this is about 6,900 MB, more than 100 MB. The parse cache needs a
-  limit.
+  parses this is 6,893 MB, more than 100 MB. The parse cache needs a limit.
 - ruby: the heap grows by 50 KB per 10,000 parses. At 1,000,000 parses this is
-  about 5 MB, less than 100 MB. The parse cache needs no limit.
+  4.9 MB, less than 100 MB. The parse cache needs no limit.
+
+A leak check found no leak. macOS `leaks --atExit` ran on a JavaScript `cache`
+run with 3,000 mutants. In that run the heap grew by 44 MB, and the parser
+states grew by about 1,900.
 
 ## Build
 
@@ -39,8 +49,9 @@ cmake --build build-bench -j8
 
 ## Seeds
 
-- JavaScript: 1,035 files from the JerryScript v3.0.0 tests. 1,013 of them
-  parse into a tree.
+- JavaScript: 1,035 files from the JerryScript v3.0.0 tests. In this run,
+  1,011 of them parse into a tree, and 2 stop early at the parse time limit.
+  The count of stopped parses reaches 15 at the end of the mutants.
 
   ```bash
   src/benchmark/get-jerryscript-seeds.sh jerry-seeds
