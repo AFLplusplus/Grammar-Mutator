@@ -32,7 +32,15 @@ functions and the harness functions of the three suites:
 
 - An assert function never throws.
 - A function that gets a callback or a string of code still runs it, inside
-  `try`/`catch`. For example, `assertThrows(fn)` calls `fn`.
+  `try`/`catch`. For example, `assertThrows(fn)` calls `fn`. A call on a
+  shell object that has no fixed shim, such as `$vm` or `TemporalHelpers`,
+  runs each function argument. It does not run a string, and `console` runs
+  nothing. The shim catches each exception of the code, so the seed goes on.
+- Four shims do not run their code: `new Worker(code)`,
+  `Realm.eval(realm, code)`, `$262.agent.start(code)`, and
+  `WScript.LoadModule(code)`. A real engine runs this code in another
+  thread, realm, or module. In the recorded result, 196 kept seeds use one
+  of them.
 - `shims.js` always replaces the assert functions. It defines each other name
   only if the engine has no value for it. So `d8` and `jsc` keep their own
   functions.
@@ -111,7 +119,8 @@ make GRAMMAR_FILE="grammars/g4/javascript/JavaScriptLexer.g4 grammars/g4/javascr
 ```
 
 Run `grammar_parser-javascript` once for each suite. Use one `trees` folder
-for all the suites. The tool keeps the trees that the folder already holds.
+for all the suites. `grammar_parser-javascript` keeps the trees that the
+folder already holds.
 One process for each suite keeps the parser cache smaller.
 
 ```bash
@@ -125,8 +134,8 @@ python3 grammars/g4/javascript/seeds/get_seeds.py count DEST/seeds DEST/trees
 
 `grammar_parser` has no time limit. Some large JSTests files parse slowly
 when all the threads parse at the same time, because the threads share the
-parser cache. In the recorded run, the tool writes no new tree for up to
-69 s. Each of these files takes less than 15 s alone, and the run ends.
+parser cache. In the recorded run, `grammar_parser-javascript` writes no
+new tree for up to 69 s. Each of these files takes less than 15 s alone, and the run ends.
 
 ### 3. Keep the Seeds That an Engine Runs
 
@@ -172,7 +181,7 @@ Copy the trees into the output folder of `afl-fuzz` (see
 
 ```bash
 mkdir -p out/default
-cp -r DEST/trees out/default/trees
+cp -r DEST/trees out/default
 export AFL_CUSTOM_MUTATOR_LIBRARY=./libgrammarmutator-javascript.so
 export AFL_CUSTOM_MUTATOR_ONLY=1
 afl-fuzz -i DEST/jerry -o out -- /path/to/jerry DEST/shims.js @@
@@ -218,13 +227,13 @@ platform. The JerryScript column depends on the JerryScript build below.
 |---|---:|---|---:|---:|---:|
 | test262 | 53,999 | negative-parse: 4,680; module: 604; fixture: 294; negative-resolution: 34; too-large: 1 | 48,386 | 46,852 | 37,200 |
 | mjsunit | 9,995 | slow-parse: 3; harness: 1 | 9,991 | 9,735 | 7,089 |
-| jstests | 10,231 | resources: 196; harness: 26; too-large: 14; slow-parse: 2 | 9,993 | 9,787 | 6,775 |
-| total | 74,225 | 5,855 | 68,370 | 66,374 | 51,064 |
+| jstests | 10,231 | resources: 196; harness: 26; too-large: 14; slow-parse: 2 | 9,993 | 9,787 | 6,781 |
+| total | 74,225 | 5,855 | 68,370 | 66,374 | 51,070 |
 
 The grammar parses 97.1% of the seeds (test262 96.8%, mjsunit 97.4%,
 jstests 97.9%). JerryScript keeps 74.7% of the seeds (test262 76.9%,
-mjsunit 71.0%, jstests 67.8%). The two columns are independent: 49,827 of the
-51,064 kept seeds also have a tree. A seed without a tree gets no grammar
+mjsunit 71.0%, jstests 67.9%). The two columns are independent: 49,833 of the
+51,070 kept seeds also have a tree. A seed without a tree gets no grammar
 mutations.
 
 The filter result for each suite:
@@ -233,8 +242,8 @@ The filter result for each suite:
 |---|---:|---:|---:|---:|---:|
 | test262 | 48,386 | 37,200 | 11,164 | 19 | 3 |
 | mjsunit | 9,991 | 7,089 | 2,838 | 64 | 0 |
-| jstests | 9,993 | 6,775 | 2,988 | 222 | 8 |
-| total | 68,370 | 51,064 | 16,990 | 305 | 11 |
+| jstests | 9,993 | 6,781 | 2,987 | 217 | 8 |
+| total | 68,370 | 51,070 | 16,989 | 300 | 11 |
 
 The grammar rejects these main forms (counted from the file names):
 
@@ -291,7 +300,7 @@ average was between 2.7 and 3.9 at the start of the parse runs.
 | `grammar_parser-javascript`, mjsunit | 254.3 s | 6.5 GiB |
 | `grammar_parser-javascript`, jstests | 532.5 s | 7.1 GiB |
 | JerryScript build | 3.0 s | |
-| `filter` with JerryScript, all suites (10 jobs) | 150.5 s | |
+| `filter` with JerryScript, all suites (10 jobs) | 150.1 s | |
 
 The disk space of the work folder after all the steps is 3.2 GiB
 (`du -sh`). `DEST/src` uses 574 MiB, `DEST/seeds` 326 MiB, `DEST/trees`
@@ -325,12 +334,13 @@ seeds miss, with these exceptions:
   library, and JerryScript has no WebAssembly.
 - `TZ_DIFF`. It is the first name of the date library of the Mozilla tests.
   This library is too large for `shims.js`.
-- `generateBinaryTests` and `testCodePointRange`. They make or hold the code
-  under test, so a shim that does nothing hides that code.
+- `generateBinaryTests` and `testCodePointRange`. They take no callback.
+  `generateBinaryTests` makes the test functions from strings, and
+  `testCodePointRange` holds the test loop. A shim that does nothing hides
+  that code.
 
-415 dropped seeds end with exit status 10. JerryScript uses this status
-when its heap of 512 KB is full: 247 jstests, 158 mjsunit, and 10 test262
-seeds.
+415 dropped seeds (247 jstests, 158 mjsunit, and 10 test262 seeds) end with
+exit status 10. JerryScript uses this status when its heap of 512 KB is full.
 
 ### Crashes
 
