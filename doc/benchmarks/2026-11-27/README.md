@@ -99,6 +99,10 @@ order also includes the one-time setup of the parser.
 | javascript | 10–100 KB | 9 | 170,754 |
 | ruby | under 1 KB | 300 | 82 |
 
+## Parse cache
+
+No cache run in this result.
+
 ## Time per output
 
 Time in µs for each output, for each stage.

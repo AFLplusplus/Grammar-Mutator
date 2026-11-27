@@ -70,6 +70,10 @@ order also includes the one-time setup of the parser.
 
 {parse}
 
+## Parse cache
+
+{cache}
+
 ## Time per output
 
 Time in µs for each output, for each stage.
@@ -128,6 +132,16 @@ SIZE_BANDS = (
 NO_RUN = "No run in this result."
 NO_SEED = "No seed record in this result."
 NO_DIGEST = "No digest in this result."
+NO_CACHE = "No cache run in this result."
+
+# The record of the cache mode counts only up. The growth line feeds the
+# decision on clearing the cache.
+CACHE_NOTE = (
+    "The parser states and the lexer states only grow. "
+    "The heap in use is the memory in use after each tree is freed. "
+    "The growth line feeds the decision on clearing the cache. "
+    "– means that the heap size is not known."
+)
 
 USAGE = "usage: report.py RESULT_DIR [--check]\n       report.py -h | --help"
 
@@ -218,10 +232,36 @@ class Digest:
 
 
 @dataclass
+class CacheRecord:
+    phase: str
+    parses: int
+    parser_states: int
+    lexer_states: int
+    heap_kb: int | None  # None: not known
+    rss_kb: int
+    us_per_parse: float
+    trees: int
+    not_utf8: int
+    stopped: int
+
+
+@dataclass
+class Cache:
+    name: str
+    grammar: str
+    options: str
+    seeds: int
+    mutants: int
+    records: list
+    wall_ms: float | None
+
+
+@dataclass
 class Result:
     platform: str = ""
     runs: list = field(default_factory=list)
     digests: list = field(default_factory=list)
+    caches: list = field(default_factory=list)
     unoptimized: list = field(default_factory=list)  # names of the raw files
 
 
@@ -375,6 +415,55 @@ def build_digest(path: Path, records: list) -> Digest:
     )
 
 
+def build_cache(path: Path, records: list) -> Cache:
+    head = records[0]
+    rows = []
+    wall = None
+
+    for rec in records[1:]:
+        if rec.kind == "cache":
+            phase = rec.text("phase")
+            if phase not in ("seeds", "mutants"):
+                raise ReportError(f"{rec.where}: unknown phase '{phase}'")
+            heap = rec.integer("heap_kb")
+            rows.append(
+                CacheRecord(
+                    phase,
+                    rec.integer("parses"),
+                    rec.integer("parser_states"),
+                    rec.integer("lexer_states"),
+                    None if heap < 0 else heap,
+                    rec.integer("rss_kb"),
+                    rec.number("us_per_parse"),
+                    rec.integer("trees"),
+                    rec.integer("not_utf8"),
+                    rec.integer("stopped"),
+                )
+            )
+        elif rec.kind == "elapsed":
+            once(wall, rec)
+            wall = rec.number("wall_ms")
+        else:
+            raise ReportError(f"{rec.where}: unknown record '{rec.kind}'")
+    if not rows:
+        raise ReportError(f"{path.name}: no cache record")
+    options = []
+    seed = head.integer("seed")
+    if seed:
+        options.append(f"-s {seed}")
+    options.append(f"-m {head.integer('mutants')}")
+    options.append(f"-i {head.integer('interval')}")
+    return Cache(
+        path.name,
+        head.text("grammar"),
+        " ".join(options),
+        head.integer("seeds"),
+        head.integer("mutants"),
+        rows,
+        wall,
+    )
+
+
 def load_result(folder: Path) -> Result:
     """Read every *.txt file of a result folder."""
     files = sorted(Path(folder).glob("*.txt"))
@@ -404,8 +493,10 @@ def load_result(folder: Path) -> Result:
         head = records[0]
         mode = head.text("mode")
         grammar = head.text("grammar")
-        if mode not in ("run", "digest"):
-            raise ReportError(f"{path.name}: the mode '{mode}' is not run or digest")
+        if mode not in ("run", "digest", "cache"):
+            raise ReportError(
+                f"{path.name}: the mode '{mode}' is not run, digest, or cache"
+            )
         for name in ("version", "system", "machine"):
             value = head.text(name)
             if name in shared and shared[name][0] != value:
@@ -425,14 +516,16 @@ def load_result(folder: Path) -> Result:
         seen[key] = path.name
         if mode == "run":
             result.runs.append(build_run(path, records))
-        else:
+        elif mode == "digest":
             result.digests.append(build_digest(path, records))
+        else:
+            result.caches.append(build_cache(path, records))
     if platform_name is None:
         raise ReportError(
             f"{folder}: no platform file (a file that starts with 'date:')"
         )
-    if not result.runs and not result.digests:
-        raise ReportError(f"{folder}: no run file and no digest file")
+    if not result.runs and not result.digests and not result.caches:
+        raise ReportError(f"{folder}: no run, digest, or cache file")
     return result
 
 
@@ -468,6 +561,7 @@ def table(header: list, rows: list, empty: str = "") -> str:
 def run_rows(result: Result) -> list:
     files = [(r.grammar, 0, "run", r) for r in result.runs]
     files += [(d.grammar, 1, "digest", d) for d in result.digests]
+    files += [(c.grammar, 2, "cache", c) for c in result.caches]
     files.sort(key=lambda f: (f[0], f[1]))
     return [
         [
@@ -475,7 +569,7 @@ def run_rows(result: Result) -> list:
             mode,
             f"`{item.options}`",
             count(item.seeds),
-            count(item.trees),
+            MISSING if mode == "cache" else count(item.trees),
             seconds(item.wall_ms),
         ]
         for grammar, _, mode, item in files
@@ -580,6 +674,82 @@ def memory_rows(runs: list) -> list:
     ]
 
 
+def kb(value: int | None) -> str:
+    """A size in KB with thousands separators. None: not known."""
+    return MISSING if value is None else f"{value:,} KB"
+
+
+def difference(now: int | None, before: int | None) -> int | None:
+    return None if now is None or before is None else now - before
+
+
+def cache_rows(caches: list) -> list:
+    rows = []
+    for cache in caches:
+        before = None
+        for r in cache.records:
+            states = growth = None
+            if before is not None:
+                states = r.parser_states - before.parser_states
+                growth = difference(r.heap_kb, before.heap_kb)
+            rows.append(
+                [
+                    cache.grammar,
+                    r.phase,
+                    count(r.parses),
+                    count(r.parser_states),
+                    MISSING if states is None else count(states),
+                    count(r.lexer_states),
+                    kb(r.heap_kb),
+                    MISSING if growth is None else kb(growth),
+                    kb(r.rss_kb),
+                    us(r.us_per_parse),
+                    count(r.trees),
+                    count(r.not_utf8),
+                    count(r.stopped),
+                ]
+            )
+            before = r
+    return rows
+
+
+def cache_growth(cache: Cache) -> int | None:
+    """The heap growth in KB per 10,000 parses over the last quarter of the mutants.
+
+    The window is the mutant records at or after seeds + 0.75 * mutants.
+    With fewer than two of them, the window is the last two mutant records.
+    """
+    mutants = [r for r in cache.records if r.phase == "mutants"]
+    start = cache.seeds + 0.75 * cache.mutants
+    window = [r for r in mutants if r.parses >= start]
+    if len(window) < 2:
+        window = mutants[-2:]
+    if len(window) < 2 or any(r.heap_kb is None for r in window):
+        return None
+    first, last = window[0], window[-1]
+    if last.parses <= first.parses:
+        return None
+    return round((last.heap_kb - first.heap_kb) / (last.parses - first.parses) * 10000)
+
+
+def render_cache(caches: list) -> str:
+    if not caches:
+        return NO_CACHE
+    header = ["Grammar", "Phase", "Parses", "Parser states", "New parser states"]
+    header += ["Lexer states", "Heap in use", "Heap growth", "Peak memory"]
+    header += ["µs per parse", "Trees", "Not UTF-8", "Stopped"]
+    lines = []
+    for cache in caches:
+        growth = cache_growth(cache)
+        lines.append(
+            f"- {cache.grammar}: heap growth over the last quarter of the mutants: "
+            + ("–" if growth is None else f"{growth:,} KB per 10,000 parses.")
+        )
+    return "\n\n".join(
+        [table(header, cache_rows(caches)), "\n".join(lines), CACHE_NOTE]
+    )
+
+
 def digest_rows(digests: list) -> list:
     return [
         [
@@ -598,6 +768,7 @@ def render(result: Result) -> str:
     """Return the generated part, without the marker lines."""
     runs = sorted(result.runs, key=lambda r: r.grammar)
     digests = sorted(result.digests, key=lambda d: d.grammar)
+    caches = sorted(result.caches, key=lambda c: c.grammar)
     stage_titles = [STAGE_TITLES[s] for s in STAGES]
     rate_titles = []
     for title in stage_titles:
@@ -614,6 +785,7 @@ def render(result: Result) -> str:
         ),
         warnings=warnings,
         parse=render_parse(runs),
+        cache=render_cache(caches),
         times=table(
             ["Grammar", "Entry", "Bytes", "Nodes"] + stage_titles + ["Trim (µs/step)"],
             time_rows(runs),

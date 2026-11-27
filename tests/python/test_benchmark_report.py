@@ -67,6 +67,15 @@ benchmark version=1.2.0 grammar=ruby system=Darwin machine=arm64 optimized=1 mod
 digest outputs=1613412 new_entries=300 trims=13702 hash=fd87045834903cd1
 """
 
+RUBY_CACHE = """\
+benchmark version=1.2.0 grammar=ruby system=Darwin machine=arm64 optimized=1 mode=cache seed=0 mutants=400 interval=100 parse_budget_ms=50 seeds=20
+cache phase=seeds parses=20 parser_states=25 lexer_states=422 heap_kb=1000 rss_kb=6336 us_per_parse=105.1 trees=20 not_utf8=0 stopped=0
+cache phase=mutants parses=120 parser_states=25 lexer_states=495 heap_kb=1200 rss_kb=7120 us_per_parse=234.6 trees=40 not_utf8=60 stopped=0
+cache phase=mutants parses=320 parser_states=26 lexer_states=515 heap_kb=1500 rss_kb=7248 us_per_parse=224.5 trees=94 not_utf8=226 stopped=0
+cache phase=mutants parses=420 parser_states=26 lexer_states=538 heap_kb=1600 rss_kb=7344 us_per_parse=223.3 trees=130 not_utf8=290 stopped=0
+elapsed wall_ms=135.7
+"""
+
 HAND_TEXT = (
     "# Title\n\n## Notes\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n"
     + report.START_MARKER
@@ -327,7 +336,7 @@ class ReportTest(unittest.TestCase):
         write(only, "platform.txt", PLATFORM)
         with self.assertRaises(report.ReportError) as ctx:
             report.load_result(only)
-        self.assertIn("no run file and no digest file", str(ctx.exception))
+        self.assertIn("no run, digest, or cache file", str(ctx.exception))
         self.assertEqual(run_main([str(only)]), 1)
         self.assertFalse((only / "README.md").exists())
 
@@ -537,6 +546,86 @@ class ReportTest(unittest.TestCase):
         self.assertIn("| ruby | 0 | 131 |", times)
         self.assertNotIn("\n\n\n", out)
 
+    def test_cache_table(self) -> None:
+        write(self.dir, "ruby-cache.txt", RUBY_CACHE)
+        out = self.render()
+        self.assertIn(
+            "| Grammar | Phase | Parses | Parser states | New parser states"
+            " | Lexer states | Heap in use | Heap growth | Peak memory"
+            " | µs per parse | Trees | Not UTF-8 | Stopped |",
+            out,
+        )
+        self.assertIn(
+            "| ruby | seeds | 20 | 25 | – | 422 | 1,000 KB | – | 6,336 KB"
+            " | 105 | 20 | 0 | 0 |",
+            out,
+        )
+        self.assertIn(
+            "| ruby | mutants | 120 | 25 | 0 | 495 | 1,200 KB | 200 KB"
+            " | 7,120 KB | 235 | 40 | 60 | 0 |",
+            out,
+        )
+        self.assertIn(
+            "| ruby | mutants | 320 | 26 | 1 | 515 | 1,500 KB | 300 KB"
+            " | 7,248 KB | 224 | 94 | 226 | 0 |",
+            out,
+        )
+        self.assertLess(out.index("## Parse time"), out.index("## Parse cache"))
+        self.assertLess(out.index("## Parse cache"), out.index("## Time per output"))
+
+    def test_cache_growth_line(self) -> None:
+        write(self.dir, "ruby-cache.txt", RUBY_CACHE)
+        self.assertIn(
+            "- ruby: heap growth over the last quarter of the mutants:"
+            " 10,000 KB per 10,000 parses.\n",
+            self.render(),
+        )
+
+    def test_cache_growth_window(self) -> None:
+        # one record at or after the 75% point: use the last two records
+        text = RUBY_CACHE.replace("parses=320", "parses=300")
+        text = text.replace("parses=420", "parses=400")
+        text = text.replace("heap_kb=1500", "heap_kb=1450")
+        text = text.replace("mutants=400", "mutants=1000")
+        write(self.dir, "ruby-cache.txt", text)
+        self.assertIn("15,000 KB per 10,000 parses", self.render())
+        # one mutant record only: no number
+        one = "\n".join(RUBY_CACHE.splitlines()[:3]) + "\n"
+        write(self.dir, "ruby-cache.txt", one)
+        self.assertIn("- ruby: heap growth over the last quarter of the mutants: –", self.render())
+
+    def test_cache_runs_row(self) -> None:
+        write(self.dir, "ruby-cache.txt", RUBY_CACHE)
+        out = self.render()
+        row = "| ruby | cache | `-m 400 -i 100` | 20 | – | 135.7 ms |"
+        self.assertIn(row, out)
+        # the files of one grammar: run, digest, cache
+        self.assertLess(out.index("| ruby | digest |"), out.index(row))
+        write(self.dir, "ruby-cache.txt", RUBY_CACHE.replace("seed=0", "seed=7"))
+        self.assertIn("`-s 7 -m 400 -i 100`", self.render())
+
+    def test_cache_only_result(self) -> None:
+        only = Path(self._tmp.name) / "only"
+        only.mkdir()
+        write(only, "platform.txt", PLATFORM)
+        write(only, "ruby-cache.txt", RUBY_CACHE)
+        out = report.render(report.load_result(only))
+        self.assertIn("## Parse cache\n\n| Grammar |", out)
+        self.assertEqual(out.count("No run in this result."), 4)
+        self.assertIn("No digest in this result.", out)
+        self.assertNotIn("\n\n\n", out)
+        self.assertEqual(run_main([str(only)]), 0)
+
+    def test_cache_heap_unknown(self) -> None:
+        write(self.dir, "ruby-cache.txt", RUBY_CACHE.replace("heap_kb=1500", "heap_kb=-1"))
+        out = self.render()
+        self.assertIn("| 26 | 1 | 515 | – | – | 7,248 KB |", out)
+        self.assertIn("| 26 | 0 | 538 | 1,600 KB | – | 7,344 KB |", out)
+        self.assertIn("- ruby: heap growth over the last quarter of the mutants: –", out)
+
+    def test_no_cache_line(self) -> None:
+        self.assertIn("## Parse cache\n\nNo cache run in this result.\n\n## Time", self.render())
+
     def test_template_has_only_named_fields(self) -> None:
         names = [f[1] for f in string.Formatter().parse(report.REPORT) if f[1]]
         expected = [
@@ -544,6 +633,7 @@ class ReportTest(unittest.TestCase):
             "runs",
             "warnings",
             "parse",
+            "cache",
             "times",
             "rates",
             "memory",
