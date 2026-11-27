@@ -23,6 +23,9 @@ need a comparison point.
 
 ## How to record a result
 
+The program `benchmark-<name>` is in `src/benchmark/` after a make build, and
+in `<build>/src/benchmark/` after a CMake build.
+
 1. Build with optimization. Use make, or CMake with the default
    `RelWithDebInfo` build type. See
    [building-grammar-mutator.md](../building-grammar-mutator.md).
@@ -36,8 +39,12 @@ need a comparison point.
    For any grammar, use the generator:
 
    ```bash
-   grammar_generator-<name> 100 1000 seeds trees 1
+   grammar_generator-<name> 100 1000 jerry-seeds trees 1
    ```
+
+   Both commands make the folder `jerry-seeds`. The benchmark commands below
+   use this folder. Use your own folder name if you prefer, and use it in
+   every command.
 
 3. Save the platform facts:
 

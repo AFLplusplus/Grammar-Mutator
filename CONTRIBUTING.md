@@ -55,7 +55,9 @@ Thank you for your help. This file tells you how to send a change.
 
 ## Measure a performance change
 
-Use the benchmark program to measure a change that affects speed.
+Use the benchmark program to measure a change that affects speed. The program
+`benchmark-<name>` is in `src/benchmark/` after a make build, and in
+`<build>/src/benchmark/` after a CMake build.
 
 1. Build with optimization. Use make, or CMake with the default
    `RelWithDebInfo` build type.
@@ -82,7 +84,8 @@ Use the benchmark program to measure a change that affects speed.
    ```
 
 5. The program sets the step variables from `-n` and `-t`. It also turns the
-   parse time limit off. So the same command does the same work.
+   parse time limit off, unless you set `PARSE_TIME_BUDGET_MS`. So the same
+   command does the same work.
 6. To keep a result as a comparison point, follow
    [doc/benchmarks/README.md](doc/benchmarks/README.md).
 
