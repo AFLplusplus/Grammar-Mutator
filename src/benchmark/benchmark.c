@@ -47,6 +47,16 @@ static double now_us(void) {
 
 }
 
+// The start time of the program, set at the start of main
+static double start_us = 0;
+
+// Print the wall time of the whole program as the last record of a mode
+static void print_elapsed(void) {
+
+  printf("elapsed wall_ms=%.1f\n", (now_us() - start_us) / 1000.0);
+
+}
+
 // The grammar name: the text after "benchmark-" in the base name of argv0
 static const char *grammar_name(const char *argv0) {
 
@@ -973,6 +983,7 @@ static int mode_run(const char *prog, int argc, char **argv) {
   }
 
   if (status == 0) printf("peak rss_kb=%ld\n", peak_rss_kb());
+  if (status == 0 && !stopped()) print_elapsed();
   fflush(stdout);
 
 done:
@@ -1195,6 +1206,7 @@ static int mode_digest(const char *prog, int argc, char **argv) {
   printf("digest outputs=%zu new_entries=%zu trims=%zu hash=%016llx\n",
          digest.outputs, digest.new_entries, digest.trims,
          (unsigned long long)digest.hash);
+  if (!stopped()) print_elapsed();
   fflush(stdout);
   status = 0;
 
@@ -1208,6 +1220,7 @@ static int run_mode(int argc, char **argv);
 
 int main(int argc, char **argv) {
 
+  start_us = now_us();
   int status = run_mode(argc, argv);
   if (stopped()) {
 

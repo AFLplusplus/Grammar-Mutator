@@ -13,13 +13,15 @@ need a comparison point.
 - `README.md` with these items:
   - what the result measured: the commit, and the release whose library code
     it has;
-  - the platform and the hardware: the output of `src/benchmark/platform.sh`;
   - the build commands and the build type;
   - the seeds: the source, the version, the count, and the command that made
     them;
   - the exact benchmark commands;
-  - a short summary of the main numbers.
+  - a generated part between two marker lines: the platform, the wall time of
+    each command, and the tables of the main numbers. `src/benchmark/report.py`
+    writes it from the `.txt` files.
 - The raw output of each command, in one `.txt` file for each command.
+- `platform.txt`: the output of `src/benchmark/platform.sh`.
 
 ## How to record a result
 
@@ -53,17 +55,39 @@ in `<build>/src/benchmark/` after a CMake build.
    ```
 
 4. Run the benchmark commands. Save the output of each command in its own
-   file:
+   file. Name each file `<name>-run.txt` or `<name>-digest.txt`, so a result
+   with two grammars keeps both:
 
    ```bash
-   benchmark-<name> run -e 5 -n 5000 -t 2000 jerry-seeds > run.txt
-   benchmark-<name> digest -n 200 -t 20 jerry-seeds > digest.txt
+   benchmark-<name> run -e 5 -n 5000 -t 2000 jerry-seeds > <name>-run.txt
+   benchmark-<name> digest -n 200 -t 20 jerry-seeds > <name>-digest.txt
    ```
 
-5. Make the result folder `doc/benchmarks/<date>/`. Put the `.txt` files and
-   a `README.md` with the items above in it.
-6. Add a line for the folder to the list below.
+   The script reads the grammar and the mode from the first line of each
+   file, not from the file name.
+
+5. Make the result folder `doc/benchmarks/<date>/`. Put the `.txt` files in
+   it. Write the hand-written parts of `README.md`, and end them with these
+   two marker lines:
+
+   ```
+   <!-- report.py: start of the generated part -->
+   <!-- report.py: end of the generated part -->
+   ```
+
+6. Write the generated part between the markers:
+
+   ```bash
+   src/benchmark/report.py doc/benchmarks/<date>
+   ```
+
+   The script replaces only the text between the markers. If `README.md` does
+   not exist, the script writes one with the headings and the markers. Add `--check` to
+   see if the file is up to date. `make test-python` checks every committed
+   result with the markers. Do not edit the generated part by hand.
+7. Add a line for the folder to the list below.
 
 ## Results
 
-No result yet.
+- [2026-11-27](2026-11-27/README.md): the library of release 1.2.0, with the
+  JavaScript `.g4` grammar and `ruby.json`, on an Apple M4 with macOS 26.6.2.

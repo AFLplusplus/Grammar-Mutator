@@ -114,6 +114,13 @@ for s in rules random splice; do
 done
 [ "$(grep -c '^trim ' "$work/run.txt")" -eq 3 ] || fail "run: trim records"
 grep -q '^peak rss_kb=[1-9]' "$work/run.txt" || fail "run: peak record"
+tail -n 1 "$work/run.txt" | grep -Eq '^elapsed wall_ms=[0-9]+\.[0-9]$' ||
+  fail "run: the last record must be elapsed"
+[ "$(grep -c '^elapsed ' "$work/run.txt")" -eq 1 ] ||
+  fail "run: expected one elapsed record"
+if grep -q '^elapsed ' "$work/parse.txt"; then
+  fail "parse: must not print an elapsed record"
+fi
 # field order and number formats of the records
 num='[0-9]+'
 tm='[0-9]+\.[0-9]'
@@ -313,6 +320,8 @@ grep -Eq '^benchmark .* mode=digest seed=0 steps=50 trims=10 parse_budget_ms=0 s
   "$work/d1.txt" || fail "digest: bad header"
 grep -Eq '^digest outputs=[1-9][0-9]* new_entries=20 trims=[1-9][0-9]* hash=[0-9a-f]{16}$' \
   "$work/d1.txt" || fail "digest: bad record"
+tail -n 1 "$work/d1.txt" | grep -Eq '^elapsed wall_ms=[0-9]+\.[0-9]$' ||
+  fail "digest: the last record must be elapsed"
 d1=$(grep '^digest ' "$work/d1.txt")
 [ "$d1" = "$(grep '^digest ' "$work/d2.txt")" ] ||
   fail "digest: the hash depends on the work folder"
