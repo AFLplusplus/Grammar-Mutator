@@ -5,9 +5,10 @@
 # each .js file of tests/jerry/ into DEST, except the files in tests/jerry/fail/.
 # DEST is one flat folder. A "/" in the path below tests/jerry/ becomes "_".
 # DEST must not exist, or it must be empty. The script stops with an error if
-# two paths give the same flat name. If the script stops before it ends, the
-# EXIT trap removes the files it copied, and also DEST if the script made it.
-# The script never removes a DEST that existed before.
+# two paths give the same flat name. If the script stops before it ends, also
+# after SIGHUP, SIGINT, or SIGTERM, the EXIT trap removes its temporary folder
+# and the files it copied, and also DEST if the script made it. The script
+# never removes a DEST that existed before, also not a symbolic link.
 set -eu
 
 url=https://github.com/jerryscript-project/jerryscript/archive/refs/tags/v3.0.0.tar.gz
@@ -18,6 +19,10 @@ if [ $# -ne 1 ]; then
   exit 2
 fi
 dest=$1
+if [ -L "$dest" ] && [ ! -e "$dest" ]; then
+  echo "[-] $dest is a symbolic link to nothing" >&2
+  exit 1
+fi
 if [ -e "$dest" ] && [ -n "$(ls -A "$dest" 2>/dev/null)" ]; then
   echo "[-] $dest exists and is not empty" >&2
   exit 1
@@ -43,6 +48,8 @@ cleanup() {
   rm -rf "$work"
 }
 trap cleanup EXIT
+# Some shells (dash) run no EXIT trap on a signal. This makes them run it.
+trap 'exit 1' HUP INT TERM
 
 archive=$work/jerryscript-3.0.0.tar.gz
 echo "[*] Downloading $url"
@@ -71,7 +78,7 @@ fi
 mkdir "$work/src"
 tar -xzf "$archive" -C "$work/src"
 jerry=$work/src/jerryscript-3.0.0/tests/jerry
-if [ ! -e "$dest" ]; then created=1; fi
+if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then created=1; fi
 : >"$work/copied"
 started=1
 mkdir -p "$dest"
