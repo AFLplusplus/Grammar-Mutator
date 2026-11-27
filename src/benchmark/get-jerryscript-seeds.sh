@@ -5,8 +5,9 @@
 # each .js file of tests/jerry/ into DEST, except the files in tests/jerry/fail/.
 # DEST is one flat folder. A "/" in the path below tests/jerry/ becomes "_".
 # DEST must not exist, or it must be empty. The script stops with an error if
-# two paths give the same flat name. After an error, the script removes the
-# files it copied, and also DEST if the script made it.
+# two paths give the same flat name. If the script stops before it ends, the
+# EXIT trap removes the files it copied, and also DEST if the script made it.
+# The script never removes a DEST that existed before.
 set -eu
 
 url=https://github.com/jerryscript-project/jerryscript/archive/refs/tags/v3.0.0.tar.gz
@@ -23,7 +24,25 @@ if [ -e "$dest" ] && [ -n "$(ls -A "$dest" 2>/dev/null)" ]; then
 fi
 
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
+created=0 # 1 if the script made DEST
+started=0 # 1 after the script starts to fill DEST
+finished=0 # 1 after all files are copied
+
+# Remove the work folder. Remove what the script made in DEST, unless the
+# script finished.
+cleanup() {
+  if [ "$started" -eq 1 ] && [ "$finished" -eq 0 ]; then
+    if [ "$created" -eq 1 ]; then
+      rm -rf "$dest"
+    else
+      while IFS= read -r copied; do
+        rm -f "$copied"
+      done <"$work/copied"
+    fi
+  fi
+  rm -rf "$work"
+}
+trap cleanup EXIT
 
 archive=$work/jerryscript-3.0.0.tar.gz
 echo "[*] Downloading $url"
@@ -52,23 +71,10 @@ fi
 mkdir "$work/src"
 tar -xzf "$archive" -C "$work/src"
 jerry=$work/src/jerryscript-3.0.0/tests/jerry
-created=0
 if [ ! -e "$dest" ]; then created=1; fi
-mkdir -p "$dest"
 : >"$work/copied"
-
-# Stop with a message. Remove only what this script made in DEST.
-stop_copy() {
-  echo "[-] $1" >&2
-  if [ "$created" -eq 1 ]; then
-    rm -rf "$dest"
-  else
-    while IFS= read -r copied; do
-      rm -f "$copied"
-    done <"$work/copied"
-  fi
-  exit 1
-}
+started=1
+mkdir -p "$dest"
 
 count=0
 # JerryScript file names have no newline, so a line loop is safe.
@@ -77,10 +83,15 @@ while IFS= read -r file; do
   rel=${file#"$jerry"/}
   target=$dest/$(printf '%s' "$rel" | tr '/' '_')
   if [ -e "$target" ]; then
-    stop_copy "Two files give the name $target"
+    echo "[-] Two files give the name $target" >&2
+    exit 1
   fi
   printf '%s\n' "$target" >>"$work/copied"
-  cp "$file" "$target" || stop_copy "Cannot copy $file to $target"
+  cp "$file" "$target" || {
+    echo "[-] Cannot copy $file to $target" >&2
+    exit 1
+  }
   count=$((count + 1))
 done <"$work/list"
+finished=1
 echo "[+] $count seeds in $dest"
