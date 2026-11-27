@@ -66,4 +66,5 @@ in `<build>/src/benchmark/` after a CMake build.
 
 ## Results
 
-No result yet.
+- [2026-11-27](2026-11-27/README.md): the library of release 1.2.0, with the
+  JavaScript `.g4` grammar and `ruby.json`, on an Apple M4 with macOS 26.6.2.

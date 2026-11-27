@@ -1,0 +1,332 @@
+benchmark version=1.2.0 grammar=ruby system=Darwin machine=arm64 optimized=1 mode=run seed=0 entries=5 steps=5000 trims=2000 parse_budget_ms=0 seeds=300 trees=300
+seed name=0 bytes=131 parse_us=1728.0 tree=1
+seed name=1 bytes=189 parse_us=169.0 tree=1
+seed name=10 bytes=171 parse_us=205.0 tree=1
+seed name=100 bytes=170 parse_us=137.0 tree=1
+seed name=101 bytes=148 parse_us=115.0 tree=1
+seed name=102 bytes=206 parse_us=199.0 tree=1
+seed name=103 bytes=138 parse_us=101.0 tree=1
+seed name=104 bytes=250 parse_us=215.0 tree=1
+seed name=105 bytes=157 parse_us=125.0 tree=1
+seed name=106 bytes=173 parse_us=148.0 tree=1
+seed name=107 bytes=142 parse_us=94.0 tree=1
+seed name=108 bytes=290 parse_us=188.0 tree=1
+seed name=109 bytes=221 parse_us=163.0 tree=1
+seed name=11 bytes=225 parse_us=190.0 tree=1
+seed name=110 bytes=192 parse_us=94.0 tree=1
+seed name=111 bytes=169 parse_us=104.0 tree=1
+seed name=112 bytes=138 parse_us=94.0 tree=1
+seed name=113 bytes=199 parse_us=136.0 tree=1
+seed name=114 bytes=164 parse_us=115.0 tree=1
+seed name=115 bytes=178 parse_us=147.0 tree=1
+seed name=116 bytes=169 parse_us=117.0 tree=1
+seed name=117 bytes=177 parse_us=111.0 tree=1
+seed name=118 bytes=147 parse_us=94.0 tree=1
+seed name=119 bytes=203 parse_us=99.0 tree=1
+seed name=12 bytes=176 parse_us=133.0 tree=1
+seed name=120 bytes=171 parse_us=115.0 tree=1
+seed name=121 bytes=176 parse_us=96.0 tree=1
+seed name=122 bytes=160 parse_us=85.0 tree=1
+seed name=123 bytes=146 parse_us=70.0 tree=1
+seed name=124 bytes=284 parse_us=181.0 tree=1
+seed name=125 bytes=137 parse_us=89.0 tree=1
+seed name=126 bytes=150 parse_us=72.0 tree=1
+seed name=127 bytes=294 parse_us=143.0 tree=1
+seed name=128 bytes=158 parse_us=89.0 tree=1
+seed name=129 bytes=183 parse_us=93.0 tree=1
+seed name=13 bytes=200 parse_us=73.0 tree=1
+seed name=130 bytes=147 parse_us=72.0 tree=1
+seed name=131 bytes=154 parse_us=80.0 tree=1
+seed name=132 bytes=194 parse_us=95.0 tree=1
+seed name=133 bytes=221 parse_us=86.0 tree=1
+seed name=134 bytes=194 parse_us=103.0 tree=1
+seed name=135 bytes=161 parse_us=94.0 tree=1
+seed name=136 bytes=220 parse_us=118.0 tree=1
+seed name=137 bytes=165 parse_us=87.0 tree=1
+seed name=138 bytes=137 parse_us=71.0 tree=1
+seed name=139 bytes=179 parse_us=101.0 tree=1
+seed name=14 bytes=192 parse_us=117.0 tree=1
+seed name=140 bytes=158 parse_us=95.0 tree=1
+seed name=141 bytes=141 parse_us=89.0 tree=1
+seed name=142 bytes=161 parse_us=98.0 tree=1
+seed name=143 bytes=139 parse_us=91.0 tree=1
+seed name=144 bytes=168 parse_us=121.0 tree=1
+seed name=145 bytes=146 parse_us=92.0 tree=1
+seed name=146 bytes=221 parse_us=143.0 tree=1
+seed name=147 bytes=156 parse_us=95.0 tree=1
+seed name=148 bytes=210 parse_us=108.0 tree=1
+seed name=149 bytes=205 parse_us=126.0 tree=1
+seed name=15 bytes=158 parse_us=99.0 tree=1
+seed name=150 bytes=216 parse_us=126.0 tree=1
+seed name=151 bytes=169 parse_us=112.0 tree=1
+seed name=152 bytes=147 parse_us=88.0 tree=1
+seed name=153 bytes=241 parse_us=150.0 tree=1
+seed name=154 bytes=173 parse_us=107.0 tree=1
+seed name=155 bytes=254 parse_us=141.0 tree=1
+seed name=156 bytes=154 parse_us=107.0 tree=1
+seed name=157 bytes=139 parse_us=88.0 tree=1
+seed name=158 bytes=141 parse_us=98.0 tree=1
+seed name=159 bytes=153 parse_us=89.0 tree=1
+seed name=16 bytes=153 parse_us=78.0 tree=1
+seed name=160 bytes=150 parse_us=71.0 tree=1
+seed name=161 bytes=200 parse_us=108.0 tree=1
+seed name=162 bytes=173 parse_us=97.0 tree=1
+seed name=163 bytes=141 parse_us=81.0 tree=1
+seed name=164 bytes=170 parse_us=95.0 tree=1
+seed name=165 bytes=146 parse_us=75.0 tree=1
+seed name=166 bytes=232 parse_us=128.0 tree=1
+seed name=167 bytes=228 parse_us=129.0 tree=1
+seed name=168 bytes=164 parse_us=87.0 tree=1
+seed name=169 bytes=235 parse_us=139.0 tree=1
+seed name=17 bytes=150 parse_us=82.0 tree=1
+seed name=170 bytes=320 parse_us=158.0 tree=1
+seed name=171 bytes=166 parse_us=96.0 tree=1
+seed name=172 bytes=149 parse_us=76.0 tree=1
+seed name=173 bytes=166 parse_us=82.0 tree=1
+seed name=174 bytes=139 parse_us=72.0 tree=1
+seed name=175 bytes=195 parse_us=101.0 tree=1
+seed name=176 bytes=157 parse_us=79.0 tree=1
+seed name=177 bytes=206 parse_us=80.0 tree=1
+seed name=178 bytes=181 parse_us=90.0 tree=1
+seed name=179 bytes=193 parse_us=80.0 tree=1
+seed name=18 bytes=193 parse_us=79.0 tree=1
+seed name=180 bytes=149 parse_us=78.0 tree=1
+seed name=181 bytes=147 parse_us=80.0 tree=1
+seed name=182 bytes=157 parse_us=83.0 tree=1
+seed name=183 bytes=154 parse_us=86.0 tree=1
+seed name=184 bytes=147 parse_us=76.0 tree=1
+seed name=185 bytes=156 parse_us=86.0 tree=1
+seed name=186 bytes=167 parse_us=90.0 tree=1
+seed name=187 bytes=165 parse_us=85.0 tree=1
+seed name=188 bytes=252 parse_us=142.0 tree=1
+seed name=189 bytes=160 parse_us=91.0 tree=1
+seed name=19 bytes=169 parse_us=83.0 tree=1
+seed name=190 bytes=147 parse_us=90.0 tree=1
+seed name=191 bytes=201 parse_us=109.0 tree=1
+seed name=192 bytes=150 parse_us=80.0 tree=1
+seed name=193 bytes=156 parse_us=87.0 tree=1
+seed name=194 bytes=202 parse_us=104.0 tree=1
+seed name=195 bytes=153 parse_us=86.0 tree=1
+seed name=196 bytes=167 parse_us=106.0 tree=1
+seed name=197 bytes=154 parse_us=107.0 tree=1
+seed name=198 bytes=286 parse_us=172.0 tree=1
+seed name=199 bytes=150 parse_us=96.0 tree=1
+seed name=2 bytes=256 parse_us=150.0 tree=1
+seed name=20 bytes=139 parse_us=94.0 tree=1
+seed name=200 bytes=204 parse_us=137.0 tree=1
+seed name=201 bytes=181 parse_us=126.0 tree=1
+seed name=202 bytes=146 parse_us=110.0 tree=1
+seed name=203 bytes=168 parse_us=118.0 tree=1
+seed name=204 bytes=153 parse_us=103.0 tree=1
+seed name=205 bytes=265 parse_us=206.0 tree=1
+seed name=206 bytes=213 parse_us=147.0 tree=1
+seed name=207 bytes=151 parse_us=114.0 tree=1
+seed name=208 bytes=170 parse_us=117.0 tree=1
+seed name=209 bytes=193 parse_us=90.0 tree=1
+seed name=21 bytes=198 parse_us=136.0 tree=1
+seed name=210 bytes=153 parse_us=110.0 tree=1
+seed name=211 bytes=191 parse_us=121.0 tree=1
+seed name=212 bytes=145 parse_us=107.0 tree=1
+seed name=213 bytes=166 parse_us=101.0 tree=1
+seed name=214 bytes=164 parse_us=114.0 tree=1
+seed name=215 bytes=176 parse_us=127.0 tree=1
+seed name=216 bytes=163 parse_us=112.0 tree=1
+seed name=217 bytes=169 parse_us=106.0 tree=1
+seed name=218 bytes=244 parse_us=165.0 tree=1
+seed name=219 bytes=326 parse_us=203.0 tree=1
+seed name=22 bytes=139 parse_us=99.0 tree=1
+seed name=220 bytes=157 parse_us=110.0 tree=1
+seed name=221 bytes=177 parse_us=113.0 tree=1
+seed name=222 bytes=152 parse_us=106.0 tree=1
+seed name=223 bytes=169 parse_us=104.0 tree=1
+seed name=224 bytes=293 parse_us=209.0 tree=1
+seed name=225 bytes=153 parse_us=86.0 tree=1
+seed name=226 bytes=203 parse_us=115.0 tree=1
+seed name=227 bytes=160 parse_us=104.0 tree=1
+seed name=228 bytes=165 parse_us=109.0 tree=1
+seed name=229 bytes=225 parse_us=142.0 tree=1
+seed name=23 bytes=145 parse_us=96.0 tree=1
+seed name=230 bytes=148 parse_us=85.0 tree=1
+seed name=231 bytes=174 parse_us=100.0 tree=1
+seed name=232 bytes=207 parse_us=141.0 tree=1
+seed name=233 bytes=172 parse_us=107.0 tree=1
+seed name=234 bytes=158 parse_us=101.0 tree=1
+seed name=235 bytes=209 parse_us=115.0 tree=1
+seed name=236 bytes=179 parse_us=99.0 tree=1
+seed name=237 bytes=151 parse_us=95.0 tree=1
+seed name=238 bytes=179 parse_us=105.0 tree=1
+seed name=239 bytes=173 parse_us=106.0 tree=1
+seed name=24 bytes=155 parse_us=94.0 tree=1
+seed name=240 bytes=259 parse_us=124.0 tree=1
+seed name=241 bytes=262 parse_us=156.0 tree=1
+seed name=242 bytes=169 parse_us=105.0 tree=1
+seed name=243 bytes=172 parse_us=114.0 tree=1
+seed name=244 bytes=344 parse_us=198.0 tree=1
+seed name=245 bytes=186 parse_us=120.0 tree=1
+seed name=246 bytes=150 parse_us=89.0 tree=1
+seed name=247 bytes=155 parse_us=98.0 tree=1
+seed name=248 bytes=152 parse_us=87.0 tree=1
+seed name=249 bytes=232 parse_us=143.0 tree=1
+seed name=25 bytes=168 parse_us=103.0 tree=1
+seed name=250 bytes=164 parse_us=102.0 tree=1
+seed name=251 bytes=171 parse_us=123.0 tree=1
+seed name=252 bytes=148 parse_us=91.0 tree=1
+seed name=253 bytes=147 parse_us=91.0 tree=1
+seed name=254 bytes=189 parse_us=96.0 tree=1
+seed name=255 bytes=177 parse_us=108.0 tree=1
+seed name=256 bytes=266 parse_us=158.0 tree=1
+seed name=257 bytes=192 parse_us=114.0 tree=1
+seed name=258 bytes=156 parse_us=88.0 tree=1
+seed name=259 bytes=180 parse_us=98.0 tree=1
+seed name=26 bytes=147 parse_us=88.0 tree=1
+seed name=260 bytes=189 parse_us=115.0 tree=1
+seed name=261 bytes=290 parse_us=179.0 tree=1
+seed name=262 bytes=169 parse_us=112.0 tree=1
+seed name=263 bytes=211 parse_us=129.0 tree=1
+seed name=264 bytes=209 parse_us=138.0 tree=1
+seed name=265 bytes=192 parse_us=119.0 tree=1
+seed name=266 bytes=175 parse_us=103.0 tree=1
+seed name=267 bytes=190 parse_us=110.0 tree=1
+seed name=268 bytes=149 parse_us=86.0 tree=1
+seed name=269 bytes=162 parse_us=92.0 tree=1
+seed name=27 bytes=162 parse_us=101.0 tree=1
+seed name=270 bytes=220 parse_us=135.0 tree=1
+seed name=271 bytes=222 parse_us=135.0 tree=1
+seed name=272 bytes=137 parse_us=96.0 tree=1
+seed name=273 bytes=145 parse_us=88.0 tree=1
+seed name=274 bytes=160 parse_us=92.0 tree=1
+seed name=275 bytes=139 parse_us=89.0 tree=1
+seed name=276 bytes=150 parse_us=85.0 tree=1
+seed name=277 bytes=226 parse_us=127.0 tree=1
+seed name=278 bytes=254 parse_us=138.0 tree=1
+seed name=279 bytes=167 parse_us=97.0 tree=1
+seed name=28 bytes=139 parse_us=75.0 tree=1
+seed name=280 bytes=177 parse_us=97.0 tree=1
+seed name=281 bytes=315 parse_us=145.0 tree=1
+seed name=282 bytes=168 parse_us=99.0 tree=1
+seed name=283 bytes=140 parse_us=94.0 tree=1
+seed name=284 bytes=140 parse_us=80.0 tree=1
+seed name=285 bytes=189 parse_us=108.0 tree=1
+seed name=286 bytes=166 parse_us=95.0 tree=1
+seed name=287 bytes=195 parse_us=108.0 tree=1
+seed name=288 bytes=147 parse_us=85.0 tree=1
+seed name=289 bytes=161 parse_us=90.0 tree=1
+seed name=29 bytes=142 parse_us=79.0 tree=1
+seed name=290 bytes=147 parse_us=77.0 tree=1
+seed name=291 bytes=208 parse_us=103.0 tree=1
+seed name=292 bytes=195 parse_us=122.0 tree=1
+seed name=293 bytes=193 parse_us=120.0 tree=1
+seed name=294 bytes=191 parse_us=109.0 tree=1
+seed name=295 bytes=140 parse_us=75.0 tree=1
+seed name=296 bytes=288 parse_us=167.0 tree=1
+seed name=297 bytes=156 parse_us=102.0 tree=1
+seed name=298 bytes=153 parse_us=96.0 tree=1
+seed name=299 bytes=147 parse_us=83.0 tree=1
+seed name=3 bytes=139 parse_us=81.0 tree=1
+seed name=30 bytes=140 parse_us=77.0 tree=1
+seed name=31 bytes=200 parse_us=114.0 tree=1
+seed name=32 bytes=142 parse_us=79.0 tree=1
+seed name=33 bytes=148 parse_us=81.0 tree=1
+seed name=34 bytes=151 parse_us=87.0 tree=1
+seed name=35 bytes=190 parse_us=109.0 tree=1
+seed name=36 bytes=147 parse_us=81.0 tree=1
+seed name=37 bytes=140 parse_us=80.0 tree=1
+seed name=38 bytes=145 parse_us=79.0 tree=1
+seed name=39 bytes=301 parse_us=181.0 tree=1
+seed name=4 bytes=153 parse_us=118.0 tree=1
+seed name=40 bytes=266 parse_us=175.0 tree=1
+seed name=41 bytes=142 parse_us=105.0 tree=1
+seed name=42 bytes=148 parse_us=106.0 tree=1
+seed name=43 bytes=245 parse_us=125.0 tree=1
+seed name=44 bytes=139 parse_us=110.0 tree=1
+seed name=45 bytes=147 parse_us=104.0 tree=1
+seed name=46 bytes=151 parse_us=107.0 tree=1
+seed name=47 bytes=139 parse_us=102.0 tree=1
+seed name=48 bytes=139 parse_us=109.0 tree=1
+seed name=49 bytes=211 parse_us=146.0 tree=1
+seed name=5 bytes=181 parse_us=129.0 tree=1
+seed name=50 bytes=154 parse_us=116.0 tree=1
+seed name=51 bytes=159 parse_us=117.0 tree=1
+seed name=52 bytes=185 parse_us=141.0 tree=1
+seed name=53 bytes=138 parse_us=102.0 tree=1
+seed name=54 bytes=154 parse_us=106.0 tree=1
+seed name=55 bytes=139 parse_us=102.0 tree=1
+seed name=56 bytes=139 parse_us=112.0 tree=1
+seed name=57 bytes=140 parse_us=113.0 tree=1
+seed name=58 bytes=163 parse_us=119.0 tree=1
+seed name=59 bytes=156 parse_us=113.0 tree=1
+seed name=6 bytes=167 parse_us=107.0 tree=1
+seed name=60 bytes=167 parse_us=110.0 tree=1
+seed name=61 bytes=164 parse_us=99.0 tree=1
+seed name=62 bytes=139 parse_us=82.0 tree=1
+seed name=63 bytes=158 parse_us=85.0 tree=1
+seed name=64 bytes=226 parse_us=108.0 tree=1
+seed name=65 bytes=265 parse_us=137.0 tree=1
+seed name=66 bytes=293 parse_us=149.0 tree=1
+seed name=67 bytes=139 parse_us=80.0 tree=1
+seed name=68 bytes=336 parse_us=194.0 tree=1
+seed name=69 bytes=224 parse_us=125.0 tree=1
+seed name=7 bytes=192 parse_us=102.0 tree=1
+seed name=70 bytes=154 parse_us=81.0 tree=1
+seed name=71 bytes=163 parse_us=83.0 tree=1
+seed name=72 bytes=250 parse_us=122.0 tree=1
+seed name=73 bytes=170 parse_us=89.0 tree=1
+seed name=74 bytes=148 parse_us=78.0 tree=1
+seed name=75 bytes=148 parse_us=75.0 tree=1
+seed name=76 bytes=138 parse_us=70.0 tree=1
+seed name=77 bytes=195 parse_us=98.0 tree=1
+seed name=78 bytes=259 parse_us=105.0 tree=1
+seed name=79 bytes=161 parse_us=100.0 tree=1
+seed name=8 bytes=169 parse_us=96.0 tree=1
+seed name=80 bytes=263 parse_us=139.0 tree=1
+seed name=81 bytes=147 parse_us=84.0 tree=1
+seed name=82 bytes=147 parse_us=90.0 tree=1
+seed name=83 bytes=168 parse_us=112.0 tree=1
+seed name=84 bytes=155 parse_us=96.0 tree=1
+seed name=85 bytes=138 parse_us=94.0 tree=1
+seed name=86 bytes=168 parse_us=106.0 tree=1
+seed name=87 bytes=148 parse_us=93.0 tree=1
+seed name=88 bytes=166 parse_us=104.0 tree=1
+seed name=89 bytes=172 parse_us=107.0 tree=1
+seed name=9 bytes=151 parse_us=102.0 tree=1
+seed name=90 bytes=156 parse_us=101.0 tree=1
+seed name=91 bytes=164 parse_us=98.0 tree=1
+seed name=92 bytes=167 parse_us=105.0 tree=1
+seed name=93 bytes=209 parse_us=125.0 tree=1
+seed name=94 bytes=225 parse_us=134.0 tree=1
+seed name=95 bytes=263 parse_us=162.0 tree=1
+seed name=96 bytes=165 parse_us=107.0 tree=1
+seed name=97 bytes=173 parse_us=109.0 tree=1
+seed name=98 bytes=157 parse_us=98.0 tree=1
+seed name=99 bytes=168 parse_us=106.0 tree=1
+store seeds=300 chunks=2302 fill_ms=34.4
+entry name=0 bytes=131 nodes=3 rules_pairs=1 repick_us=25.0 count_us=1.0
+stage entry=0 stage=rules steps=1 us_per_output=9.0 avg_bytes=171 dup_pct=0.0 same_pct=0.0
+stage entry=0 stage=random steps=5000 us_per_output=1.0 avg_bytes=149 dup_pct=66.7 same_pct=49.8
+stage entry=0 stage=splice steps=5000 us_per_output=2.1 avg_bytes=178 dup_pct=85.3 same_pct=0.3
+trim entry=0 steps=2 us_per_step=0.5
+entry name=199 bytes=150 nodes=19 rules_pairs=39 repick_us=16.0 count_us=1.0
+stage entry=199 stage=rules steps=39 us_per_output=1.3 avg_bytes=158 dup_pct=0.0 same_pct=2.6
+stage entry=199 stage=random steps=5000 us_per_output=1.0 avg_bytes=154 dup_pct=78.6 same_pct=28.3
+stage entry=199 stage=recursive steps=5000 us_per_output=5.5 avg_bytes=318 dup_pct=99.7 same_pct=0.0
+stage entry=199 stage=splice steps=5000 us_per_output=1.6 avg_bytes=168 dup_pct=67.2 same_pct=22.7
+trim entry=199 steps=13 us_per_step=0.8
+entry name=196 bytes=167 nodes=35 rules_pairs=1184 repick_us=16.0 count_us=1.0
+stage entry=196 stage=rules steps=1184 us_per_output=1.1 avg_bytes=164 dup_pct=0.4 same_pct=0.5
+stage entry=196 stage=random steps=5000 us_per_output=1.4 avg_bytes=167 dup_pct=75.5 same_pct=26.4
+stage entry=196 stage=recursive steps=5000 us_per_output=12.2 avg_bytes=404 dup_pct=99.5 same_pct=0.0
+stage entry=196 stage=splice steps=5000 us_per_output=1.9 avg_bytes=177 dup_pct=62.6 same_pct=18.4
+trim entry=196 steps=21 us_per_step=1.2
+entry name=134 bytes=194 nodes=70 rules_pairs=3501 repick_us=19.0 count_us=1.0
+stage entry=134 stage=rules steps=3501 us_per_output=2.1 avg_bytes=197 dup_pct=0.3 same_pct=0.3
+stage entry=134 stage=random steps=5000 us_per_output=2.3 avg_bytes=193 dup_pct=70.9 same_pct=25.2
+stage entry=134 stage=recursive steps=5000 us_per_output=13.3 avg_bytes=418 dup_pct=99.4 same_pct=0.1
+stage entry=134 stage=splice steps=5000 us_per_output=2.8 avg_bytes=202 dup_pct=55.3 same_pct=16.6
+trim entry=134 steps=38 us_per_step=2.2
+entry name=244 bytes=344 nodes=175 rules_pairs=9345 repick_us=27.0 count_us=3.0
+stage entry=244 stage=rules steps=5000 us_per_output=5.5 avg_bytes=343 dup_pct=0.3 same_pct=0.3
+stage entry=244 stage=random steps=5000 us_per_output=5.7 avg_bytes=331 dup_pct=66.0 same_pct=28.8
+stage entry=244 stage=recursive steps=5000 us_per_output=15.1 avg_bytes=580 dup_pct=98.1 same_pct=0.0
+stage entry=244 stage=splice steps=5000 us_per_output=6.5 avg_bytes=339 dup_pct=46.2 same_pct=22.9
+trim entry=244 steps=102 us_per_step=5.7
+peak rss_kb=9600
