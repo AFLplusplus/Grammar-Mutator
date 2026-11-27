@@ -73,9 +73,14 @@ else
   if command -v lscpu >/dev/null 2>&1; then
     sockets=$(lscpu 2>/dev/null | sed -n 's/^Socket(s):[[:space:]]*//p' | head -n 1)
     per_socket=$(lscpu 2>/dev/null | sed -n 's/^Core(s) per socket:[[:space:]]*//p' | head -n 1)
-    case "$sockets$per_socket" in
+    case "$sockets" in
       '' | *[!0-9]*) ;;
-      *) physical=$((sockets * per_socket)) ;;
+      *)
+        case "$per_socket" in
+          '' | *[!0-9]*) ;;
+          *) physical=$((sockets * per_socket)) ;;
+        esac
+        ;;
     esac
   fi
   logical=$(nproc 2>/dev/null || true)
