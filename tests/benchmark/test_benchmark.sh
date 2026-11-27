@@ -76,6 +76,13 @@ grep -q ' result=error$' "$work/parse2.txt" || fail "parse: no result=error"
 grep -q "no-such-file: " "$work/parse2.txt.err" ||
   fail "parse: no reason on stderr for the unreadable file"
 grep -q ' result=ok$' "$work/parse2.txt" || fail "parse: other file not printed"
+# the reason is the error of the open call, also if stdout is /dev/null (on
+# macOS the first output of stdio sets errno to ENOTTY)
+status=0
+"$bench" parse "$work/no-such-file" > /dev/null 2> "$work/errno.txt" || status=$?
+[ "$status" -eq 1 ] || fail "parse to /dev/null: expected exit 1, got $status"
+grep -q 'No such file or directory' "$work/errno.txt" ||
+  fail "parse: wrong reason: $(cat "$work/errno.txt")"
 echo "[+] parse reports an unreadable file and goes on"
 
 # usage errors
@@ -153,28 +160,49 @@ capture "$work/dashdash.txt" "$bench" run -e 1 -n 5 -t 5 -- "$work/seeds"
 echo "[+] run accepts attached option values and --"
 
 # a signal stops the program, removes the work folder, and keeps the signal
-# as the exit status
-mkdir "$work/tmp-int" "$work/tmp-term"
-TMPDIR="$work/tmp-int" "$bench" run -n 1000000 -t 1 -e 1 "$work/seeds" \
-  > /dev/null 2> "$work/int.err" &
-pid_int=$!
-TMPDIR="$work/tmp-term" "$bench" run -n 1000000 -t 1 -e 1 "$work/seeds" \
-  > /dev/null 2> "$work/term.err" &
-pid_term=$!
-sleep 1
+# as the exit status. The program makes the trees folder after it starts the
+# handlers, so the test waits for it.
+mkdir "$work/tmp-int" "$work/tmp-term" "$work/tmp-hup"
+for sig in int term hup; do
+  TMPDIR="$work/tmp-$sig" "$bench" run -n 1000000 -t 1 -e 1 "$work/seeds" \
+    > /dev/null 2> "$work/$sig.err" &
+  eval "pid_$sig=\$!"
+done
+for sig in int term hup; do
+  tries=0
+  while ! ls -d "$work/tmp-$sig"/benchmark.*/trees > /dev/null 2>&1; do
+    tries=$((tries + 1))
+    [ "$tries" -le 100 ] || fail "$sig: the run did not start in 10 s"
+    sleep 0.1
+  done
+done
 kill -INT "$pid_int"
 kill -TERM "$pid_term"
+kill -HUP "$pid_hup"
 status_int=0
-wait "$pid_int" || status_int=$?
 status_term=0
-wait "$pid_term" || status_term=$?
-[ "$status_int" -gt 128 ] || fail "SIGINT: expected a status above 128, got $status_int"
-[ "$status_term" -gt 128 ] || fail "SIGTERM: expected a status above 128, got $status_term"
-[ -s "$work/int.err" ] || fail "SIGINT: no message on stderr"
-[ -s "$work/term.err" ] || fail "SIGTERM: no message on stderr"
-[ -z "$(ls -A "$work/tmp-int")" ] || fail "SIGINT left a work folder behind"
-[ -z "$(ls -A "$work/tmp-term")" ] || fail "SIGTERM left a work folder behind"
-echo "[+] SIGINT and SIGTERM remove the work folder"
+status_hup=0
+{
+  wait "$pid_int" || status_int=$?
+  wait "$pid_term" || status_term=$?
+  wait "$pid_hup" || status_hup=$?
+} 2> /dev/null
+for sig in int term hup; do
+  eval "st=\$status_$sig"
+  [ "$st" -gt 128 ] || fail "$sig: expected a status above 128, got $st"
+  [ -s "$work/$sig.err" ] || fail "$sig: no message on stderr"
+  [ -z "$(ls -A "$work/tmp-$sig")" ] || fail "$sig left a work folder behind"
+done
+echo "[+] SIGINT, SIGTERM, and SIGHUP remove the work folder"
+
+# a closed pipe (SIGPIPE) ends the run, with the same cleanup. The run prints
+# a record after each entry, so a write comes after head has left. The run
+# is short, so the test cannot hang.
+mkdir "$work/tmp-pipe"
+TMPDIR="$work/tmp-pipe" "$bench" run -e 20 -n 2000 -t 10 "$work/seeds" 2> /dev/null |
+  head -1 > /dev/null
+[ -z "$(ls -A "$work/tmp-pipe")" ] || fail "a closed pipe left a work folder"
+echo "[+] a closed pipe removes the work folder"
 
 # run mode: -e larger than the trees measures each tree once
 capture "$work/many.txt" "$bench" run -e 50 -n 5 -t 5 "$work/seeds"
@@ -221,7 +249,7 @@ rm -rf "$work/seeds/sub" "$work/seeds/.hidden"
 capture "$work/d1.txt" "$bench" digest -n 50 -t 10 "$work/seeds"
 [ "$status" -eq 0 ] || fail "digest: exit $status"
 mkdir "$work/tmp2"
-TMPDIR="$work/tmp2" capture "$work/d2.txt" "$bench" digest -n 50 -t 10 "$work/seeds"
+capture "$work/d2.txt" env TMPDIR="$work/tmp2" "$bench" digest -n 50 -t 10 "$work/seeds"
 [ "$status" -eq 0 ] || fail "digest in another work folder: exit $status"
 grep -Eq '^benchmark .* mode=digest seed=0 steps=50 trims=10 parse_budget_ms=0 seeds=20 trees=20$' \
   "$work/d1.txt" || fail "digest: bad header"

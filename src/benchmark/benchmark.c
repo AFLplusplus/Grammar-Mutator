@@ -59,25 +59,35 @@ static const char *grammar_name(const char *argv0) {
 
 }
 
-// The signal that asked the program to stop, or 0. The handler restores the
-// default action, so that a second signal stops the program at once.
+// The signal that asked the program to stop, or 0. The handlers only set this
+// flag. The loops check it between library calls and then clean up.
 static volatile sig_atomic_t stop_signal = 0;
 
 static void on_signal(int sig) {
 
-  stop_signal = sig;
-  signal(sig, SIG_DFL);
+  if (!stop_signal) stop_signal = sig;
 
 }
 
+// Handle the signals that stop the program. A second SIGINT, SIGTERM, or
+// SIGHUP stops the program at once (SA_RESETHAND), without the cleanup. A
+// closed pipe (SIGPIPE) keeps its handler, so that the next write fails with
+// an error and the program can clean up.
+// sigaction replaces an inherited SIG_IGN on purpose: a background job of a
+// shell starts with SIGINT ignored, and the program must still clean up. Do
+// not change this to the "keep SIG_IGN" pattern.
 static void install_signal_handlers(void) {
 
+  static const int once[] = {SIGINT, SIGTERM, SIGHUP};
   struct sigaction action;
   memset(&action, 0, sizeof(action));
   action.sa_handler = on_signal;
   sigemptyset(&action.sa_mask);
-  sigaction(SIGINT, &action, NULL);
-  sigaction(SIGTERM, &action, NULL);
+  action.sa_flags = SA_RESETHAND;
+  for (size_t i = 0; i < sizeof(once) / sizeof(once[0]); ++i)
+    sigaction(once[i], &action, NULL);
+  action.sa_flags = 0;
+  sigaction(SIGPIPE, &action, NULL);
 
 }
 
@@ -201,11 +211,13 @@ static int mode_parse(int argc, char **argv) {
     size_t len = 0;
     errno = 0;
     uint8_t *buf = read_file(argv[i], &len);
+    int      read_errno = errno;  // printf can change errno
     printf("parse file=");
     print_value(stdout, argv[i]);
     if (!buf) {
 
-      fprintf(stderr, "%s: %s\n", argv[i], strerror(errno ? errno : ENOMEM));
+      fprintf(stderr, "%s: %s\n", argv[i],
+              strerror(read_errno ? read_errno : ENOMEM));
       printf(" bytes=0 nodes=0 us=0.0 result=error\n");
       status = 1;
       continue;
@@ -437,9 +449,19 @@ static char *work_create(const char *seed_dir, const seed_list_t *seeds) {
 
   }
 
+  // From here, a signal ends the run through the cleanup of the work folder
+  install_signal_handlers();
+
   char *queue = join_path(work, "queue");
   bool  ok = queue && create_directory(queue);
   for (size_t i = 0; ok && i < seeds->count; ++i) {
+
+    if (stopped()) {
+
+      ok = false;
+      break;
+
+    }
 
     char    *from = join_path(seed_dir, seeds->names[i]);
     char    *to = join_path(queue, seeds->names[i]);
@@ -697,11 +719,27 @@ static bool measure_entry(my_mutator_t *data, const char *queue,
 
   // Pick the entry once untimed. Then the timed pick frees the tree of this
   // entry, not the last seed, so repick_us follows the size of the entry.
-  queue_get(data, path);
-  double begin = now_us();
-  queue_get(data, path);
-  double repick_us = now_us() - begin;
+  double begin = 0;
+  double repick_us = 0;
+  if (!queue_get(data, path)) {
+
+    fprintf(stderr, "Cannot get the entry %s\n", name);
+    free(path);
+    return false;
+
+  }
+
+  begin = now_us();
+  uint8_t picked = queue_get(data, path);
+  repick_us = now_us() - begin;
   free(path);
+  if (!picked) {
+
+    fprintf(stderr, "Cannot get the entry %s\n", name);
+    return false;
+
+  }
+
   size_t nodes = 0;
   if (!data->tree_cur) {
 
@@ -737,7 +775,11 @@ static bool measure_entry(my_mutator_t *data, const char *queue,
   printf(" bytes=%zu nodes=%zu rules_pairs=%zu repick_us=%.1f count_us=%.1f\n",
          len, nodes, rules_pairs, repick_us, count_us);
 
+  // Flush each part, so that a reader sees the progress and a closed pipe
+  // shows early
+  fflush(stdout);
   if (!measure_stages(data, name, planned, steps, same)) return false;
+  fflush(stdout);
 
   size_t trim_steps;
   double trim_us;
@@ -800,8 +842,6 @@ static int bench_open(bench_ctx_t *ctx, const char *prog, bool with_entries,
 
   ctx->work = work_create(ctx->seed_dir, &ctx->seeds);
   if (!ctx->work) return 1;
-  // From here, a signal ends the run through the cleanup of the work folder
-  install_signal_handlers();
   ctx->queue = join_path(ctx->work, "queue");
   if (!ctx->queue) return 1;
   set_step_variables(ctx->opt.steps, ctx->opt.trims);
@@ -860,9 +900,17 @@ static int mode_run(const char *prog, int argc, char **argv) {
     struct stat st;
     if (!path) goto done;
     infos[i].bytes = stat(path, &st) == 0 ? (size_t)st.st_size : 0;
-    double begin = now_us();
-    queue_get(data, path);
+    double  begin = now_us();
+    uint8_t got = queue_get(data, path);
     infos[i].us = now_us() - begin;
+    if (!got) {
+
+      fprintf(stderr, "Cannot get the entry %s\n", path);
+      free(path);
+      goto done;
+
+    }
+
     infos[i].tree = data->tree_cur != NULL;
     fill_us += infos[i].us;
     if (infos[i].tree) order[trees++] = i;
@@ -1154,9 +1202,10 @@ int main(int argc, char **argv) {
   if (stopped()) {
 
     // The mode did its cleanup. Stop with the signal, so that the shell sees
-    // it. The handler restored the default action.
+    // it.
     fflush(stdout);
     fprintf(stderr, "Stopped by signal %d\n", (int)stop_signal);
+    signal((int)stop_signal, SIG_DFL);
     raise((int)stop_signal);
 
   }
