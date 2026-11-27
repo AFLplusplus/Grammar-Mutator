@@ -47,6 +47,11 @@ void parse_budget_record(parse_budget_t *budget, uint64_t elapsed_ns,
 // Read a monotonic clock in ns
 uint64_t parse_budget_now_ns(void);
 
+// Read PARSE_TIME_BUDGET_MS and return the smallest time limit in ns. Unset or
+// empty: PARSE_BUDGET_MIN_NS. Digits only: that number of ms (0 turns the limit
+// off). Anything else: a warning on stderr and PARSE_BUDGET_MIN_NS.
+uint64_t parse_budget_min_ns_from_env(void);
+
 #ifdef __cplusplus
 
 }

@@ -20,6 +20,8 @@
    the names of the generated classes without a namespace.
  */
 
+#include <antlr4-runtime.h>
+
 #include "g4_matcher.h"
 
 namespace g4build {
@@ -34,5 +36,43 @@ tree_t *tree_parse(const uint8_t *buf, size_t len, parse_budget_t *budget,
   g4::Limits limits;
   limits.budget = budget;
   return g4::parse(g4build::grammar, buf, len, limits, status);
+
+}
+
+bool tree_parser_cache_states(size_t *parser_states, size_t *lexer_states) {
+
+  if (!parser_states || !lexer_states) return false;
+
+  try {
+
+    // Make a lexer and a parser on an empty input. Their simulators refer to
+    // the shared static caches. This changes no cache.
+    antlr4::ANTLRInputStream input("");
+    auto lexer = g4build::grammar.make_lexer(&input);
+    antlr4::CommonTokenStream tokens(lexer.get());
+    auto parser = g4build::grammar.make_parser(&tokens);
+
+    size_t count = 0;
+    for (auto &dfa :
+         parser->getInterpreter<antlr4::atn::ParserATNSimulator>()
+             ->decisionToDFA)
+      count += dfa.states.size();
+    *parser_states = count;
+
+    count = 0;
+    for (auto &dfa :
+         lexer->getInterpreter<antlr4::atn::LexerATNSimulator>()
+             ->_decisionToDFA)
+      count += dfa.states.size();
+    *lexer_states = count;
+
+  } catch (...) {
+
+    // No exception may cross the C frames of the caller
+    return false;
+
+  }
+
+  return true;
 
 }

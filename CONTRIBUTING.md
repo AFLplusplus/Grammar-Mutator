@@ -76,6 +76,12 @@ Use the benchmark program to measure a change that affects speed. The program
    benchmark-<name> run <seed folder>
    ```
 
+   To measure the growth of the ANTLR parse cache, run the `cache` mode:
+
+   ```bash
+   benchmark-<name> cache -m 100000 <seed folder>
+   ```
+
 4. If the change must keep the outputs, compare the `digest` record before
    and after.
 
@@ -85,13 +91,15 @@ Use the benchmark program to measure a change that affects speed. The program
 
 5. The program sets the step variables from `-n` and `-t`. It also turns the
    parse time limit off, unless you set `PARSE_TIME_BUDGET_MS`. So the same
-   command does the same work.
+   command does the same work. The `cache` mode keeps the time limit of the
+   mutator on purpose. So its `stopped` count and its state counts can differ
+   a little between runs.
 6. To keep a result as a comparison point, follow
    [doc/benchmarks/README.md](doc/benchmarks/README.md).
 
-To stop a `run` or `digest`, press Ctrl-C. The program removes its work folder
-and stops. A second Ctrl-C stops the program at once. It can leave the work
-folder in `TMPDIR`.
+To stop a `run`, `digest`, or `cache`, press Ctrl-C. The program removes its
+work folder and stops. A second Ctrl-C stops the program at once. It can leave
+the work folder in `TMPDIR`.
 
 ## Branches
 

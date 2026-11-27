@@ -63,6 +63,15 @@ in `<build>/src/benchmark/` after a CMake build.
    benchmark-<name> digest -n 200 -t 20 jerry-seeds > <name>-digest.txt
    ```
 
+   The `cache` mode measures the ANTLR parse cache. It parses the seeds, and
+   then it parses random mutants of them. At each interval it prints the
+   number of cached prediction states, the heap in use, and the time of a
+   parse. Name its files `<name>-cache.txt`:
+
+   ```bash
+   benchmark-<name> cache -m 100000 jerry-seeds > <name>-cache.txt
+   ```
+
    The script reads the grammar and the mode from the first line of each
    file, not from the file name.
 
@@ -91,3 +100,5 @@ in `<build>/src/benchmark/` after a CMake build.
 
 - [2026-11-27](2026-11-27/README.md): the library of release 1.2.0, with the
   JavaScript `.g4` grammar and `ruby.json`, on an Apple M4 with macOS 26.6.2.
+- [2026-11-27-2](2026-11-27-2/README.md): the growth of the ANTLR parse cache
+  (`cache` mode), with the same seeds and machine as the first result.

@@ -126,3 +126,34 @@ uint64_t parse_budget_now_ns(void) {
   return (uint64_t)ts.tv_sec * UINT64_C(1000000000) + (uint64_t)ts.tv_nsec;
 
 }
+
+// Read PARSE_TIME_BUDGET_MS. Unset or empty: the default. Digits only: that
+// number of ms (0 turns the limit off). Anything else: a warning and the
+// default.
+uint64_t parse_budget_min_ns_from_env(void) {
+
+  const char *ptr = getenv("PARSE_TIME_BUDGET_MS");
+  if (!ptr || !*ptr) return PARSE_BUDGET_MIN_NS;
+
+  const uint64_t max_ms = UINT64_MAX / 1000000;
+  uint64_t       ms = 0;
+  for (const char *p = ptr; *p; ++p) {
+
+    uint64_t digit = (uint64_t)(*p - '0');
+    if (*p < '0' || *p > '9' || ms > (max_ms - digit) / 10) {
+
+      fprintf(stderr,
+              "[grammar mutator] warning: PARSE_TIME_BUDGET_MS must be a "
+              "whole number of ms, at most 18446744073709. The mutator uses "
+              "50.\n");
+      return PARSE_BUDGET_MIN_NS;
+
+    }
+
+    ms = ms * 10 + digit;
+
+  }
+
+  return ms * 1000000;
+
+}

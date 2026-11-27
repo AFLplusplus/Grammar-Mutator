@@ -17,6 +17,8 @@
  */
 
 #include <cstdint>
+#include <cstdlib>
+#include <string>
 #include "gtest/gtest.h"
 #include "parse_budget.h"
 
@@ -133,5 +135,32 @@ TEST(ParseBudget, ClockMovesForward) {
 TEST(ParseBudget, FreeNullIsSafe) {
 
   parse_budget_free(NULL);
+
+}
+
+TEST(ParseBudget, MinNsFromEnv) {
+
+  const char *old = getenv("PARSE_TIME_BUDGET_MS");
+  std::string saved = old ? old : "";
+
+  unsetenv("PARSE_TIME_BUDGET_MS");
+  EXPECT_EQ(parse_budget_min_ns_from_env(), PARSE_BUDGET_MIN_NS);
+  setenv("PARSE_TIME_BUDGET_MS", "", 1);
+  EXPECT_EQ(parse_budget_min_ns_from_env(), PARSE_BUDGET_MIN_NS);
+  setenv("PARSE_TIME_BUDGET_MS", "0", 1);
+  EXPECT_EQ(parse_budget_min_ns_from_env(), UINT64_C(0));
+  setenv("PARSE_TIME_BUDGET_MS", "200", 1);
+  EXPECT_EQ(parse_budget_min_ns_from_env(), UINT64_C(200000000));
+  setenv("PARSE_TIME_BUDGET_MS", "abc", 1);
+  EXPECT_EQ(parse_budget_min_ns_from_env(), PARSE_BUDGET_MIN_NS);
+  setenv("PARSE_TIME_BUDGET_MS", "18446744073709", 1);
+  EXPECT_EQ(parse_budget_min_ns_from_env(), UINT64_C(18446744073709000000));
+  setenv("PARSE_TIME_BUDGET_MS", "18446744073710", 1);
+  EXPECT_EQ(parse_budget_min_ns_from_env(), PARSE_BUDGET_MIN_NS);
+
+  if (old)
+    setenv("PARSE_TIME_BUDGET_MS", saved.c_str(), 1);
+  else
+    unsetenv("PARSE_TIME_BUDGET_MS");
 
 }
