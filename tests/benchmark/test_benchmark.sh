@@ -162,19 +162,31 @@ echo "[+] run accepts attached option values and --"
 # a signal stops the program, removes the work folder, and keeps the signal
 # as the exit status. The program makes the trees folder after it starts the
 # handlers, so the test waits for it.
+# Wait until the run in the TMPDIR $1 made its trees folder. Stop all started
+# background runs and fail if that takes more than 10 s.
+bg_pids=
+wait_for_trees() {
+  tries=0
+  while ! ls -d "$1"/benchmark.*/trees > /dev/null 2>&1; do
+    tries=$((tries + 1))
+    if [ "$tries" -gt 100 ]; then
+      # shellcheck disable=SC2086
+      kill $bg_pids 2> /dev/null || true
+      fail "the run did not start in 10 s ($1)"
+    fi
+    sleep 0.1
+  done
+}
+
 mkdir "$work/tmp-int" "$work/tmp-term" "$work/tmp-hup"
 for sig in int term hup; do
   TMPDIR="$work/tmp-$sig" "$bench" run -n 1000000 -t 1 -e 1 "$work/seeds" \
     > /dev/null 2> "$work/$sig.err" &
   eval "pid_$sig=\$!"
+  bg_pids="$bg_pids $!"
 done
 for sig in int term hup; do
-  tries=0
-  while ! ls -d "$work/tmp-$sig"/benchmark.*/trees > /dev/null 2>&1; do
-    tries=$((tries + 1))
-    [ "$tries" -le 100 ] || fail "$sig: the run did not start in 10 s"
-    sleep 0.1
-  done
+  wait_for_trees "$work/tmp-$sig"
 done
 kill -INT "$pid_int"
 kill -TERM "$pid_term"
@@ -194,6 +206,43 @@ for sig in int term hup; do
   [ -z "$(ls -A "$work/tmp-$sig")" ] || fail "$sig left a work folder behind"
 done
 echo "[+] SIGINT, SIGTERM, and SIGHUP remove the work folder"
+
+# a run that starts with SIGHUP ignored (as under nohup) goes on after a
+# hang-up, and a later SIGTERM stops it
+mkdir "$work/tmp-nohup"
+(
+  trap '' HUP
+  TMPDIR="$work/tmp-nohup" exec "$bench" run -n 1000000 -t 1 -e 1 "$work/seeds" \
+    > /dev/null 2> "$work/nohup.err"
+) &
+pid_nohup=$!
+bg_pids=$pid_nohup
+wait_for_trees "$work/tmp-nohup"
+kill -HUP "$pid_nohup"
+sleep 0.3
+if ! kill -0 "$pid_nohup" 2> /dev/null; then
+  fail "a run with SIGHUP ignored stopped on SIGHUP"
+fi
+kill -TERM "$pid_nohup"
+{ wait "$pid_nohup" || true; } 2> /dev/null
+[ -z "$(ls -A "$work/tmp-nohup")" ] || fail "the nohup run left a work folder"
+echo "[+] a run with SIGHUP ignored goes on after SIGHUP"
+
+# a failed write to stdout gives exit 1 (a closed stdout gives EBADF)
+status=0
+"$bench" parse "$work"/seeds/* >&- 2> /dev/null || status=$?
+[ "$status" -eq 1 ] || fail "parse with a closed stdout: expected exit 1, got $status"
+mkdir "$work/tmp-closed"
+status=0
+TMPDIR="$work/tmp-closed" "$bench" run -e 1 -n 5 -t 5 "$work/seeds" >&- 2> /dev/null ||
+  status=$?
+[ "$status" -eq 1 ] || fail "run with a closed stdout: expected exit 1, got $status"
+status=0
+TMPDIR="$work/tmp-closed" "$bench" digest -n 5 -t 5 "$work/seeds" >&- 2> /dev/null ||
+  status=$?
+[ "$status" -eq 1 ] || fail "digest with a closed stdout: expected exit 1, got $status"
+[ -z "$(ls -A "$work/tmp-closed")" ] || fail "a failed write left a work folder"
+echo "[+] a failed write to stdout gives exit 1"
 
 # a closed pipe (SIGPIPE) ends the run, with the same cleanup. The run prints
 # a record after each entry, so a write comes after head has left. The run

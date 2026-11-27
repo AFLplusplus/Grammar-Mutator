@@ -73,9 +73,11 @@ static void on_signal(int sig) {
 // SIGHUP stops the program at once (SA_RESETHAND), without the cleanup. A
 // closed pipe (SIGPIPE) keeps its handler, so that the next write fails with
 // an error and the program can clean up.
-// sigaction replaces an inherited SIG_IGN on purpose: a background job of a
-// shell starts with SIGINT ignored, and the program must still clean up. Do
-// not change this to the "keep SIG_IGN" pattern.
+// For SIGINT and SIGPIPE, sigaction replaces an inherited SIG_IGN on purpose:
+// a background job of a shell starts with SIGINT ignored, and the program must
+// still clean up. Do not change this to the "keep SIG_IGN" pattern.
+// SIGHUP is different. If it is ignored (nohup), the program keeps it ignored,
+// so that the run goes on after a hang-up.
 static void install_signal_handlers(void) {
 
   static const int once[] = {SIGINT, SIGTERM, SIGHUP};
@@ -84,8 +86,16 @@ static void install_signal_handlers(void) {
   action.sa_handler = on_signal;
   sigemptyset(&action.sa_mask);
   action.sa_flags = SA_RESETHAND;
-  for (size_t i = 0; i < sizeof(once) / sizeof(once[0]); ++i)
+  for (size_t i = 0; i < sizeof(once) / sizeof(once[0]); ++i) {
+
+    struct sigaction old;
+    if (once[i] == SIGHUP && sigaction(SIGHUP, NULL, &old) == 0 &&
+        old.sa_handler == SIG_IGN)
+      continue;
     sigaction(once[i], &action, NULL);
+
+  }
+
   action.sa_flags = 0;
   sigaction(SIGPIPE, &action, NULL);
 
@@ -1207,6 +1217,14 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Stopped by signal %d\n", (int)stop_signal);
     signal((int)stop_signal, SIG_DFL);
     raise((int)stop_signal);
+
+  }
+
+  // A write error other than a closed pipe (for example ENOSPC or EBADF)
+  if ((fflush(stdout) != 0 || ferror(stdout)) && status == 0) {
+
+    fprintf(stderr, "Cannot write the output\n");
+    status = 1;
 
   }
 
