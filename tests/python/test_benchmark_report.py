@@ -180,16 +180,20 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(run_main([str(empty)]), 1)
 
         write(self.dir, "other.txt", "hello\n")
-        with self.assertRaises(report.ReportError):
+        with self.assertRaises(report.ReportError) as ctx:
             report.load_result(self.dir)
+        self.assertIn("other.txt", str(ctx.exception))
+        self.assertIn("not a benchmark output", str(ctx.exception))
         (self.dir / "other.txt").unlink()
 
         bad = RUBY_RUN.replace(
-            "stage entry=0 stage=rules steps=9", "stage entry=x stage=rules steps=abc"
+            "stage entry=0 stage=rules steps=9", "stage entry=0 stage=rules steps=abc"
         )
         write(self.dir, "ruby-run.txt", bad)
-        with self.assertRaises(report.ReportError):
+        with self.assertRaises(report.ReportError) as ctx:
             report.load_result(self.dir)
+        self.assertIn("ruby-run.txt:5", str(ctx.exception))
+        self.assertIn("steps=abc", str(ctx.exception))
         self.assertEqual(run_main([str(self.dir)]), 1)
         write(self.dir, "ruby-run.txt", RUBY_RUN)
 
@@ -206,12 +210,68 @@ class ReportTest(unittest.TestCase):
         (self.dir / "platform2.txt").unlink()
 
         write(self.dir, "README.md", report.START_MARKER + "\n")
-        with self.assertRaises(report.ReportError):
+        with self.assertRaises(report.ReportError) as ctx:
             report.check(self.dir)
+        self.assertIn(str(self.dir / "README.md"), str(ctx.exception))
+        self.assertIn("exactly one start marker", str(ctx.exception))
         self.assertEqual(run_main([str(self.dir)]), 1)
-        both = report.START_MARKER + "\n" + report.START_MARKER + "\n" + report.END_MARKER
+        both = "\n".join([report.START_MARKER] * 2 + [report.END_MARKER])
         with self.assertRaises(report.ReportError):
             report.update_readme(both, "x\n", "x")
+
+    def test_short_times_in_ms(self) -> None:
+        out = self.render()
+        self.assertIn("The fill took 22.9 s.", out)
+        self.assertEqual(report.seconds(34.4), "34.4 ms")
+        self.assertEqual(report.seconds(999.9), "999.9 ms")
+        self.assertEqual(report.seconds(1000.0), "1.0 s")
+        self.assertEqual(report.seconds(132400.0), "132.4 s")
+        fast = RUBY_RUN.replace("fill_ms=1234.5", "fill_ms=34.4")
+        write(self.dir, "ruby-run.txt", fast)
+        self.assertIn("The fill took 34.4 ms.", self.render())
+
+    def test_repeated_records(self) -> None:
+        cases = {
+            "entry": "entry name=0 bytes=1 nodes=1 rules_pairs=1\n",
+            "peak": "peak rss_kb=1\n",
+            "store": "store seeds=1 chunks=1 fill_ms=1.0\n",
+            "elapsed": "elapsed wall_ms=1.0\n",
+        }
+        for kind, line in cases.items():
+            with self.subTest(kind=kind):
+                text = JS_RUN + line if kind == "elapsed" else RUBY_RUN + line
+                name = "javascript-run.txt" if kind == "elapsed" else "ruby-run.txt"
+                write(self.dir, name, text)
+                with self.assertRaises(report.ReportError) as ctx:
+                    report.load_result(self.dir)
+                self.assertIn(f"{name}:", str(ctx.exception))
+                self.assertIn("more than once", str(ctx.exception))
+                write(self.dir, "ruby-run.txt", RUBY_RUN)
+                write(self.dir, "javascript-run.txt", JS_RUN)
+
+    def test_missing_field(self) -> None:
+        bad = RUBY_RUN.replace(" us_per_output=9.0", "", 1)
+        write(self.dir, "ruby-run.txt", bad)
+        with self.assertRaises(report.ReportError) as ctx:
+            report.load_result(self.dir)
+        self.assertIn("ruby-run.txt:5", str(ctx.exception))
+        self.assertIn("us_per_output", str(ctx.exception))
+
+    def test_crlf(self) -> None:
+        names = ("ruby-run.txt", "javascript-run.txt", "ruby-digest.txt", "platform.txt")
+        for name in names:
+            text = (self.dir / name).read_bytes().replace(b"\n", b"\r\n")
+            (self.dir / name).write_bytes(text)
+        crlf = self.render()
+        self.assertNotIn("\r", crlf)
+        hand = HAND_TEXT.replace("\n", "\r\n")
+        (self.dir / "README.md").write_bytes(hand.encode())
+        self.assertEqual(run_main([str(self.dir)]), 0)
+        data = (self.dir / "README.md").read_bytes().decode()
+        before = hand[: hand.index(report.START_MARKER)]
+        self.assertTrue(data.startswith(before + report.START_MARKER))
+        self.assertTrue(data.endswith("| 3 | 4 |"))
+        self.assertEqual(run_main([str(self.dir), "--check"]), 0)
 
     def test_check(self) -> None:
         self.assertEqual(run_main([str(self.dir), "--check"]), 1)

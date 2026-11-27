@@ -126,17 +126,13 @@ class Result:
     digests: list = field(default_factory=list)
 
 
-def parse_records(path: Path) -> list:
-    """Split a raw file into records. Raise ReportError for a bad line."""
-    try:
-        content = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise ReportError(f"{path.name}: cannot read the file: {exc}") from None
+def parse_records(name: str, content: str) -> list:
+    """Split the text of a raw file into records. Raise ReportError for a bad line."""
     records = []
     for number, line in enumerate(content.splitlines(), 1):
         if not line.strip():
             continue
-        where = f"{path.name}:{number}"
+        where = f"{name}:{number}"
         words = line.split()
         fields = {}
         for word in words[1:]:
@@ -148,6 +144,12 @@ def parse_records(path: Path) -> list:
     return records
 
 
+def once(current: object, rec: Record) -> None:
+    """Raise ReportError if a record that may come once has come before."""
+    if current is not None:
+        raise ReportError(f"{rec.where}: the {rec.kind} record is there more than once")
+
+
 def build_run(path: Path, records: list) -> Run:
     head = records[0]
     entries = []
@@ -155,14 +157,20 @@ def build_run(path: Path, records: list) -> Run:
     store = None
     peak = None
     wall = None
+
     for rec in records[1:]:
         if rec.kind == "seed":
             rec.text("name")
             rec.integer("bytes")
         elif rec.kind == "store":
+            once(store, rec)
             store = rec
         elif rec.kind == "entry":
             entry = Entry(rec.text("name"), rec.integer("bytes"), rec.integer("nodes"))
+            if entry.name in by_name:
+                raise ReportError(
+                    f"{rec.where}: entry '{entry.name}' is there more than once"
+                )
             entries.append(entry)
             by_name[entry.name] = entry
         elif rec.kind in ("stage", "trim"):
@@ -181,8 +189,10 @@ def build_run(path: Path, records: list) -> Run:
                 rec.number(key)
             entry.stages[stage] = rec
         elif rec.kind == "peak":
+            once(peak, rec)
             peak = rec.integer("rss_kb")
         elif rec.kind == "elapsed":
+            once(wall, rec)
             wall = rec.number("wall_ms")
         else:
             raise ReportError(f"{rec.where}: unknown record '{rec.kind}'")
@@ -216,10 +226,13 @@ def build_digest(path: Path, records: list) -> Digest:
     head = records[0]
     digest = None
     wall = None
+
     for rec in records[1:]:
         if rec.kind == "digest":
+            once(digest, rec)
             digest = rec
         elif rec.kind == "elapsed":
+            once(wall, rec)
             wall = rec.number("wall_ms")
         else:
             raise ReportError(f"{rec.where}: unknown record '{rec.kind}'")
@@ -265,11 +278,11 @@ def load_result(folder: Path) -> Result:
                     f"{path.name}: second platform file (the first is {platform_name})"
                 )
             platform_name = path.name
-            result.platform = content.rstrip("\n")
+            result.platform = "\n".join(content.splitlines())
             continue
         if not first.startswith("benchmark "):
             raise ReportError(f"{path.name}: not a benchmark output or a platform file")
-        records = parse_records(path)
+        records = parse_records(path.name, content)
         head = records[0]
         mode = head.text("mode")
         grammar = head.text("grammar")
@@ -301,8 +314,11 @@ def count(value: int) -> str:
 
 
 def seconds(ms: float | None) -> str:
+    """A time in ms: below 1 s in ms, else in seconds. Both have one decimal."""
     if ms is None:
         return MISSING
+    if round(ms, 1) < 1000:
+        return f"{ms:.1f} ms"
     return f"{ms / 1000.0:.1f} s"
 
 
@@ -406,10 +422,13 @@ def render(result: Result) -> str:
     return "\n".join(out) + "\n"
 
 
-def update_readme(text: str | None, generated: str, title: str) -> str:
+def update_readme(
+    text: str | None, generated: str, title: str, where: str = "README.md"
+) -> str:
     """Put the generated part between the markers of the README text.
 
     TITLE is the name of the result folder. It names a new README.
+    WHERE is the path of the README. It starts the text of an error.
     """
     block = f"{START_MARKER}\n\n{generated}\n{END_MARKER}"
     if text is None:
@@ -422,13 +441,13 @@ def update_readme(text: str | None, generated: str, title: str) -> str:
     ends = text.count(END_MARKER)
     if starts != 1 or ends != 1:
         raise ReportError(
-            f"README.md: need exactly one start marker and one end marker"
+            f"{where}: need exactly one start marker and one end marker"
             f" (found {starts} and {ends})"
         )
     begin = text.index(START_MARKER)
     end = text.index(END_MARKER)
     if end < begin:
-        raise ReportError("README.md: the end marker is before the start marker")
+        raise ReportError(f"{where}: the end marker is before the start marker")
     return text[:begin] + block + text[end + len(END_MARKER) :]
 
 
@@ -444,7 +463,9 @@ def read_readme(folder: Path) -> str | None:
 def expected_readme(folder: Path) -> str:
     folder = Path(folder)
     generated = render(load_result(folder))
-    return update_readme(read_readme(folder), generated, folder.resolve().name)
+    return update_readme(
+        read_readme(folder), generated, folder.resolve().name, str(folder / "README.md")
+    )
 
 
 def check(folder: Path) -> bool:
@@ -466,7 +487,10 @@ def main(argv: list) -> int:
         wanted = expected_readme(folder)
         if checking:
             if read_readme(folder) != wanted:
-                print(f"report.py: {folder}/README.md is not up to date", file=sys.stderr)
+                print(
+                    f"report.py: {folder / 'README.md'} is not up to date",
+                    file=sys.stderr,
+                )
                 return 1
             return 0
         with open(folder / "README.md", "w", encoding="utf-8", newline="") as handle:
