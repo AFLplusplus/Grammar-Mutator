@@ -83,8 +83,8 @@ tree_t *tree_parse(const uint8_t *data_buf, size_t data_size,
   size_t   token_count = 0;
 
   // A returned tree means PARSE_OK, even if ANTLR recovered from errors.
-  // NULL means PARSE_SYNTAX_ERROR, or PARSE_LIMIT if the time limit stopped
-  // the parse.
+  // NULL means PARSE_SYNTAX_ERROR, PARSE_NOT_UTF8 if the input is not UTF-8,
+  // or PARSE_LIMIT if the time limit stopped the parse.
   if (status) *status = PARSE_SYNTAX_ERROR;
 
   /**
@@ -134,6 +134,13 @@ tree_t *tree_parse(const uint8_t *data_buf, size_t data_size,
   } catch (const parse_clock::StopParse &) {
     if (status) *status = PARSE_LIMIT;
     return nullptr;
+  } catch (antlr4::IllegalArgumentException &e) {
+    // ANTLRInputStream throws this for bytes that are not UTF-8
+    if (status) *status = PARSE_NOT_UTF8;
+#ifdef DEBUG_BUILD
+    fprintf(stderr, "ANTLR4 parsing error: %s\n", e.what());
+#endif
+    return nullptr;
   } catch (std::exception &e) {
 #ifdef DEBUG_BUILD
     fprintf(stderr, "ANTLR4 parsing error: %s\n", e.what());
@@ -158,4 +165,33 @@ tree_t *tree_parse(const uint8_t *data_buf, size_t data_size,
   tree->root = root;
   if (status) *status = PARSE_OK;
   return tree;
+}
+
+bool tree_parser_cache_states(size_t *parser_states, size_t *lexer_states) {
+  if (!parser_states || !lexer_states) return false;
+
+  try {
+    // A lexer and a parser on an empty input. Their simulators refer to the
+    // shared static caches. This changes no cache.
+    ANTLRInputStream input("");
+    GrammarLexer     lexer(&input);
+    CommonTokenStream tokens(&lexer);
+    GrammarParser     parser(&tokens);
+
+    size_t count = 0;
+    for (auto &dfa : parser.getInterpreter<atn::ParserATNSimulator>()
+                         ->decisionToDFA)
+      count += dfa.states.size();
+    *parser_states = count;
+
+    count = 0;
+    for (auto &dfa : lexer.getInterpreter<atn::LexerATNSimulator>()
+                         ->_decisionToDFA)
+      count += dfa.states.size();
+    *lexer_states = count;
+  } catch (std::exception &) {
+    return false;
+  }
+
+  return true;
 }

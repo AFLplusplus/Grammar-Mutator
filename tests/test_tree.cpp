@@ -642,7 +642,7 @@ TEST_F(TreeTest, TreeParseReportsStatus) {
   parse_status_t status = PARSE_THREAD_ERROR;
   char           bad[] = "\xFD";
   EXPECT_EQ(tree_parse((const uint8_t *)bad, 1, nullptr, &status), nullptr);
-  EXPECT_EQ(status, PARSE_SYNTAX_ERROR);
+  EXPECT_EQ(status, PARSE_NOT_UTF8);
 
   // A generated tree gives a valid test case for any grammar
   tree_t *gen = gen_init__(0);
@@ -758,6 +758,55 @@ TEST_F(TreeTest, MissingTestCaseFileKeepsStatus) {
       load_tree_from_test_case_ex("no_such_test_case_file", nullptr, &status),
       nullptr);
   EXPECT_EQ(status, PARSE_OK);
+
+}
+
+TEST_F(TreeTest, ParserCacheStatesGrowWithAParse) {
+
+  tree_t *gen = gen_init__(0);
+  tree_to_buf(gen);
+  std::string input((const char *)gen->data_buf, gen->data_len);
+  tree_free(gen);
+
+  parse_status_t status = PARSE_SYNTAX_ERROR;
+  tree_t        *parsed =
+      tree_parse((const uint8_t *)input.data(), input.size(), nullptr, &status);
+  ASSERT_NE(parsed, nullptr);
+  EXPECT_EQ(status, PARSE_OK);
+  tree_free(parsed);
+
+  size_t parser1 = 0, lexer1 = 0;
+  ASSERT_TRUE(tree_parser_cache_states(&parser1, &lexer1));
+  // The ruby grammar has two decisions that need prediction, and a generated
+  // input does not reach them. So the parser count can stay 0 here.
+  EXPECT_GT(lexer1, 0u);
+
+  parsed =
+      tree_parse((const uint8_t *)input.data(), input.size(), nullptr, &status);
+  ASSERT_NE(parsed, nullptr);
+  tree_free(parsed);
+
+  size_t parser2 = 0, lexer2 = 0;
+  ASSERT_TRUE(tree_parser_cache_states(&parser2, &lexer2));
+  EXPECT_EQ(parser2, parser1);
+  EXPECT_EQ(lexer2, lexer1);
+
+}
+
+TEST_F(TreeTest, NotUtf8InputDoesNotTouchTheCache) {
+
+  size_t parser1 = 0, lexer1 = 0;
+  ASSERT_TRUE(tree_parser_cache_states(&parser1, &lexer1));
+
+  parse_status_t status = PARSE_OK;
+  EXPECT_EQ(tree_parse((const uint8_t *)"\xff\xfe", 2, nullptr, &status),
+            nullptr);
+  EXPECT_EQ(status, PARSE_NOT_UTF8);
+
+  size_t parser2 = 0, lexer2 = 0;
+  ASSERT_TRUE(tree_parser_cache_states(&parser2, &lexer2));
+  EXPECT_EQ(parser2, parser1);
+  EXPECT_EQ(lexer2, lexer1);
 
 }
 

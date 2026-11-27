@@ -245,6 +245,16 @@ tree_t *tree_parse(const uint8_t *buf, size_t len, parse_budget_t *budget,
                    parse_status_t *status);
 
 /**
+ * Count the prediction (DFA) states in the parser cache and in the lexer cache
+ * of the ANTLR shim. Each shim defines this function. It changes no cache. Call
+ * it only when no parse runs.
+ * @param  parser_states Receives the number of states of the parser cache
+ * @param  lexer_states  Receives the number of states of the lexer cache
+ * @return               true on success, false on an error
+ */
+bool tree_parser_cache_states(size_t *parser_states, size_t *lexer_states);
+
+/**
  * Parse the given buffer to construct a parsing tree
  * @param  data_buf  The buffer of a test case
  * @param  data_size The size of the buffer
