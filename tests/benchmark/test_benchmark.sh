@@ -112,3 +112,27 @@ status=0
 [ "$status" -eq 1 ] || fail "run on a missing folder: expected exit 1"
 [ -z "$(ls -A "$work/tmp")" ] || fail "run left a work folder behind"
 echo "[+] run rejects bad input and leaves no work folder"
+
+# digest mode: the same input gives the same hash, in another work folder
+rm -rf "$work/seeds/sub" "$work/seeds/.hidden"
+d1=$("$bench" digest -n 50 -t 10 "$work/seeds") || fail "digest: nonzero exit"
+mkdir "$work/tmp2"
+d2=$(TMPDIR="$work/tmp2" "$bench" digest -n 50 -t 10 "$work/seeds")
+echo "$d1" | grep -Eq '^benchmark .* mode=digest seed=0 steps=50 trims=10 parse_budget_ms=0 seeds=20 trees=20$' ||
+  fail "digest: bad header"
+echo "$d1" | grep -Eq '^digest outputs=[1-9][0-9]* new_entries=20 trims=[1-9][0-9]* hash=[0-9a-f]{16}$' ||
+  fail "digest: bad record"
+[ "$(echo "$d1" | grep '^digest ')" = "$(echo "$d2" | grep '^digest ')" ] ||
+  fail "digest: the hash depends on the work folder"
+# another random seed gives another hash
+d3=$("$bench" digest -n 50 -t 10 -s 1 "$work/seeds" | grep '^digest ' |
+  sed 's/.*hash=//')
+[ "$d3" != "$(echo "$d1" | grep '^digest ' | sed 's/.*hash=//')" ] ||
+  fail "digest: another random seed gives the same hash"
+# -e is not a digest option
+status=0
+"$bench" digest -e 3 "$work/seeds" > /dev/null 2>&1 || status=$?
+[ "$status" -eq 2 ] || fail "digest -e: expected exit 2, got $status"
+[ -z "$(ls -A "$work/tmp")" ] && [ -z "$(ls -A "$work/tmp2")" ] ||
+  fail "digest left a work folder behind"
+echo "[+] digest gives a stable hash and leaves no work folder"

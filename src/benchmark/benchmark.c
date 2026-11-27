@@ -566,6 +566,172 @@ done:
   return status;
 }
 
+// The 64-bit FNV-1a hash of the outputs. Each buffer adds its bytes and then
+// its length as 8 little-endian bytes.
+#define FNV_OFFSET 0xcbf29ce484222325ULL
+#define FNV_PRIME 0x100000001b3ULL
+
+static void mix_byte(uint64_t *h, uint8_t byte) {
+  *h = (*h ^ byte) * FNV_PRIME;
+}
+
+static void mix(uint64_t *h, const uint8_t *buf, size_t len) {
+  for (size_t i = 0; i < len; ++i) mix_byte(h, buf[i]);
+  for (int i = 0; i < 8; ++i) mix_byte(h, (uint8_t)((uint64_t)len >> (8 * i)));
+}
+
+static void mix_text(uint64_t *h, const char *text) {
+  mix(h, (const uint8_t *)text, strlen(text));
+}
+
+typedef struct {
+  uint64_t hash;
+  size_t   outputs, new_entries, trims;
+} digest_t;
+
+// The trim rule of the digest mode: add the output to the hash. Every 8th
+// step is a success, if the output is not empty.
+static bool digest_trim_rule(void *ctx, size_t step, const uint8_t *out,
+                             size_t len) {
+  digest_t *digest = ctx;
+  mix(&digest->hash, out, len);
+  ++digest->trims;
+  return (step + 1) % 8 == 0 && len > 0;
+}
+
+// Process one queue file of the digest mode: all fuzz outputs, a new entry
+// from the last output (for a seed only), and all trim steps. Return false on
+// an error.
+static bool digest_entry(my_mutator_t *data, const char *work,
+                         const char *entry_file, bool is_seed,
+                         digest_t *digest) {
+  afl_custom_queue_get(data, (const uint8_t *)entry_file);
+  uint32_t planned = afl_custom_fuzz_count(data, NULL, 0);
+  uint8_t *last = NULL;
+  size_t   last_len = 0;
+  bool     ok = true;
+  for (uint32_t k = 0; k < planned; ++k) {
+    uint8_t *out = NULL;
+    size_t   len = afl_custom_fuzz(data, NULL, 0, &out, NULL, 0, 1 << 20);
+    ++digest->outputs;
+    if (!out) {
+      mix(&digest->hash, (const uint8_t *)"NULL", 4);
+      continue;
+    }
+    mix(&digest->hash, out, len);
+    if (len > 0) {
+      uint8_t *copy = realloc(last, len);
+      if (!copy) {
+        ok = false;
+        break;
+      }
+      memcpy(copy, out, len);
+      last = copy;
+      last_len = len;
+    }
+  }
+  if (ok && last && is_seed) {
+    char name[32];
+    snprintf(name, sizeof(name), "queue/new_%06zu", digest->new_entries);
+    char *new_file = join_path(work, name);
+    FILE *fp = new_file ? fopen(new_file, "wb") : NULL;
+    ok = fp && fwrite(last, 1, last_len, fp) == last_len;
+    if (fp && fclose(fp) != 0) ok = false;
+    if (ok) {
+      afl_custom_queue_new_entry(data, (const uint8_t *)new_file,
+                                 (const uint8_t *)entry_file);
+      ++digest->new_entries;
+    } else {
+      fprintf(stderr, "Cannot write the new entry\n");
+    }
+    free(new_file);
+  }
+  free(last);
+  if (!ok) return false;
+
+  double elapsed;
+  size_t steps;
+  return trim_entry(data, digest_trim_rule, digest, &steps, &elapsed);
+}
+
+// The digest mode: hash all outputs of the mutator, to check a change
+static int mode_digest(const char *prog, int argc, char **argv) {
+  options_t   opt;
+  const char *seed_dir;
+  if (!parse_options(argc, argv, false, &opt, &seed_dir)) return usage(prog);
+
+  seed_list_t seeds;
+  if (!seed_list_load(seed_dir, &seeds)) {
+    fprintf(stderr, "Cannot read the seed folder %s\n", seed_dir);
+    return 1;
+  }
+  if (seeds.count == 0) {
+    fprintf(stderr, "No seed file in %s\n", seed_dir);
+    seed_list_free(&seeds);
+    return 1;
+  }
+  char *work = work_create(seed_dir, &seeds);
+  if (!work) {
+    seed_list_free(&seeds);
+    return 1;
+  }
+  char         *queue = join_path(work, "queue");
+  int           status = 1;
+  my_mutator_t *data = NULL;
+  if (!queue) goto done;
+
+  set_step_variables(opt.steps, opt.trims);
+  data = afl_custom_init(NULL, (unsigned)opt.seed);
+  if (!data) goto done;
+
+  digest_t digest = {FNV_OFFSET, 0, 0, 0};
+  size_t   trees = 0;
+  for (size_t i = 0; i < seeds.count; ++i) {
+    char *path = join_path(queue, seeds.names[i]);
+    if (!path) goto done;
+    afl_custom_queue_get(data, (const uint8_t *)path);
+    if (!data->tree_cur) {
+      mix_text(&digest.hash, seeds.names[i]);
+      mix_text(&digest.hash, "NOTREE");
+      free(path);
+      continue;
+    }
+    ++trees;
+    bool ok = digest_entry(data, work, path, true, &digest);
+    free(path);
+    if (!ok) goto done;
+  }
+  if (trees == 0) {
+    fprintf(stderr, "No seed in %s gives a tree\n", seed_dir);
+    goto done;
+  }
+  size_t seed_entries = digest.new_entries;
+  for (size_t i = 0; i < seed_entries; ++i) {
+    char name[32];
+    snprintf(name, sizeof(name), "queue/new_%06zu", i);
+    char *path = join_path(work, name);
+    if (!path) goto done;
+    bool ok = digest_entry(data, work, path, false, &digest);
+    free(path);
+    if (!ok) goto done;
+  }
+
+  print_header(stdout, grammar_name(prog), "digest", &opt, seeds.count, trees);
+  printf("digest outputs=%zu new_entries=%zu trims=%zu hash=%016llx\n",
+         digest.outputs, digest.new_entries, digest.trims,
+         (unsigned long long)digest.hash);
+  fflush(stdout);
+  status = 0;
+
+done:
+  if (data) afl_custom_deinit(data);
+  free(queue);
+  remove_directory(work);
+  free(work);
+  seed_list_free(&seeds);
+  return status;
+}
+
 int main(int argc, char **argv) {
   if (argc < 2) return usage(argv[0]);
   const char *mode = argv[1];
@@ -576,6 +742,7 @@ int main(int argc, char **argv) {
     return status;
   }
   if (strcmp(mode, "run") == 0) return mode_run(argv[0], argc - 2, argv + 2);
-  // The digest mode comes later.
+  if (strcmp(mode, "digest") == 0)
+    return mode_digest(argv[0], argc - 2, argv + 2);
   return usage(argv[0]);
 }
