@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -390,6 +391,32 @@ class FetchRepoTest(unittest.TestCase):
                 )
         self.assertIn(self.url, str(ctx.exception))
 
+    def test_ls_tree_failure(self) -> None:
+        real_git = get_seeds._git
+
+        def fake_git(work, url, *args, **kwargs):
+            if "ls-tree" in args:
+                return subprocess.CompletedProcess(args, 1, "", "")
+            return real_git(work, url, *args, **kwargs)
+
+        with mock.patch.object(get_seeds, "_git", fake_git):
+            with self.assertRaises(SystemExit) as ctx:
+                get_seeds.fetch_repo(
+                    self.url, self.commits[0], ["a"], self.tmp / "work5"
+                )
+        message = str(ctx.exception)
+        self.assertIn("ls-tree", message)
+        self.assertIn(self.url, message)
+        self.assertNotIn("missing", message)
+
+    def test_unreadable_head(self) -> None:
+        with mock.patch.object(get_seeds, "_head", lambda work, url: ""):
+            with self.assertRaises(SystemExit) as ctx:
+                get_seeds.fetch_repo(
+                    self.url, self.commits[0], ["a"], self.tmp / "work6"
+                )
+        self.assertIn("cannot read HEAD", str(ctx.exception))
+
     def test_missing_git(self) -> None:
         with mock.patch.object(get_seeds, "GIT_PROGRAM", "no-such-git-xyz"):
             with self.assertRaises(SystemExit) as ctx:
@@ -660,6 +687,132 @@ class FilterTest(unittest.TestCase):
         self.assertNotIn("Traceback", err.getvalue())
 
 
+    def run_main(self, argv):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code = get_seeds.main(argv)
+        return code, err.getvalue()
+
+    def assert_one_line_error(self, code, text):
+        self.assertEqual(code, 2)
+        lines = text.splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0].startswith("[-]"))
+
+    def test_engine_without_exec_bit(self):
+        engine = self.tmp / "noexec.sh"
+        engine.write_text("#!/bin/sh\nexit 0\n")
+        engine.chmod(0o644)
+        code, text = self.run_main(
+            [
+                "filter",
+                "--cmd",
+                "%s {seed}" % engine,
+                str(self.seeds),
+                str(self.tmp / "OUT3"),
+            ]
+        )
+        self.assert_one_line_error(code, text)
+
+    def test_non_empty_out_through_main(self):
+        self.out.mkdir()
+        (self.out / "x").write_text("x")
+        code, text = self.run_main(
+            ["filter", "--cmd", "no-such-engine-xyz", str(self.seeds),
+             str(self.out)]
+        )
+        self.assert_one_line_error(code, text)
+        self.assertIn("empty", text)
+
+    def test_missing_seeds_folder(self):
+        code, text = self.run_main(
+            ["filter", "--cmd", "sh", str(self.tmp / "none"),
+             str(self.tmp / "OUT4")]
+        )
+        self.assert_one_line_error(code, text)
+
+    def test_shims_path_with_placeholder(self):
+        shims = self.tmp / "{seed}" / "shims.js"
+        shims.parent.mkdir()
+        shims.write_text("")
+        fake = self.tmp / "check.sh"
+        fake.write_text(
+            "#!/bin/sh\n"
+            'case $1 in */{seed}/shims.js) ;; *) exit 1 ;; esac\n'
+            'case $(cat "$2") in ok) exit 0 ;; *) exit 1 ;; esac\n'
+        )
+        fake.chmod(0o755)
+        summary = get_seeds.run_filter(
+            [str(fake), "{shims}", "{seed}"],
+            shims,
+            self.seeds,
+            self.out,
+            1.0,
+            4,
+        )
+        self.assertEqual(summary.kept, Counter(mjsunit=1, jstests=1))
+
+    def test_bad_timeout_and_jobs(self):
+        for flag, value in (("--timeout", "0"), ("-j", "0")):
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                with self.assertRaises(SystemExit) as ctx:
+                    get_seeds.main(
+                        ["filter", "--cmd", "sh", flag, value,
+                         str(self.seeds), str(self.tmp / "OUT5")]
+                    )
+            self.assertEqual(ctx.exception.code, 2)
+            self.assertIn(flag, err.getvalue())
+
+    def test_group_kill_reaches_grandchildren(self):
+        mark = self.tmp / "mark"
+        fake = self.tmp / "grand.sh"
+        fake.write_text(
+            "#!/bin/sh\n"
+            '(sleep 1; touch "$(cat "$2")") &\n'
+            "sleep 5\n"
+        )
+        fake.chmod(0o755)
+        seeds = self.tmp / "G"
+        (seeds / "mjsunit").mkdir(parents=True)
+        (seeds / "mjsunit" / "mjsunit_a.js").write_text(str(mark))
+        summary = get_seeds.run_filter(
+            [str(fake), "{shims}", "{seed}"],
+            self.shims,
+            seeds,
+            self.tmp / "GOUT",
+            0.5,
+            1,
+        )
+        self.assertEqual(summary.timed_out, Counter(mjsunit=1))
+        time.sleep(1.5)
+        self.assertFalse(mark.exists())
+
+    def test_group_kill_after_normal_exit(self):
+        mark = self.tmp / "mark2"
+        fake = self.tmp / "leave.sh"
+        fake.write_text(
+            "#!/bin/sh\n"
+            '(sleep 1; touch "$(cat "$2")") &\n'
+            "exit 0\n"
+        )
+        fake.chmod(0o755)
+        seeds = self.tmp / "H"
+        (seeds / "mjsunit").mkdir(parents=True)
+        (seeds / "mjsunit" / "mjsunit_a.js").write_text(str(mark))
+        summary = get_seeds.run_filter(
+            [str(fake), "{shims}", "{seed}"],
+            self.shims,
+            seeds,
+            self.tmp / "HOUT",
+            2.0,
+            1,
+        )
+        self.assertEqual(summary.kept, Counter(mjsunit=1))
+        time.sleep(1.5)
+        self.assertFalse(mark.exists())
+
+
 class CountTest(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
@@ -695,6 +848,18 @@ class CountTest(unittest.TestCase):
         self.assertIn(["jstests", "2", "0"], rows)
         self.assertIn(["mjsunit", "3", "1"], rows)
         self.assertEqual(rows[-1], ["total", "5", "1"])
+
+    def test_missing_folders(self):
+        for argv in (
+            ["count", str(self.tmp / "none")],
+            ["count", str(self.seeds), str(self.tmp / "none")],
+        ):
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                code = get_seeds.main(argv)
+            self.assertEqual(code, 2)
+            self.assertEqual(len(err.getvalue().splitlines()), 1)
+            self.assertTrue(err.getvalue().startswith("[-]"))
 
     def test_count_without_trees(self):
         out = io.StringIO()

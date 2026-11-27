@@ -435,19 +435,25 @@ def fetch_repo(url: str, commit: str, paths: list[str], work: Path) -> Path:
     )
     # Check the paths before the checkout, so that the message is the same
     # for every git version.
-    missing = [
-        path
-        for path in paths
-        if not _git(
+    missing = []
+    for path in paths:
+        listing = _git(
             work, url, "ls-tree", "-d", "FETCH_HEAD", "--", path, capture=True
-        ).stdout.strip()
-    ]
+        )
+        if listing.returncode != 0:
+            raise SystemExit(
+                "[-] git ls-tree failed for %s" % url
+            )
+        if not listing.stdout.strip():
+            missing.append(path)
     if missing:
         raise SystemExit(
             "[-] %s at %s: missing path %s" % (url, commit, ", ".join(missing))
         )
     _git_ok(work, url, "checkout", "-q", "--force", "FETCH_HEAD")
     head = _head(work, url)
+    if not head:
+        raise SystemExit("[-] %s: cannot read HEAD" % url)
     if head != commit:
         raise SystemExit(
             "[-] %s: HEAD is %s, not the pinned commit %s"
@@ -499,17 +505,37 @@ class FilterSummary:
     signals: dict = field(default_factory=dict)
 
 
+class CliError(SystemExit):
+    """A user error. `main` prints it as one line and returns 2."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(2)
+        self.message = message
+
+
+def _check_folders(seeds_dir: Path, out_dir: Path) -> None:
+    if not seeds_dir.is_dir():
+        raise CliError("[-] %s is not a folder" % seeds_dir)
+    if out_dir.exists() and (
+        not out_dir.is_dir() or any(out_dir.iterdir())
+    ):
+        raise CliError("[-] %s is not an empty folder" % out_dir)
+
+
 def _run_one(argv: list[str], timeout: float) -> str:
     """Run the engine once. Return ok, failed, timeout, or crash:<name>."""
     # A new session gives the run its own process group. A time-out then
     # also stops the children of the engine command.
-    proc = subprocess.Popen(
-        argv,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+    try:
+        proc = subprocess.Popen(
+            argv,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError as err:
+        raise CliError("[-] Cannot run %s: %s" % (argv[0], err))
     try:
         proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -519,6 +545,11 @@ def _run_one(argv: list[str], timeout: float) -> str:
             pass
         proc.communicate()
         return "timeout"
+    # Stop the children that are still alive.
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except OSError:
+        pass
     if proc.returncode == 0:
         return "ok"
     if proc.returncode < 0:
@@ -543,16 +574,24 @@ def run_filter(
     `template` is the engine command. `{shims}` and `{seed}` in its
     arguments become the shims path and the seed path.
     """
-    if out_dir.exists() and any(out_dir.iterdir()):
-        raise SystemExit("[-] %s is not empty" % out_dir)
+    _check_folders(seeds_dir, out_dir)
     files = sorted(p for p in seeds_dir.rglob("*") if p.is_file())
 
+    stop: list[bool] = []
+
     def work(path: Path) -> str:
+        if stop:
+            return "failed"
+        values = {"shims": str(shims), "seed": str(path)}
         argv = [
-            arg.replace("{shims}", str(shims)).replace("{seed}", str(path))
+            re.sub(r"\{(shims|seed)\}", lambda m: values[m.group(1)], arg)
             for arg in template
         ]
-        return _run_one(argv, timeout)
+        try:
+            return _run_one(argv, timeout)
+        except CliError:
+            stop.append(True)
+            raise
 
     summary = FilterSummary(
         Counter(), Counter(), Counter(), Counter(), {}
@@ -579,6 +618,8 @@ def run_filter(
 
 def count_by_suite(folder: Path) -> Counter:
     """Count the regular files under `folder` for each suite."""
+    if not folder.is_dir():
+        raise CliError("[-] %s is not a folder" % folder)
     counts: Counter = Counter()
     for path in folder.rglob("*"):
         if path.is_file():
@@ -602,6 +643,7 @@ def _table(header: list[str], rows: list[list[str]]) -> str:
 
 
 def _filter(args: argparse.Namespace) -> int:
+    _check_folders(args.seeds, args.out)
     template = shlex.split(args.cmd)
     if not template:
         print("[-] Empty --cmd", file=sys.stderr)
@@ -655,7 +697,9 @@ def _filter(args: argparse.Namespace) -> int:
 
 def _count(args: argparse.Namespace) -> int:
     seeds = count_by_suite(args.seeds)
-    trees = Counter()
+    trees: Counter = Counter()
+    if args.trees is not None and not args.trees.is_dir():
+        raise CliError("[-] %s is not a folder" % args.trees)
     header = ["Suite", "Seeds"]
     if args.trees is not None:
         trees = Counter(
@@ -701,11 +745,19 @@ def main(argv: list[str]) -> int:
     count.add_argument("seeds", type=Path, help="folder of seeds")
     count.add_argument("trees", type=Path, nargs="?", help="folder of trees")
     args = parser.parse_args(argv)
-    if args.command == "filter":
-        return _filter(args)
-    if args.command == "count":
-        return _count(args)
-    return _fetch(args.dest)
+    if args.command == "filter" and not args.timeout > 0:
+        parser.error("--timeout must be greater than 0")
+    if args.command == "filter" and args.jobs < 1:
+        parser.error("-j must be at least 1")
+    try:
+        if args.command == "filter":
+            return _filter(args)
+        if args.command == "count":
+            return _count(args)
+        return _fetch(args.dest)
+    except CliError as err:
+        print(err.message, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
