@@ -29,10 +29,17 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
+#ifdef __APPLE__
+  #include <malloc/malloc.h>
+#elif defined(__GLIBC__)
+  #include <malloc.h>
+#endif
 
 #include "custom_mutator.h"
 #include "chunk_store_internal.h"
 #include "node_stack.h"
+#include "parse_budget.h"
+#include "mutants.h"
 #include "tree.h"
 #include "tree_mutation.h"
 #include "utils.h"
@@ -182,8 +189,9 @@ static int usage(const char *prog) {
           "Usage:\n"
           "  %s parse FILE...\n"
           "  %s run    [-s SEED] [-e ENTRIES] [-n STEPS] [-t TRIMS] SEED_DIR\n"
-          "  %s digest [-s SEED] [-n STEPS] [-t TRIMS] SEED_DIR\n",
-          prog, prog, prog);
+          "  %s digest [-s SEED] [-n STEPS] [-t TRIMS] SEED_DIR\n"
+          "  %s cache  [-s SEED] [-m MUTANTS] [-i INTERVAL] SEED_DIR\n",
+          prog, prog, prog, prog);
   return 2;
 
 }
@@ -265,19 +273,22 @@ static int mode_parse(int argc, char **argv) {
 
 typedef struct {
 
-  uint64_t seed, entries, steps, trims;
+  uint64_t seed, entries, steps, trims, mutants, interval;
 
 } options_t;
 
 // Read the options of a mode. Return false on a usage error. The one operand
-// is the seed folder. Only the run mode takes -e.
-static bool parse_options(int argc, char **argv, bool with_entries,
+// is the seed folder. "allowed" holds the letters of the flags of the mode.
+// The cache mode sets the default interval after the options.
+static bool parse_options(int argc, char **argv, const char *allowed,
                           options_t *opt, const char **dir) {
 
   opt->seed = 0;
   opt->entries = 5;
   opt->steps = 1000;
   opt->trims = 1000;
+  opt->mutants = 10000;
+  opt->interval = 0;
   *dir = NULL;
   int i = 0;
   while (i < argc) {
@@ -303,14 +314,20 @@ static bool parse_options(int argc, char **argv, bool with_entries,
 
     uint64_t *target = NULL;
     uint64_t  min = 0;
-    if (flag == 's')
+    if (flag == '\0' || !strchr(allowed, flag))
+      return false;
+    else if (flag == 's')
       target = &opt->seed;
-    else if (flag == 'e' && with_entries)
+    else if (flag == 'e')
       target = &opt->entries, min = 1;
     else if (flag == 'n')
       target = &opt->steps;
     else if (flag == 't')
       target = &opt->trims;
+    else if (flag == 'm')
+      target = &opt->mutants, min = 1;
+    else if (flag == 'i')
+      target = &opt->interval, min = 1;
     else
       return false;
     uint64_t value;
@@ -321,6 +338,8 @@ static bool parse_options(int argc, char **argv, bool with_entries,
 
   if (argc - i != 1) return false;
   *dir = argv[i];
+  if (opt->interval == 0)
+    opt->interval = opt->mutants >= 10 ? opt->mutants / 10 : 1;
   return true;
 
 }
@@ -550,6 +569,18 @@ static void print_header(FILE *out, const char *grammar, const char *mode,
   print_value(out, un.machine);
   fprintf(out, " optimized=%d mode=%s seed=%llu", optimized, mode,
           (unsigned long long)opt->seed);
+  if (strcmp(mode, "cache") == 0) {
+
+    // The cache mode has no steps and no trees. It reports the parse limit of
+    // its own budget.
+    fprintf(out, " mutants=%llu interval=%llu parse_budget_ms=%llu seeds=%zu\n",
+            (unsigned long long)opt->mutants, (unsigned long long)opt->interval,
+            (unsigned long long)(parse_budget_min_ns_from_env() / 1000000),
+            seeds);
+    return;
+
+  }
+
   if (strcmp(mode, "run") == 0)
     fprintf(out, " entries=%llu", (unsigned long long)opt->entries);
   const char *budget = getenv("PARSE_TIME_BUDGET_MS");
@@ -844,7 +875,8 @@ typedef struct {
 static int bench_open(bench_ctx_t *ctx, const char *prog, bool with_entries,
                       int argc, char **argv) {
 
-  if (!parse_options(argc, argv, with_entries, &ctx->opt, &ctx->seed_dir))
+  if (!parse_options(argc, argv, with_entries ? "sent" : "snt", &ctx->opt,
+                     &ctx->seed_dir))
     return usage(prog);
   if (!seed_list_load(ctx->seed_dir, &ctx->seeds)) {
 
@@ -1216,6 +1248,217 @@ done:
 
 }
 
+// The heap in use in KB, or -1 if the platform has no malloc statistics
+static long heap_kb(void) {
+
+#ifdef __APPLE__
+  malloc_statistics_t st;
+  memset(&st, 0, sizeof(st));
+  malloc_zone_statistics(NULL, &st);
+  return (long)(st.size_in_use / 1024);
+#elif defined(__GLIBC__) && defined(__GLIBC_PREREQ)
+  #if __GLIBC_PREREQ(2, 33)
+  struct mallinfo2 info = mallinfo2();
+  return (long)(((size_t)info.uordblks + (size_t)info.hblkhd) / 1024);
+  #else
+  return -1;
+  #endif
+#else
+  return -1;
+#endif
+
+}
+
+// The counts and the time of the parses of the cache mode
+typedef struct {
+
+  uint64_t parses, trees, not_utf8, stopped;
+  uint64_t timed;     // parses since the last record that reached the lexer
+  double   timed_us;  // the time of these parses
+
+} cache_stats_t;
+
+// Parse one input and free the tree. A failed parse is not an error: count it
+// by its status.
+static void cache_parse(const uint8_t *buf, size_t len, parse_budget_t *budget,
+                        cache_stats_t *stats) {
+
+  parse_status_t status = PARSE_OK;
+  double         begin = now_us();
+  tree_t        *tree = tree_parse(buf, len, budget, &status);
+  double         elapsed = now_us() - begin;
+  ++stats->parses;
+  if (tree) {
+
+    ++stats->trees;
+    tree_free(tree);
+
+  } else if (status == PARSE_NOT_UTF8) {
+
+    ++stats->not_utf8;
+
+  } else if (status == PARSE_LIMIT) {
+
+    ++stats->stopped;
+
+  }
+
+  // The shim rejects an input that is not UTF-8 before the lexer. Its time
+  // says nothing about the cache.
+  if (tree || status != PARSE_NOT_UTF8) {
+
+    ++stats->timed;
+    stats->timed_us += elapsed;
+
+  }
+
+}
+
+// Print one record of the cache mode and start a new time interval. Return
+// false if the cache cannot be read.
+static bool cache_record(const char *phase, cache_stats_t *stats) {
+
+  size_t parser_states = 0, lexer_states = 0;
+  if (!tree_parser_cache_states(&parser_states, &lexer_states)) {
+
+    fprintf(stderr, "Cannot read the size of the parser cache\n");
+    return false;
+
+  }
+
+  printf(
+      "cache phase=%s parses=%llu parser_states=%zu lexer_states=%zu "
+      "heap_kb=%ld rss_kb=%ld us_per_parse=%.1f trees=%llu not_utf8=%llu "
+      "stopped=%llu\n",
+      phase, (unsigned long long)stats->parses, parser_states, lexer_states,
+      heap_kb(), peak_rss_kb(),
+      stats->timed ? stats->timed_us / (double)stats->timed : 0.0,
+      (unsigned long long)stats->trees, (unsigned long long)stats->not_utf8,
+      (unsigned long long)stats->stopped);
+  stats->timed = 0;
+  stats->timed_us = 0;
+  return true;
+
+}
+
+// The cache mode: parse the seeds and then mutants of them, and print the size
+// of the parser cache at intervals. It writes nothing, so it has no work
+// folder.
+static int mode_cache(const char *prog, int argc, char **argv) {
+
+  options_t   opt;
+  const char *seed_dir;
+  if (!parse_options(argc, argv, "smi", &opt, &seed_dir)) return usage(prog);
+  seed_list_t names = {0};
+  if (!seed_list_load(seed_dir, &names)) {
+
+    fprintf(stderr, "Cannot read the seed folder %s\n", seed_dir);
+    return 1;
+
+  }
+
+  if (names.count == 0) {
+
+    fprintf(stderr, "No seed file in %s\n", seed_dir);
+    seed_list_free(&names);
+    return 1;
+
+  }
+
+  int             status = 1;
+  bench_seed_t   *seeds = calloc(names.count, sizeof(bench_seed_t));
+  parse_budget_t *budget = NULL;
+  size_t          loaded = 0;
+  if (!seeds) {
+
+    no_memory();
+    goto done;
+
+  }
+
+  for (; loaded < names.count; ++loaded) {
+
+    char *path = join_path(seed_dir, names.names[loaded]);
+    if (!path) goto done;
+    size_t   len = 0;
+    uint8_t *buf = read_file(path, &len);
+    if (!buf) {
+
+      fprintf(stderr, "Cannot read %s\n", path);
+      free(path);
+      goto done;
+
+    }
+
+    free(path);
+    seeds[loaded].buf = buf;
+    seeds[loaded].len = len;
+
+  }
+
+  // One budget, as the mutator makes it. A minimum of 0 turns the limit off.
+  uint64_t min_ns = parse_budget_min_ns_from_env();
+  if (min_ns > 0) {
+
+    budget = parse_budget_create();
+    if (!budget) {
+
+      no_memory();
+      goto done;
+
+    }
+
+    parse_budget_set_min_ns(budget, min_ns);
+
+  }
+
+  print_header(stdout, grammar_name(prog), "cache", &opt, names.count, 0);
+  cache_stats_t stats = {0};
+  for (size_t i = 0; i < names.count; ++i) {
+
+    if (stopped()) goto done;
+    cache_parse(seeds[i].buf, seeds[i].len, budget, &stats);
+
+  }
+
+  if (!cache_record("seeds", &stats)) goto done;
+  bench_rng_t rng;
+  bench_rng_seed(&rng, opt.seed);
+  for (uint64_t m = 1; m <= opt.mutants; ++m) {
+
+    if (stopped()) goto done;
+    size_t   len = 0;
+    uint8_t *mutant = bench_make_mutant(&rng, seeds, names.count, &len);
+    if (!mutant) {
+
+      no_memory();
+      goto done;
+
+    }
+
+    cache_parse(mutant, len, budget, &stats);
+    free(mutant);
+    if ((m % opt.interval == 0 || m == opt.mutants) &&
+        !cache_record("mutants", &stats))
+      goto done;
+
+  }
+
+  if (stopped()) goto done;
+  print_elapsed();
+  fflush(stdout);
+  status = 0;
+
+done:
+  for (size_t i = 0; i < loaded; ++i)
+    free((void *)seeds[i].buf);
+  free(seeds);
+  parse_budget_free(budget);
+  seed_list_free(&names);
+  return status;
+
+}
+
 static int run_mode(int argc, char **argv);
 
 int main(int argc, char **argv) {
@@ -1261,6 +1504,8 @@ static int run_mode(int argc, char **argv) {
   if (strcmp(mode, "run") == 0) return mode_run(argv[0], argc - 2, argv + 2);
   if (strcmp(mode, "digest") == 0)
     return mode_digest(argv[0], argc - 2, argv + 2);
+  if (strcmp(mode, "cache") == 0)
+    return mode_cache(argv[0], argc - 2, argv + 2);
   return usage(argv[0]);
 
 }

@@ -45,7 +45,7 @@ endif
 LIB_SRC_FILES = chunk_store.c f1_c_fuzz.c grammar_mutator.c list.c parse_budget.c tree.c tree_mutation.c tree_trimming.c utils.c
 GEN_SRC_FILES = grammar_generator.c
 PARSER_SRC_FILES = grammar_parser.c grammar_parser_files.c grammar_parser_work.c
-BENCHMARK_SRC_FILES = benchmark/benchmark.c
+BENCHMARK_SRC_FILES = benchmark/benchmark.c benchmark/mutants.c
 
 LIB_OBJS = $(LIB_SRC_FILES:.c=.o)
 GEN_OBJS = $(GEN_SRC_FILES:.c=.o)
@@ -112,8 +112,11 @@ $(GRAMMAR_PARSER_PROM): $(PARSER_OBJS) $(GRAMMAR_MUTATOR_LIB)
 benchmark/benchmark.o: benchmark/benchmark.c
 	$(CC) $(C_DEFINES) -I../include -I. -I../third_party/rxi_map $(C_FLAGS) $(DEP_FLAGS) -o $@ -c $<
 
+benchmark/mutants.o: benchmark/mutants.c
+	$(CC) $(C_DEFINES) -I../include $(C_FLAGS) $(DEP_FLAGS) -o $@ -c $<
+
 $(BENCH_PROM): $(BENCHMARK_OBJS) $(GRAMMAR_MUTATOR_LIB)
-	$(CXX) $(C_FLAGS) $< -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB)
+	$(CXX) $(C_FLAGS) $(BENCHMARK_OBJS) -o $@ -Wl,-rpath,$(realpath ./) $(GRAMMAR_MUTATOR_LIB)
 
 -include $(OBJS:.o=.d)
 

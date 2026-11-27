@@ -393,3 +393,88 @@ grep '^benchmark ' "$work/dm.txt" | grep -q ' seeds=21 trees=20$' ||
 [ "$(grep '^digest ' "$work/dm.txt")" != "$d1" ] ||
   fail "digest: a seed without a tree must change the hash"
 echo "[+] digest counts a seed without a tree"
+
+# cache mode: the shared checks, then the checks that need the ruby seeds
+tests/benchmark/check_cache.sh "$name" "$work/seeds" ||
+  fail "cache: the shared checks failed"
+
+# The numbers of the states of all cache records of a file, one line each
+cache_states() {
+  sed -n 's/^cache .* parser_states=\([0-9]*\) lexer_states=\([0-9]*\) .*/\1 \2/p' "$1"
+}
+# The value of a field in the last cache record of a file
+last_field() {
+  grep '^cache ' "$1" | tail -n 1 | sed -n "s/.* $2=\\([-0-9.]*\\).*/\\1/p"
+}
+
+# the same -s gives the same state counts (nothing stops with the ruby seeds)
+capture "$work/c1.txt" "$bench" cache -m 200 -i 50 -s 3 "$work/seeds"
+[ "$status" -eq 0 ] || fail "cache -s 3: exit $status"
+capture "$work/c2.txt" "$bench" cache -m 200 -i 50 -s 3 "$work/seeds"
+[ "$status" -eq 0 ] || fail "cache -s 3 again: exit $status"
+[ "$(last_field "$work/c1.txt" stopped)" -eq 0 ] || fail "cache: a parse stopped"
+cache_states "$work/c1.txt" > "$work/c1.states"
+cache_states "$work/c2.txt" > "$work/c2.states"
+cmp "$work/c1.states" "$work/c2.states" ||
+  fail "cache: the same -s gives other state counts"
+# havoc breaks UTF-8 in some mutants
+[ "$(last_field "$work/c1.txt" not_utf8)" -gt 0 ] ||
+  fail "cache: expected not_utf8 above 0"
+echo "[+] cache gives the same state counts for the same -s"
+
+# an empty seed next to the others
+mkdir "$work/cache-empty"
+cp "$work"/seeds/* "$work/cache-empty/"
+: > "$work/cache-empty/zz-empty"
+capture "$work/c3.txt" "$bench" cache -m 100 -i 50 "$work/cache-empty"
+[ "$status" -eq 0 ] || fail "cache with an empty seed: exit $status"
+grep -q ' seeds=21$' "$work/c3.txt" || fail "cache: expected seeds=21"
+# a folder with only an empty seed
+mkdir "$work/cache-only-empty"
+: > "$work/cache-only-empty/empty"
+capture "$work/c4.txt" "$bench" cache -m 100 -i 50 "$work/cache-only-empty"
+[ "$status" -eq 0 ] || fail "cache with only an empty seed: exit $status"
+echo "[+] cache accepts an empty seed"
+
+# a folder of only non-UTF-8 files: every parse is not_utf8, no state changes
+mkdir "$work/cache-bad"
+# The files are long, so that no mutant removes all bad bytes
+head -c 2000 /dev/zero | LC_ALL=C tr '\0' '\377' > "$work/cache-bad/bad1"
+head -c 2000 /dev/zero | LC_ALL=C tr '\0' '\376' > "$work/cache-bad/bad2"
+capture "$work/c5.txt" "$bench" cache -m 100 -i 50 "$work/cache-bad"
+[ "$status" -eq 0 ] || fail "cache with bad seeds: exit $status"
+[ "$(last_field "$work/c5.txt" not_utf8)" -eq 102 ] ||
+  fail "cache with bad seeds: every parse must be not_utf8"
+[ "$(last_field "$work/c5.txt" trees)" -eq 0 ] ||
+  fail "cache with bad seeds: expected no tree"
+[ "$(cache_states "$work/c5.txt" | sort -u | wc -l | tr -d ' ')" -eq 1 ] ||
+  fail "cache with bad seeds: the state counts changed"
+echo "[+] cache counts the seeds that are not UTF-8"
+
+# bad options and an empty folder
+for args in "cache -m 0 $work/seeds" "cache -i abc $work/seeds" \
+  "cache -e 3 $work/seeds" "cache -n 5 $work/seeds" "cache"; do
+  status=0
+  # shellcheck disable=SC2086
+  "$bench" $args > /dev/null 2> "$work/err.txt" || status=$?
+  [ "$status" -eq 2 ] || fail "'$args': expected exit 2, got $status"
+  grep -q '^Usage:' "$work/err.txt" || fail "'$args': no usage text"
+done
+status=0
+"$bench" cache "$work/empty" > /dev/null 2>&1 || status=$?
+[ "$status" -eq 1 ] || fail "cache on an empty folder: expected exit 1"
+status=0
+"$bench" cache "$work/no-such-dir" > /dev/null 2>&1 || status=$?
+[ "$status" -eq 1 ] || fail "cache on a missing folder: expected exit 1"
+echo "[+] cache rejects bad options and an empty folder"
+
+# a signal stops the cache mode and keeps the signal as the exit status
+"$bench" cache -m 100000000 -i 100000000 "$work/seeds" \
+  > /dev/null 2> "$work/csig.err" &
+cache_pid=$!
+sleep 0.5
+kill -TERM "$cache_pid"
+status=0
+{ wait "$cache_pid" || status=$?; } 2> /dev/null
+[ "$status" -gt 128 ] || fail "cache: SIGTERM gave status $status"
+echo "[+] SIGTERM stops the cache mode"

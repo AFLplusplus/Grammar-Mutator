@@ -17,7 +17,8 @@
 
 # A program to benchmark the grammar mutator
 add_executable(benchmark
-  benchmark.c)
+  benchmark.c
+  mutants.c)
 target_link_libraries(benchmark
   PRIVATE grammarmutator)
 target_include_directories(benchmark
