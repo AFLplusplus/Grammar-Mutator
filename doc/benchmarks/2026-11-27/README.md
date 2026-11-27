@@ -4,29 +4,11 @@ This result is the comparison point for release 1.2.0.
 
 ## What it measured
 
-- Commit `fc77333` on `stable`. Its library code is the same as release
-  1.2.0 (`v1.2.0`, `9f8df44`). Only the benchmark program and its build lines
-  are different.
+- The benchmark program of this branch. It adds the wall-time record
+  (`elapsed`). The library code is the same as release 1.2.0 (`v1.2.0`,
+  `9f8df44`).
 - The load average was about 2 before and after the runs. Other desktop
   programs were open. No build ran at the same time.
-
-## Platform
-
-The output of `src/benchmark/platform.sh` (also in `platform.txt`):
-
-```
-date: 2026-11-27
-system: macOS 26.6.2
-kernel: Darwin 25.6.0
-machine: arm64
-cpu: Apple M4
-cores: 10 physical, 10 logical (4 performance, 6 efficiency)
-memory: 24.0 GiB
-cc: Apple clang version 21.0.0 (clang-2100.1.1.101)
-c++: Apple clang version 21.0.0 (clang-2100.1.1.101)
-cmake: cmake version 4.2.1
-power: Now drawing from 'AC Power'
-```
 
 ## Build
 
@@ -71,53 +53,90 @@ build-bench/src/benchmark/benchmark-ruby run -e 5 -n 5000 -t 2000 ruby-seeds > r
 build-bench/src/benchmark/benchmark-ruby digest -n 1000 -t 100 ruby-seeds > ruby-digest.txt
 ```
 
-The wall times were 2 min 12 s, 3 min, 1 s, and 10 s.
+<!-- report.py: start of the generated part -->
 
-## Summary
+## Platform
 
-### JavaScript `.g4`
+```
+date: 2026-11-27
+system: macOS 26.6.2
+kernel: Darwin 25.6.0
+machine: arm64
+cpu: Apple M4
+cores: 10 physical, 10 logical (4 performance, 6 efficiency)
+memory: 24.0 GiB
+cc: Apple clang version 21.0.0 (clang-2100.1.1.101)
+c++: Apple clang version 21.0.0 (clang-2100.1.1.101)
+cmake: cmake version 4.2.1
+power: Now drawing from 'AC Power'
+```
 
-Time per output in µs, for each stage. The smallest entry has no recursion
-edge, so it has no recursive stage.
+## Runs
+
+| Grammar | Mode | Options | Seeds | Trees | Wall time |
+|---|---|---|---|---|---|
+| javascript | run | `-e 5 -n 5000 -t 2000` | 1,035 | 1,013 | 131.6 s |
+| javascript | digest | `-n 200 -t 20` | 1,035 | 1,013 | 178.9 s |
+| ruby | run | `-e 5 -n 5000 -t 2000` | 300 | 300 | 445.9 ms |
+| ruby | digest | `-n 1000 -t 100` | 300 | 300 | 10.5 s |
+
+## javascript
+
+Time in µs for each output, for each stage.
 
 | Entry | Bytes | Nodes | Rules | Random | Recursive | Splice | Trim (µs/step) |
 |---|---|---|---|---|---|---|---|
-| regression-test-issue-1821.js | 635 | 19 | 31 | 8 | – | 69 | 10 |
-| regression-test-issue-3880.js | 767 | 263 | 36 | 14 | 23 | 62 | 10 |
-| regression-test-issue-739.js | 985 | 632 | 49 | 31 | 48 | 72 | 23 |
-| try-pattern.js | 2,077 | 1,972 | 102 | 78 | 93 | 124 | 84 |
-| test_suite_11.js | 78,546 | 121,574 | 4,641 | 4,574 | 4,685 | 4,862 | 5,162 |
+| regression-test-issue-1821.js | 635 | 19 | 30 | 7.6 | – | 74 | 11 |
+| regression-test-issue-3880.js | 767 | 263 | 37 | 15 | 23 | 60 | 9.4 |
+| regression-test-issue-739.js | 985 | 632 | 52 | 31 | 41 | 64 | 23 |
+| try-pattern.js | 2,077 | 1,972 | 108 | 83 | 92 | 127 | 85 |
+| test_suite_11.js | 78,546 | 121,574 | 4,645 | 4,616 | 4,689 | 4,906 | 5,152 |
+
+Duplicate outputs and outputs equal to the seed, in percent.
+
+| Entry | Rules dup % | Rules same % | Random dup % | Random same % | Recursive dup % | Recursive same % | Splice dup % | Splice same % |
+|---|---|---|---|---|---|---|---|---|
+| regression-test-issue-1821.js | 1.3 | 0.0 | 40.1 | 12.8 | – | – | 19.6 | 6.7 |
+| regression-test-issue-3880.js | 0.6 | 0.3 | 41.5 | 13.6 | 97.0 | 0.1 | 15.8 | 11.1 |
+| regression-test-issue-739.js | 0.7 | 0.7 | 31.1 | 12.7 | 94.5 | 0.0 | 11.9 | 8.2 |
+| try-pattern.js | 0.7 | 0.6 | 25.6 | 14.6 | 88.3 | 0.0 | 10.4 | 7.9 |
+| test_suite_11.js | 0.7 | 0.7 | 15.7 | 15.4 | 4.7 | 0.0 | 8.6 | 8.6 |
 
 - Chunk store: 365,859 chunks from 1,013 trees. The fill took 22.9 s.
-- Peak memory: 855,632 KB.
-- Duplicate outputs: rules at most 1.3%, random 16–42%, recursive 88–97%
-  (4.7% on the largest entry), splice 9–20%.
-- Outputs equal to the seed: random 13–15%, splice 7–11%.
+- Peak memory: 850,544 KB.
 
-### `ruby.json`
+## ruby
+
+Time in µs for each output, for each stage.
 
 | Entry | Bytes | Nodes | Rules | Random | Recursive | Splice | Trim (µs/step) |
 |---|---|---|---|---|---|---|---|
-| 0 | 131 | 3 | 9.0 | 1.0 | – | 2.1 | 0.5 |
-| 199 | 150 | 19 | 1.3 | 1.0 | 5.5 | 1.6 | 0.8 |
-| 196 | 167 | 35 | 1.1 | 1.4 | 12.2 | 1.9 | 1.2 |
-| 134 | 194 | 70 | 2.1 | 2.3 | 13.3 | 2.8 | 2.2 |
-| 244 | 344 | 175 | 5.5 | 5.7 | 15.1 | 6.5 | 5.7 |
+| 0 | 131 | 3 | 6.0 | 0.9 | – | 1.8 | 1.0 |
+| 199 | 150 | 19 | 1.2 | 1.0 | 5.5 | 1.6 | 0.8 |
+| 196 | 167 | 35 | 1.1 | 1.3 | 12 | 1.9 | 1.1 |
+| 134 | 194 | 70 | 2.1 | 2.3 | 13 | 2.9 | 2.2 |
+| 244 | 344 | 175 | 5.4 | 5.6 | 15 | 6.4 | 5.5 |
 
-- Chunk store: 2,302 chunks from 300 trees. Peak memory: 9,600 KB.
-- Duplicate outputs: random 66–79%, recursive 98–99.7%, splice 46–85%.
-- Outputs equal to the seed: random 25–50%, splice 0.3–23%.
+Duplicate outputs and outputs equal to the seed, in percent.
 
-### Digests
+| Entry | Rules dup % | Rules same % | Random dup % | Random same % | Recursive dup % | Recursive same % | Splice dup % | Splice same % |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 0.0 | 0.0 | 66.7 | 49.8 | – | – | 85.3 | 0.3 |
+| 199 | 0.0 | 2.6 | 78.6 | 28.3 | 99.7 | 0.0 | 67.2 | 22.7 |
+| 196 | 0.4 | 0.5 | 75.5 | 26.4 | 99.5 | 0.0 | 62.6 | 18.4 |
+| 134 | 0.3 | 0.3 | 70.9 | 25.2 | 99.4 | 0.1 | 55.3 | 16.6 |
+| 244 | 0.3 | 0.3 | 66.0 | 28.8 | 98.1 | 0.0 | 46.2 | 22.9 |
 
-| Seeds | Options | Outputs | New entries | Trim steps | Hash |
+- Chunk store: 2,302 chunks from 300 trees. The fill took 28.1 ms.
+- Peak memory: 9,488 KB.
+
+## Digests
+
+| Grammar | Options | Outputs | New entries | Trim steps | Hash |
 |---|---|---|---|---|---|
-| JavaScript | `-n 200 -t 20` | 1,613,412 | 1,013 | 36,887 | `14d12669df4be2e1` |
-| `ruby.json` | `-n 1000 -t 100` | 2,216,315 | 300 | 13,702 | `fd87045834903cd1` |
+| javascript | `-n 200 -t 20` | 1,613,412 | 1,013 | 36,887 | `14d12669df4be2e1` |
+| ruby | `-n 1000 -t 100` | 2,216,315 | 300 | 13,702 | `fd87045834903cd1` |
 
-### Notes
+The duplicate rates go up with the number of steps. Compare results only at the same options and on the same platform.
 
-- The duplicate rates go up with the number of steps, because a small tree
-  has few different outputs. Compare them only at the same `-n`.
-- Time per output grows with the tree size. For the largest entry, it is
-  about 40 ns for each node.
+<!-- report.py: end of the generated part -->

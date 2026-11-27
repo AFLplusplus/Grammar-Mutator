@@ -13,13 +13,15 @@ need a comparison point.
 - `README.md` with these items:
   - what the result measured: the commit, and the release whose library code
     it has;
-  - the platform and the hardware: the output of `src/benchmark/platform.sh`;
   - the build commands and the build type;
   - the seeds: the source, the version, the count, and the command that made
     them;
   - the exact benchmark commands;
-  - a short summary of the main numbers.
+  - a generated part between two marker lines: the platform, the wall time of
+    each command, and the tables of the main numbers. `src/benchmark/report.py`
+    writes it from the `.txt` files.
 - The raw output of each command, in one `.txt` file for each command.
+- `platform.txt`: the output of `src/benchmark/platform.sh`.
 
 ## How to record a result
 
@@ -60,9 +62,25 @@ in `<build>/src/benchmark/` after a CMake build.
    benchmark-<name> digest -n 200 -t 20 jerry-seeds > digest.txt
    ```
 
-5. Make the result folder `doc/benchmarks/<date>/`. Put the `.txt` files and
-   a `README.md` with the items above in it.
-6. Add a line for the folder to the list below.
+5. Make the result folder `doc/benchmarks/<date>/`. Put the `.txt` files in
+   it. Write the hand-written parts of `README.md`, and end them with these
+   two marker lines:
+
+   ```
+   <!-- report.py: start of the generated part -->
+   <!-- report.py: end of the generated part -->
+   ```
+
+6. Write the generated part between the markers:
+
+   ```bash
+   src/benchmark/report.py doc/benchmarks/<date>
+   ```
+
+   The script replaces only the text between the markers. Add `--check` to
+   see if the file is up to date. `make test-python` checks every committed
+   result with the markers. Do not edit the generated part by hand.
+7. Add a line for the folder to the list below.
 
 ## Results
 

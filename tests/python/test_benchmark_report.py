@@ -283,6 +283,21 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(run_main([str(self.dir), "--check"]), 1)
         self.assertFalse(report.check(self.dir))
 
+    def test_committed_results_match(self) -> None:
+        root = Path(__file__).resolve().parents[2] / "doc" / "benchmarks"
+        folders = [
+            readme.parent
+            for readme in sorted(root.glob("*/README.md"))
+            if report.START_MARKER in readme.read_text(encoding="utf-8")
+        ]
+        self.assertTrue(folders, "no committed result has the report markers")
+        for folder in folders:
+            with self.subTest(folder=folder.name):
+                self.assertTrue(
+                    report.check(folder),
+                    f"{folder}: README.md differs from report.py output",
+                )
+
     def test_usage(self) -> None:
         self.assertEqual(run_main([]), 2)
         self.assertEqual(run_main(["a", "b", "c"]), 2)
