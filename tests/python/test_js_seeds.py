@@ -23,9 +23,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest import mock
 from collections import Counter
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SEEDS_DIR = ROOT / "grammars" / "g4" / "javascript" / "seeds"
@@ -34,10 +34,19 @@ sys.path.insert(0, str(SEEDS_DIR))
 import get_seeds
 
 CHANGED = [
-    ("%OptimizeFunctionOnNextCall(f);", '__v8native("OptimizeFunctionOnNextCall")(f);'),
+    (
+        "%OptimizeFunctionOnNextCall(f);",
+        '__v8native("OptimizeFunctionOnNextCall")(f);',
+    ),
     ("f();\n%DeoptimizeNow();", 'f();\n__v8native("DeoptimizeNow")();'),
-    ("assertTrue(%HasFastProperties(o));", 'assertTrue(__v8native("HasFastProperties")(o));'),
-    ("var s = %GetOptimizationStatus(f);", 'var s = __v8native("GetOptimizationStatus")(f);'),
+    (
+        "assertTrue(%HasFastProperties(o));",
+        'assertTrue(__v8native("HasFastProperties")(o));',
+    ),
+    (
+        "var s = %GetOptimizationStatus(f);",
+        'var s = __v8native("GetOptimizationStatus")(f);',
+    ),
     ("return  %Foo(x);", 'return  __v8native("Foo")(x);'),
     ("if (!%IsSmi(x)) {}", 'if (!__v8native("IsSmi")(x)) {}'),
     ("g(a, %_Call(b));", 'g(a, __v8native("_Call")(b));'),
@@ -294,9 +303,12 @@ class BuildSeedsTest(unittest.TestCase):
 
 GIT = [
     "git",
-    "-c", "init.defaultBranch=main",
-    "-c", "user.name=test",
-    "-c", "user.email=test@example.invalid",
+    "-c",
+    "init.defaultBranch=main",
+    "-c",
+    "user.name=test",
+    "-c",
+    "user.email=test@example.invalid",
 ]
 
 
@@ -377,6 +389,14 @@ class FetchRepoTest(unittest.TestCase):
                     self.url, "1" * 40, ["a"], self.tmp / "work3"
                 )
         self.assertIn(self.url, str(ctx.exception))
+
+    def test_missing_git(self) -> None:
+        with mock.patch.object(get_seeds, "GIT_PROGRAM", "no-such-git-xyz"):
+            with self.assertRaises(SystemExit) as ctx:
+                get_seeds.fetch_repo(
+                    self.url, self.commits[0], ["a"], self.tmp / "work4"
+                )
+        self.assertIn("Cannot run no-such-git-xyz", str(ctx.exception))
 
     def test_main_fetch(self) -> None:
         suite = get_seeds.Suite("local", self.url, self.commits[0], "a", (".",))
@@ -482,7 +502,9 @@ class ShimsTest(unittest.TestCase):
 
     def test_function_declaration_replaces_shim(self):
         self.assertNotEqual(
-            self.run_seed("function assertEquals() { throw 1; } assertEquals();"),
+            self.run_seed(
+                "function assertEquals() { throw 1; } assertEquals();"
+            ),
             0,
         )
 

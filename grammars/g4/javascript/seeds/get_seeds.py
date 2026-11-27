@@ -347,25 +347,46 @@ def write_summary(
     path.write_text("\n".join(lines) + "\n")
 
 
-def _git(work: Path, url: str, *args: str) -> None:
-    """Run git in `work`. Stop with a short message if it fails."""
+# The name of the git program.
+GIT_PROGRAM = "git"
+
+
+def _git(
+    work: Path, url: str, *args: str, capture: bool = False
+) -> subprocess.CompletedProcess:
+    """Run git in `work`. Stop with a short message if git cannot run."""
     try:
-        subprocess.run(["git", "-C", str(work)] + list(args), check=True)
-    except (subprocess.CalledProcessError, OSError) as err:
+        return subprocess.run(
+            [GIT_PROGRAM, "-C", str(work)] + list(args),
+            capture_output=capture,
+            text=True,
+        )
+    except OSError as err:
         raise SystemExit(
-            "[-] git %s failed for %s: %s" % (" ".join(args), url, err)
+            "[-] Cannot run %s for %s: %s" % (GIT_PROGRAM, url, err)
         )
 
 
-def _is_checked_out(work: Path, commit: str, paths: list[str]) -> bool:
+def _git_ok(work: Path, url: str, *args: str) -> None:
+    """Run git in `work`. Stop with a short message if it fails."""
+    if _git(work, url, *args).returncode != 0:
+        raise SystemExit(
+            "[-] git %s failed for %s" % (" ".join(args), url)
+        )
+
+
+def _head(work: Path, url: str) -> str:
+    """Return the commit of HEAD in `work`, or "" if there is none."""
     if not (work / ".git").exists():
-        return False
-    head = subprocess.run(
-        ["git", "-C", str(work), "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-    )
-    if head.returncode != 0 or head.stdout.strip() != commit:
+        return ""
+    result = _git(work, url, "rev-parse", "HEAD", capture=True)
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _is_checked_out(
+    work: Path, url: str, commit: str, paths: list[str]
+) -> bool:
+    if _head(work, url) != commit:
         return False
     return all((work / path).exists() for path in paths)
 
@@ -377,15 +398,13 @@ def fetch_repo(url: str, commit: str, paths: list[str], work: Path) -> Path:
     Else it fetches only this commit, without file contents, and checks out
     only `paths`. It returns `work`.
     """
-    if _is_checked_out(work, commit, paths):
+    if _is_checked_out(work, url, commit, paths):
         return work
     work.mkdir(parents=True, exist_ok=True)
     if not (work / ".git").exists():
-        _git(work, url, "init", "-q")
-    remotes = subprocess.run(
-        ["git", "-C", str(work), "remote"], capture_output=True, text=True
-    ).stdout.split()
-    _git(
+        _git_ok(work, url, "init", "-q")
+    remotes = _git(work, url, "remote", capture=True).stdout.split()
+    _git_ok(
         work,
         url,
         "remote",
@@ -393,13 +412,13 @@ def fetch_repo(url: str, commit: str, paths: list[str], work: Path) -> Path:
         "origin",
         url,
     )
-    _git(work, url, "config", "core.sparseCheckout", "true")
+    _git_ok(work, url, "config", "core.sparseCheckout", "true")
     info = work / ".git" / "info"
     info.mkdir(exist_ok=True)
     (info / "sparse-checkout").write_text(
         "".join("/%s/\n" % path for path in paths)
     )
-    _git(
+    _git_ok(
         work,
         url,
         "fetch",
@@ -410,11 +429,25 @@ def fetch_repo(url: str, commit: str, paths: list[str], work: Path) -> Path:
         "origin",
         commit,
     )
-    _git(work, url, "checkout", "-q", "--force", "FETCH_HEAD")
-    if not _is_checked_out(work, commit, paths):
-        missing = [p for p in paths if not (work / p).exists()]
+    # Check the paths before the checkout, so that the message is the same
+    # for every git version.
+    missing = [
+        path
+        for path in paths
+        if not _git(
+            work, url, "ls-tree", "-d", "FETCH_HEAD", "--", path, capture=True
+        ).stdout.strip()
+    ]
+    if missing:
         raise SystemExit(
             "[-] %s at %s: missing path %s" % (url, commit, ", ".join(missing))
+        )
+    _git_ok(work, url, "checkout", "-q", "--force", "FETCH_HEAD")
+    head = _head(work, url)
+    if head != commit:
+        raise SystemExit(
+            "[-] %s: HEAD is %s, not the pinned commit %s"
+            % (url, head, commit)
         )
     return work
 
@@ -444,14 +477,13 @@ def _fetch(dest: Path) -> int:
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser = argparse.ArgumentParser(description="Turn engine test suites into JavaScript seeds.")
     sub = parser.add_subparsers(dest="command", required=True)
     fetch = sub.add_parser("fetch", help="download the suites, select seeds")
     fetch.add_argument("dest", type=Path, help="working folder")
     args = parser.parse_args(argv)
-    if args.command == "fetch":
-        return _fetch(args.dest)
-    return 2
+    # Each later subcommand adds a branch here.
+    return _fetch(args.dest)
 
 
 if __name__ == "__main__":
