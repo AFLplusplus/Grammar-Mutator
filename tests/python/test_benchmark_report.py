@@ -449,19 +449,71 @@ class ReportTest(unittest.TestCase):
         write(self.dir, "ruby-run.txt", run)
         out = self.render()
         section = out[out.index("## Parse time") : out.index("## Time per output")]
-        # median 300; 90th percentile by nearest rank: the 5th of 5 values;
-        # median µs per KB: 100/(500/1024), 400/2, 4000/20, ... → 204.8
+        # The median is 300. The 90th percentile by nearest rank is the 5th of
+        # 5 values. The median µs per KB is 204.8 (100 µs for 500 bytes).
         self.assertIn("| ruby | 5 | 1 | 300 | 4,000 | 4,000 | s3 | 205 |", section)
         self.assertIn("| ruby | under 1 KB | 3 | 200 |", section)
         self.assertIn("| ruby | 1–10 KB | 1 | 400 |", section)
         self.assertIn("| ruby | 10–100 KB | 1 | 4,000 |", section)
         self.assertNotIn("| ruby | 100 KB or more |", section)
         # the javascript run has one seed of 755 bytes
-        self.assertIn("| javascript | 1 | 0 | 2,376 | 2,376 | 2,376 | a.js |", section)
+        js_row = "| javascript | 1 | 0 | 2,376 | 2,376 | 2,376 | a.js | 3,223 |"
+        self.assertIn(js_row, section)
         self.assertIn("| javascript | under 1 KB | 1 | 2,376 |", section)
         self.assertLess(section.index("| javascript |"), section.index("| ruby |"))
         self.assertIn("one-time setup of the parser", section)
         self.assertNotIn("\n\n\n", out)
+
+    def test_size_band_edges(self) -> None:
+        seeds = (
+            "seed name=b1 bytes=1023 parse_us=1.0 tree=1\n"
+            "seed name=b2 bytes=1024 parse_us=2.0 tree=1\n"
+            "seed name=b3 bytes=10240 parse_us=3.0 tree=1\n"
+            "seed name=b4 bytes=102400 parse_us=4.0 tree=1\n"
+        )
+        run = RUBY_RUN.replace("seed name=0 bytes=131 parse_us=1728.0 tree=1\n", seeds)
+        write(self.dir, "ruby-run.txt", run)
+        section = self.parse_section()
+        self.assertIn("| ruby | under 1 KB | 1 | 1.0 |", section)
+        self.assertIn("| ruby | 1–10 KB | 1 | 2.0 |", section)
+        self.assertIn("| ruby | 10–100 KB | 1 | 3.0 |", section)
+        self.assertIn("| ruby | 100 KB or more | 1 | 4.0 |", section)
+
+    def test_parse_edges(self) -> None:
+        # four seeds (an even count), one of 0 bytes and without a tree,
+        # and two seeds with the same slowest time
+        seeds = (
+            "seed name=e1 bytes=0 parse_us=60.0 tree=0\n"
+            "seed name=e2 bytes=2048 parse_us=40.0 tree=1\n"
+            "seed name=e3 bytes=4096 parse_us=60.0 tree=1\n"
+            "seed name=e4 bytes=1023 parse_us=30.0 tree=1\n"
+        )
+        run = RUBY_RUN.replace("seed name=0 bytes=131 parse_us=1728.0 tree=1\n", seeds)
+        write(self.dir, "ruby-run.txt", run)
+        # The median of 30, 40, 60, 60 is 50. The slowest seed is the first of
+        # the two 60 µs seeds. The 0-byte seed has no µs per KB: the median of
+        # 20, 15, and 30 is 20.
+        self.assertIn("| ruby | 4 | 1 | 50 | 60 | 60 | e1 | 20 |", self.parse_section())
+
+    def test_parse_only_zero_bytes(self) -> None:
+        seed = "seed name=z bytes=0 parse_us=5.0 tree=0\n"
+        run = RUBY_RUN.replace("seed name=0 bytes=131 parse_us=1728.0 tree=1\n", seed)
+        write(self.dir, "ruby-run.txt", run)
+        self.assertIn("| ruby | 1 | 1 | 5.0 | 5.0 | 5.0 | z | – |", self.parse_section())
+
+    def test_parse_without_seed_records(self) -> None:
+        for name, text, seed in (
+            ("ruby-run.txt", RUBY_RUN, "seed name=0 bytes=131 parse_us=1728.0 tree=1\n"),
+            ("javascript-run.txt", JS_RUN, "seed name=a.js bytes=755 parse_us=2376.0 tree=1\n"),
+        ):
+            write(self.dir, name, text.replace(seed, ""))
+        section = self.parse_section()
+        self.assertIn("No seed record in this result.", section)
+        self.assertNotIn("| Grammar |", section)
+
+    def parse_section(self) -> str:
+        out = self.render()
+        return out[out.index("## Parse time") : out.index("## Time per output")]
 
     def test_nearest_rank(self) -> None:
         self.assertEqual(report.nearest_rank([5.0], 0.9), 5.0)

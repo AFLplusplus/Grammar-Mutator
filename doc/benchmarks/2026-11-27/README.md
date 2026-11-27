@@ -82,9 +82,10 @@ power: Now drawing from 'AC Power'
 
 ## Parse time
 
-The time of the first load of each seed: the parse, the tree file write, and
-the chunk store add, in µs. All seeds count, also the seeds without a tree.
-The first seed in name order also includes the one-time setup of the parser.
+The tables show the time of the first load of each seed in µs. This time
+includes the parse, the tree file write, and the chunk store add. All seeds
+count, including the seeds without a tree. The time of the first seed in name
+order also includes the one-time setup of the parser.
 
 | Grammar | Seeds | No tree | Median | 90th percentile | Slowest | Slowest seed | Median µs per KB |
 |---|---|---|---|---|---|---|---|

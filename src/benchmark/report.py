@@ -63,9 +63,10 @@ REPORT = """\
 
 {warnings}## Parse time
 
-The time of the first load of each seed: the parse, the tree file write, and
-the chunk store add, in µs. All seeds count, also the seeds without a tree.
-The first seed in name order also includes the one-time setup of the parser.
+The tables show the time of the first load of each seed in µs. This time
+includes the parse, the tree file write, and the chunk store add. All seeds
+count, including the seeds without a tree. The time of the first seed in name
+order also includes the one-time setup of the parser.
 
 {parse}
 
@@ -115,15 +116,17 @@ SKELETON = """\
 {block}
 """
 
-NO_RUN = "No run in this result."
-
-# The size bands of the parse-time table: (lower limit, upper limit, name)
+# The size bands of the parse-time table: (lower limit, upper limit, name).
+# A seed is in a band if lower limit <= bytes < upper limit.
 SIZE_BANDS = (
     (0, 1024, "under 1 KB"),
     (1024, 10 * 1024, "1–10 KB"),
     (10 * 1024, 100 * 1024, "10–100 KB"),
     (100 * 1024, math.inf, "100 KB or more"),
 )
+
+NO_RUN = "No run in this result."
+NO_SEED = "No seed record in this result."
 NO_DIGEST = "No digest in this result."
 
 USAGE = "usage: report.py RESULT_DIR [--check]\n       report.py -h | --help"
@@ -522,6 +525,7 @@ def parse_rows(runs: list) -> list:
             continue
         times = [s.parse_us for s in seeds]
         slowest = max(seeds, key=lambda s: s.parse_us)
+        # A seed of 0 bytes has no time per KB, so it is not in this median
         per_kb = [s.parse_us / (s.bytes / 1024) for s in seeds if s.bytes > 0]
         rows.append(
             [
@@ -551,10 +555,12 @@ def size_rows(runs: list) -> list:
 
 
 def render_parse(runs: list) -> str:
-    """The parse-time tables, or one line if no run file has seed records."""
+    """The parse-time tables, or one line if there is no seed record."""
+    if not runs:
+        return NO_RUN
     summary = parse_rows(runs)
     if not summary:
-        return NO_RUN
+        return NO_SEED
     header = ["Grammar", "Seeds", "No tree", "Median", "90th percentile", "Slowest"]
     header += ["Slowest seed", "Median µs per KB"]
     sizes = table(["Grammar", "Size", "Seeds", "Median"], size_rows(runs))
