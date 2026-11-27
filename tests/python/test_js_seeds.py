@@ -15,10 +15,15 @@ Run them with `make test-python`.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from collections import Counter
 from pathlib import Path
 
@@ -285,6 +290,108 @@ class BuildSeedsTest(unittest.TestCase):
         self.assertIn("negative-parse", text)
         self.assertRegex(text, r"files\D*3")
         self.assertRegex(text, r"seeds\D*2")
+
+
+GIT = [
+    "git",
+    "-c", "init.defaultBranch=main",
+    "-c", "user.name=test",
+    "-c", "user.email=test@example.invalid",
+]
+
+
+def run_git(cwd: Path, *args: str) -> str:
+    result = subprocess.run(
+        GIT + list(args),
+        cwd=str(cwd),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def make_source(path: Path) -> list[str]:
+    """Make a repository with two commits. Return the commit hashes."""
+    path.mkdir()
+    run_git(path, "init", "-q")
+    run_git(path, "config", "uploadpack.allowFilter", "true")
+    run_git(path, "config", "uploadpack.allowAnySHA1InWant", "true")
+    commits = []
+    for n in (1, 2):
+        for folder, name in (("a", "x.js"), ("b", "y.js")):
+            (path / folder).mkdir(exist_ok=True)
+            (path / folder / name).write_text("var v%d = %s;\n" % (n, name))
+        run_git(path, "add", ".")
+        run_git(path, "commit", "-q", "-m", "c%d" % n)
+        commits.append(run_git(path, "rev-parse", "HEAD"))
+    return commits
+
+
+class FetchRepoTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.tmp = Path(self._tmp.name)
+        self.src = self.tmp / "source"
+        self.commits = make_source(self.src)
+        self.url = "file://%s" % self.src
+
+    def test_fetch_and_update(self) -> None:
+        work = self.tmp / "work"
+        get_seeds.fetch_repo(self.url, self.commits[0], ["a"], work)
+        self.assertEqual((work / "a" / "x.js").read_text(), "var v1 = x.js;\n")
+        self.assertFalse((work / "b").exists())
+        self.assertEqual(run_git(work, "rev-parse", "HEAD"), self.commits[0])
+        # A new commit replaces the stale cache.
+        result = get_seeds.fetch_repo(self.url, self.commits[1], ["a"], work)
+        self.assertEqual(result, work)
+        self.assertEqual((work / "a" / "x.js").read_text(), "var v2 = x.js;\n")
+        self.assertEqual(run_git(work, "rev-parse", "HEAD"), self.commits[1])
+
+    def test_cache_hit_does_not_fetch(self) -> None:
+        work = self.tmp / "work"
+        get_seeds.fetch_repo(self.url, self.commits[1], ["a"], work)
+        shutil.rmtree(self.src)
+        get_seeds.fetch_repo(self.url, self.commits[1], ["a"], work)
+        self.assertEqual(run_git(work, "rev-parse", "HEAD"), self.commits[1])
+
+    def test_missing_path(self) -> None:
+        with self.assertRaises(SystemExit) as ctx:
+            get_seeds.fetch_repo(
+                self.url, self.commits[0], ["missing"], self.tmp / "work2"
+            )
+        self.assertIn("missing", str(ctx.exception))
+
+    def test_bad_commit(self) -> None:
+        real_run = subprocess.run
+
+        def quiet_run(*args, **kwargs):  # hide the error text of git
+            if not kwargs.get("capture_output"):
+                kwargs.setdefault("stderr", subprocess.DEVNULL)
+            return real_run(*args, **kwargs)
+
+        with mock.patch.object(get_seeds.subprocess, "run", quiet_run):
+            with self.assertRaises(SystemExit) as ctx:
+                get_seeds.fetch_repo(
+                    self.url, "1" * 40, ["a"], self.tmp / "work3"
+                )
+        self.assertIn(self.url, str(ctx.exception))
+
+    def test_main_fetch(self) -> None:
+        suite = get_seeds.Suite("local", self.url, self.commits[0], "a", (".",))
+        dest = self.tmp / "dest"
+        out = io.StringIO()
+        with mock.patch.object(get_seeds, "SUITES", (suite,)):
+            with contextlib.redirect_stdout(out):
+                code = get_seeds.main(["fetch", str(dest)])
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            (dest / "seeds" / "local" / "local_x.js").read_text(),
+            "var v1 = x.js;\n",
+        )
+        self.assertIn("local", (dest / "summary.txt").read_text())
+        self.assertIn("local", out.getvalue())
 
 
 if __name__ == "__main__":

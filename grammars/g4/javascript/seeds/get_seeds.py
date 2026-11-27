@@ -25,8 +25,12 @@ The subcommands are:
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import re
+import shutil
+import subprocess
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -103,7 +107,6 @@ def rewrite_natives(text: str) -> str:
 MAX_SEED_BYTES = 1048576
 # The longest file name that common file systems allow.
 MAX_NAME_BYTES = 255
-_PLACEHOLDER_COMMIT = "0" * 40
 
 
 @dataclass(frozen=True)
@@ -125,21 +128,24 @@ SUITES: tuple[Suite, ...] = (
     Suite(
         "test262",
         "https://github.com/tc39/test262",
-        _PLACEHOLDER_COMMIT,
+        # The head of main on 2026-11-27.
+        "4e4505c343d64b3c25da2338f2594504b0728594",
         "test",
         ("annexB", "built-ins", "intl402", "language", "staging"),
     ),
     Suite(
         "mjsunit",
         "https://github.com/v8/v8",
-        _PLACEHOLDER_COMMIT,
+        # The head of main on 2026-11-27.
+        "1344a52aeaec26ca151586e9f8d08517e0997235",
         "test/mjsunit",
         (".",),
     ),
     Suite(
         "jstests",
         "https://github.com/WebKit/WebKit",
-        _PLACEHOLDER_COMMIT,
+        # The head of main on 2026-11-27.
+        "4940531db2fa181a710f9e204390628ab44e5183",
         "JSTests",
         ("stress", "es6", "ChakraCore", "mozilla", "regexp"),
     ),
@@ -339,3 +345,114 @@ def write_summary(
         for reason, count in sorted(dropped.items()):
             lines.append("  dropped %s: %d" % (reason, count))
     path.write_text("\n".join(lines) + "\n")
+
+
+def _git(work: Path, url: str, *args: str) -> None:
+    """Run git in `work`. Stop with a short message if it fails."""
+    try:
+        subprocess.run(["git", "-C", str(work)] + list(args), check=True)
+    except (subprocess.CalledProcessError, OSError) as err:
+        raise SystemExit(
+            "[-] git %s failed for %s: %s" % (" ".join(args), url, err)
+        )
+
+
+def _is_checked_out(work: Path, commit: str, paths: list[str]) -> bool:
+    if not (work / ".git").exists():
+        return False
+    head = subprocess.run(
+        ["git", "-C", str(work), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if head.returncode != 0 or head.stdout.strip() != commit:
+        return False
+    return all((work / path).exists() for path in paths)
+
+
+def fetch_repo(url: str, commit: str, paths: list[str], work: Path) -> Path:
+    """Check out `paths` of `commit` of the repository `url` in `work`.
+
+    The call does nothing if `work` already has this commit and these paths.
+    Else it fetches only this commit, without file contents, and checks out
+    only `paths`. It returns `work`.
+    """
+    if _is_checked_out(work, commit, paths):
+        return work
+    work.mkdir(parents=True, exist_ok=True)
+    if not (work / ".git").exists():
+        _git(work, url, "init", "-q")
+    remotes = subprocess.run(
+        ["git", "-C", str(work), "remote"], capture_output=True, text=True
+    ).stdout.split()
+    _git(
+        work,
+        url,
+        "remote",
+        "set-url" if "origin" in remotes else "add",
+        "origin",
+        url,
+    )
+    _git(work, url, "config", "core.sparseCheckout", "true")
+    info = work / ".git" / "info"
+    info.mkdir(exist_ok=True)
+    (info / "sparse-checkout").write_text(
+        "".join("/%s/\n" % path for path in paths)
+    )
+    _git(
+        work,
+        url,
+        "fetch",
+        "-q",
+        "--depth",
+        "1",
+        "--filter=blob:none",
+        "origin",
+        commit,
+    )
+    _git(work, url, "checkout", "-q", "--force", "FETCH_HEAD")
+    if not _is_checked_out(work, commit, paths):
+        missing = [p for p in paths if not (work / p).exists()]
+        raise SystemExit(
+            "[-] %s at %s: missing path %s" % (url, commit, ", ".join(missing))
+        )
+    return work
+
+
+def _sparse_paths(suite: Suite) -> list[str]:
+    """Return the repository paths that a suite needs."""
+    return [
+        suite.root if folder == "." else "%s/%s" % (suite.root, folder)
+        for folder in suite.folders
+    ]
+
+
+def _fetch(dest: Path) -> int:
+    roots: dict[str, Path] = {}
+    for suite in SUITES:
+        print("[*] fetching %s at %s" % (suite.name, suite.commit))
+        work = dest / "src" / suite.name
+        fetch_repo(suite.url, suite.commit, _sparse_paths(suite), work)
+        roots[suite.name] = work / suite.root
+    summary = build_seeds(roots, dest / "seeds", EXCLUDE)
+    shims = Path(__file__).resolve().parent / "shims.js"
+    if shims.exists():
+        shutil.copyfile(str(shims), str(dest / "shims.js"))
+    write_summary(dest / "summary.txt", SUITES, summary)
+    print((dest / "summary.txt").read_text(), end="")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    sub = parser.add_subparsers(dest="command", required=True)
+    fetch = sub.add_parser("fetch", help="download the suites, select seeds")
+    fetch.add_argument("dest", type=Path, help="working folder")
+    args = parser.parse_args(argv)
+    if args.command == "fetch":
+        return _fetch(args.dest)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
