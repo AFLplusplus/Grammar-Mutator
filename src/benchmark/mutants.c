@@ -80,10 +80,26 @@ uint8_t *bench_make_mutant(bench_rng_t *rng, const bench_seed_t *seeds,
     switch (below(rng, 6)) {
 
       case 0:  // flip one bit
-        if (used > 0) buf[below(rng, used)] ^= (uint8_t)(1u << below(rng, 8));
+        if (used > 0) {
+
+          // Draw in a fixed order: C does not order the calls of one
+          // expression.
+          size_t pos = below(rng, used);
+          size_t bit = below(rng, 8);
+          buf[pos] ^= (uint8_t)(1u << bit);
+
+        }
+
         break;
       case 1:  // set one byte to a random value
-        if (used > 0) buf[below(rng, used)] = (uint8_t)bench_rng_next(rng);
+        if (used > 0) {
+
+          size_t  pos = below(rng, used);
+          uint8_t value = (uint8_t)bench_rng_next(rng);
+          buf[pos] = value;
+
+        }
+
         break;
       case 2: {  // delete a block
 

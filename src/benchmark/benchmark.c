@@ -274,12 +274,13 @@ static int mode_parse(int argc, char **argv) {
 typedef struct {
 
   uint64_t seed, entries, steps, trims, mutants, interval;
+  uint64_t budget_ms;  // cache mode: the parse limit, set by the mode
 
 } options_t;
 
 // Read the options of a mode. Return false on a usage error. The one operand
 // is the seed folder. "allowed" holds the letters of the flags of the mode.
-// The cache mode sets the default interval after the options.
+// Every mode gets the default interval, but only the cache mode uses it.
 static bool parse_options(int argc, char **argv, const char *allowed,
                           options_t *opt, const char **dir) {
 
@@ -289,6 +290,7 @@ static bool parse_options(int argc, char **argv, const char *allowed,
   opt->trims = 1000;
   opt->mutants = 10000;
   opt->interval = 0;
+  opt->budget_ms = 0;
   *dir = NULL;
   int i = 0;
   while (i < argc) {
@@ -575,8 +577,7 @@ static void print_header(FILE *out, const char *grammar, const char *mode,
     // its own budget.
     fprintf(out, " mutants=%llu interval=%llu parse_budget_ms=%llu seeds=%zu\n",
             (unsigned long long)opt->mutants, (unsigned long long)opt->interval,
-            (unsigned long long)(parse_budget_min_ns_from_env() / 1000000),
-            seeds);
+            (unsigned long long)opt->budget_ms, seeds);
     return;
 
   }
@@ -1349,6 +1350,7 @@ static int mode_cache(const char *prog, int argc, char **argv) {
   options_t   opt;
   const char *seed_dir;
   if (!parse_options(argc, argv, "smi", &opt, &seed_dir)) return usage(prog);
+  install_signal_handlers();
   seed_list_t names = {0};
   if (!seed_list_load(seed_dir, &names)) {
 
@@ -1398,6 +1400,7 @@ static int mode_cache(const char *prog, int argc, char **argv) {
 
   // One budget, as the mutator makes it. A minimum of 0 turns the limit off.
   uint64_t min_ns = parse_budget_min_ns_from_env();
+  opt.budget_ms = min_ns / 1000000;
   if (min_ns > 0) {
 
     budget = parse_budget_create();

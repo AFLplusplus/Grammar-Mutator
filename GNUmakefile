@@ -300,6 +300,7 @@ code-format: export LLVM_VERSION = $(CLANG_FORMAT_VERSION)
 code-format:
 	./.custom-format.py -i src/*.c
 	./.custom-format.py -i src/benchmark/*.c
+	./.custom-format.py -i src/benchmark/*.h
 	./.custom-format.py -i tests/*.cpp
 	./.custom-format.py -i src/*.h
 	./.custom-format.py -i tests/*.h

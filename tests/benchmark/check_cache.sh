@@ -41,6 +41,17 @@ grep -Eq '^benchmark version=[^ ]+ grammar='"$name"' system=[^ ]+ machine=[^ ]+ 
 tail -n 1 "$work/cache.txt" | grep -Eq '^elapsed wall_ms=[0-9]+\.[0-9]$' ||
   fail "cache: the last record must be elapsed"
 
+# The first record is the seed record. Its parses is the seeds of the header.
+header_seeds=$(sed -n 's/^benchmark .* seeds=\([0-9]*\)$/\1/p' "$work/cache.txt")
+first=$(grep '^cache ' "$work/cache.txt" | head -n 1)
+case $first in
+  "cache phase=seeds parses=$header_seeds "*) ;;
+  *) fail "cache: the first record must be the seed record: $first" ;;
+esac
+if grep '^cache ' "$work/cache.txt" | tail -n +2 | grep -v '^cache phase=mutants ' > /dev/null; then
+  fail "cache: a record after the first must be a mutants record"
+fi
+
 # Check the format and the order of the records. The first mutant record is
 # 50 parses after the seed record, as the later ones are.
 num='[0-9]+'

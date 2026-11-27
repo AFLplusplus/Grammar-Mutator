@@ -468,13 +468,31 @@ status=0
 [ "$status" -eq 1 ] || fail "cache on a missing folder: expected exit 1"
 echo "[+] cache rejects bad options and an empty folder"
 
-# a signal stops the cache mode and keeps the signal as the exit status
-"$bench" cache -m 100000000 -i 100000000 "$work/seeds" \
-  > /dev/null 2> "$work/csig.err" &
+# a signal stops the cache mode: the records so far reach stdout, stderr has
+# the stop message, and the signal is the exit status
+"$bench" cache -m 100000000 -i 1 "$work/seeds" \
+  > "$work/csig.out" 2> "$work/csig.err" &
 cache_pid=$!
-sleep 0.5
+tries=0
+while [ "$(grep -c '^cache ' "$work/csig.out")" -lt 1 ]; do
+  tries=$((tries + 1))
+  [ "$tries" -le 100 ] || { kill "$cache_pid" 2> /dev/null || true; fail "cache: no record in 10 s"; }
+  sleep 0.1
+done
 kill -TERM "$cache_pid"
 status=0
 { wait "$cache_pid" || status=$?; } 2> /dev/null
 [ "$status" -gt 128 ] || fail "cache: SIGTERM gave status $status"
-echo "[+] SIGTERM stops the cache mode"
+grep -q 'Stopped by signal 15' "$work/csig.err" ||
+  fail "cache: no stop message on stderr"
+grep -q '^benchmark ' "$work/csig.out" || fail "cache: the header was lost"
+grep -q '^cache phase=seeds ' "$work/csig.out" ||
+  fail "cache: the seed record was lost"
+echo "[+] SIGTERM stops the cache mode and keeps the records"
+
+# a bad PARSE_TIME_BUDGET_MS gives its warning once
+capture "$work/cw.txt" env PARSE_TIME_BUDGET_MS=abc "$bench" cache -m 10 "$work/seeds"
+[ "$status" -eq 0 ] || fail "cache with a bad budget: exit $status"
+[ "$(grep -c 'PARSE_TIME_BUDGET_MS' "$work/cw.txt.err")" -eq 1 ] ||
+  fail "cache: expected the budget warning once"
+echo "[+] cache warns once about a bad PARSE_TIME_BUDGET_MS"
