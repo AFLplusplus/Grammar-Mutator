@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0 (2026-11-25)
+
+<!-- Release notes generated using configuration in .github/release.yml at stable -->
+
+## What's Changed
+* perf: skip the AFL++ splice buffer by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/75
+* feat: name the mutation stage in queue file names by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/77
+* fix: keep the current tree when a new entry has no original file by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/78
+* fix: free the recursion edges that a trim step skips by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/79
+* perf: remove repeated tree copies and walks by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/80
+* fix: close the tree file on errors and fix remove_directory by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/81
+* fix: stop the parse hang of ambiguous grammars by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/82
+
+
+**Full Changelog**: https://github.com/AFLplusplus/Grammar-Mutator/compare/v1.1.0...v1.2.0
+
 ## 1.1.0 (2026-11-22)
 
 <!-- Release notes generated using configuration in .github/release.yml at stable -->
