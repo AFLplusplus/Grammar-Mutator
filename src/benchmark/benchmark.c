@@ -1260,7 +1260,10 @@ static long heap_kb(void) {
 #elif defined(__GLIBC__) && defined(__GLIBC_PREREQ)
   #if __GLIBC_PREREQ(2, 33)
   struct mallinfo2 info = mallinfo2();
-  return (long)(((size_t)info.uordblks + (size_t)info.hblkhd) / 1024);
+  size_t           total = (size_t)info.uordblks + (size_t)info.hblkhd;
+  // Under Valgrind, mallinfo2 gives 0. A real heap is never 0 after the
+  // seeds are loaded, so 0 means that the value is not known.
+  return total ? (long)(total / 1024) : -1;
   #else
   return -1;
   #endif
@@ -1336,6 +1339,7 @@ static bool cache_record(const char *phase, cache_stats_t *stats) {
       stats->timed ? stats->timed_us / (double)stats->timed : 0.0,
       (unsigned long long)stats->trees, (unsigned long long)stats->not_utf8,
       (unsigned long long)stats->stopped);
+  fflush(stdout);
   stats->timed = 0;
   stats->timed_us = 0;
   return true;
@@ -1416,6 +1420,9 @@ static int mode_cache(const char *prog, int argc, char **argv) {
   }
 
   print_header(stdout, grammar_name(prog), "cache", &opt, names.count, 0);
+  // A SIGKILL (for example from the out-of-memory killer) cannot be caught.
+  // So flush each record at once.
+  fflush(stdout);
   cache_stats_t stats = {0};
   for (size_t i = 0; i < names.count; ++i) {
 
