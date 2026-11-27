@@ -571,5 +571,139 @@ class ShimsTest(unittest.TestCase):
         )
 
 
+class FilterTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = Path(tmp.name)
+        self.fake = self.tmp / "fake.sh"
+        self.fake.write_text(
+            "#!/bin/sh\n"
+            "# $1 = shims, $2 = seed\n"
+            'seed=${2#--x=}\n'
+            'case $(cat "$seed") in\n'
+            "  ok) exit 0 ;;\n"
+            "  bad) exit 1 ;;\n"
+            "  slow) sleep 5 ;;\n"
+            "  crash) kill -SEGV $$ ;;\n"
+            "esac\n"
+        )
+        self.fake.chmod(0o755)
+        self.shims = self.tmp / "shims.js"
+        self.shims.write_text("")
+        self.seeds = self.tmp / "SEEDS"
+        for suite, name, text in (
+            ("mjsunit", "mjsunit_ok.js", "ok"),
+            ("mjsunit", "mjsunit_bad.js", "bad"),
+            ("mjsunit", "mjsunit_slow.js", "slow"),
+            ("jstests", "jstests_crash.js", "crash"),
+            ("jstests", "jstests_ok.js", "ok"),
+        ):
+            (self.seeds / suite).mkdir(parents=True, exist_ok=True)
+            (self.seeds / suite / name).write_text(text)
+        self.out = self.tmp / "OUT"
+
+    def run_filter(self, template):
+        return get_seeds.run_filter(
+            template, self.shims, self.seeds, self.out, 1.0, 4
+        )
+
+    def test_filter(self):
+        summary = self.run_filter(
+            ["sh", str(self.fake), "{shims}", "{seed}"]
+        )
+        found = sorted(
+            str(p.relative_to(self.out))
+            for p in self.out.rglob("*")
+            if p.is_file()
+        )
+        self.assertEqual(
+            found, ["jstests/jstests_ok.js", "mjsunit/mjsunit_ok.js"]
+        )
+        self.assertEqual(
+            (self.out / "mjsunit" / "mjsunit_ok.js").read_bytes(), b"ok"
+        )
+        self.assertEqual(summary.kept, Counter(mjsunit=1, jstests=1))
+        self.assertEqual(summary.failed, Counter(mjsunit=1))
+        self.assertEqual(summary.timed_out, Counter(mjsunit=1))
+        self.assertEqual(summary.crashed, {"jstests": ["jstests_crash.js"]})
+        self.assertEqual(summary.seeds, Counter(mjsunit=3, jstests=2))
+
+    def test_placeholder_in_argument(self):
+        summary = self.run_filter(
+            ["sh", str(self.fake), "{shims}", "--x={seed}"]
+        )
+        self.assertEqual(summary.kept, Counter(mjsunit=1, jstests=1))
+
+    def test_non_empty_out(self):
+        self.out.mkdir()
+        (self.out / "x").write_text("x")
+        with self.assertRaises(SystemExit):
+            self.run_filter(["sh", str(self.fake), "{shims}", "{seed}"])
+
+    def test_missing_engine(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code = get_seeds.main(
+                [
+                    "filter",
+                    "--cmd",
+                    "no-such-engine-xyz {seed}",
+                    str(self.seeds),
+                    str(self.tmp / "OUT2"),
+                ]
+            )
+        self.assertEqual(code, 2)
+        lines = err.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0].startswith("[-]"))
+        self.assertNotIn("Traceback", err.getvalue())
+
+
+class CountTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = Path(tmp.name)
+        self.seeds = self.tmp / "SEEDS"
+        for suite, name in (
+            ("mjsunit", "mjsunit_ok.js"),
+            ("mjsunit", "mjsunit_bad.js"),
+            ("mjsunit", "mjsunit_slow.js"),
+            ("jstests", "jstests_crash.js"),
+            ("jstests", "jstests_ok.js"),
+        ):
+            (self.seeds / suite).mkdir(parents=True, exist_ok=True)
+            (self.seeds / suite / name).write_text("x")
+
+    def test_count_by_suite(self):
+        self.assertEqual(
+            get_seeds.count_by_suite(self.seeds),
+            Counter(mjsunit=3, jstests=2),
+        )
+
+    def test_count_table(self):
+        trees = self.tmp / "TREES"
+        trees.mkdir()
+        (trees / "mjsunit_ok.js").write_text("t")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = get_seeds.main(["count", str(self.seeds), str(trees)])
+        self.assertEqual(code, 0)
+        rows = [line.split() for line in out.getvalue().splitlines()]
+        self.assertEqual(rows[0], ["Suite", "Seeds", "Trees"])
+        self.assertIn(["jstests", "2", "0"], rows)
+        self.assertIn(["mjsunit", "3", "1"], rows)
+        self.assertEqual(rows[-1], ["total", "5", "1"])
+
+    def test_count_without_trees(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            get_seeds.main(["count", str(self.seeds)])
+        rows = [line.split() for line in out.getvalue().splitlines()]
+        self.assertEqual(rows[0], ["Suite", "Seeds"])
+        self.assertEqual(rows[-1], ["total", "5"])
+
+
 if __name__ == "__main__":
     unittest.main()

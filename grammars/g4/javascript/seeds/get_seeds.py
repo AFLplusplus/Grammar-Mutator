@@ -27,12 +27,16 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
+import shlex
 import shutil
+import signal
 import subprocess
 import sys
 from collections import Counter
-from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # A runtime call follows one of these characters.
@@ -476,13 +480,231 @@ def _fetch(dest: Path) -> int:
     return 0
 
 
+# The time limit of one engine run in seconds (AFL++ EXEC_TIMEOUT).
+DEFAULT_TIMEOUT_S = 1.0
+
+
+def suite_of(name: str) -> str:
+    """Return the suite of a seed name: the text before the first `_`."""
+    return name.split("_", 1)[0]
+
+
+@dataclass
+class FilterSummary:
+    seeds: Counter
+    kept: Counter
+    failed: Counter
+    timed_out: Counter
+    crashed: dict
+    signals: dict = field(default_factory=dict)
+
+
+def _run_one(argv: list[str], timeout: float) -> str:
+    """Run the engine once. Return ok, failed, timeout, or crash:<name>."""
+    # A new session gives the run its own process group. A time-out then
+    # also stops the children of the engine command.
+    proc = subprocess.Popen(
+        argv,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    try:
+        proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        proc.communicate()
+        return "timeout"
+    if proc.returncode == 0:
+        return "ok"
+    if proc.returncode < 0:
+        try:
+            name = signal.Signals(-proc.returncode).name
+        except ValueError:
+            name = "signal %d" % -proc.returncode
+        return "crash:" + name
+    return "failed"
+
+
+def run_filter(
+    template: list[str],
+    shims: Path,
+    seeds_dir: Path,
+    out_dir: Path,
+    timeout: float,
+    jobs: int,
+) -> FilterSummary:
+    """Copy the seeds that the engine runs in time to `out_dir`.
+
+    `template` is the engine command. `{shims}` and `{seed}` in its
+    arguments become the shims path and the seed path.
+    """
+    if out_dir.exists() and any(out_dir.iterdir()):
+        raise SystemExit("[-] %s is not empty" % out_dir)
+    files = sorted(p for p in seeds_dir.rglob("*") if p.is_file())
+
+    def work(path: Path) -> str:
+        argv = [
+            arg.replace("{shims}", str(shims)).replace("{seed}", str(path))
+            for arg in template
+        ]
+        return _run_one(argv, timeout)
+
+    summary = FilterSummary(
+        Counter(), Counter(), Counter(), Counter(), {}
+    )
+    with ThreadPoolExecutor(max(1, jobs)) as pool:
+        results = list(pool.map(work, files))
+    for path, result in zip(files, results):
+        suite = suite_of(path.name)
+        summary.seeds[suite] += 1
+        if result == "ok":
+            summary.kept[suite] += 1
+            target = out_dir / path.relative_to(seeds_dir)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(str(path), str(target))
+        elif result == "timeout":
+            summary.timed_out[suite] += 1
+        elif result.startswith("crash:"):
+            summary.crashed.setdefault(suite, []).append(path.name)
+            summary.signals[path.name] = result[6:]
+        else:
+            summary.failed[suite] += 1
+    return summary
+
+
+def count_by_suite(folder: Path) -> Counter:
+    """Count the regular files under `folder` for each suite."""
+    counts: Counter = Counter()
+    for path in folder.rglob("*"):
+        if path.is_file():
+            counts[suite_of(path.name)] += 1
+    return counts
+
+
+def _table(header: list[str], rows: list[list[str]]) -> str:
+    widths = [
+        max(len(row[i]) for row in [header] + rows)
+        for i in range(len(header))
+    ]
+    lines = []
+    for row in [header] + rows:
+        cells = [
+            cell.ljust(widths[0]) if i == 0 else cell.rjust(widths[i])
+            for i, cell in enumerate(row)
+        ]
+        lines.append("  ".join(cells).rstrip())
+    return "\n".join(lines)
+
+
+def _filter(args: argparse.Namespace) -> int:
+    template = shlex.split(args.cmd)
+    if not template:
+        print("[-] Empty --cmd", file=sys.stderr)
+        return 2
+    engine = template[0]
+    if shutil.which(engine) is None:
+        print("[-] Cannot run %s" % engine, file=sys.stderr)
+        return 2
+    shims = args.shims or args.seeds.parent / "shims.js"
+    if not shims.is_file():
+        print("[-] Cannot find the shims file %s" % shims, file=sys.stderr)
+        return 2
+    summary = run_filter(
+        template,
+        shims,
+        args.seeds,
+        args.out,
+        args.timeout,
+        args.jobs,
+    )
+    names = sorted(summary.seeds)
+    rows = []
+    for name in names:
+        rows.append(
+            [name]
+            + [
+                str(counter[name])
+                for counter in (
+                    summary.seeds,
+                    summary.kept,
+                    summary.failed,
+                    summary.timed_out,
+                )
+            ]
+            + [str(len(summary.crashed.get(name, [])))]
+        )
+    total = ["total"] + [
+        str(sum(int(row[i]) for row in rows)) for i in range(1, 6)
+    ]
+    print(
+        _table(
+            ["Suite", "Seeds", "Kept", "Failed", "Timeout", "Crash"],
+            rows + [total],
+        )
+    )
+    for name in sorted(summary.crashed):
+        for file in sorted(summary.crashed[name]):
+            print("crash %s: %s (%s)" % (name, file, summary.signals[file]))
+    return 0
+
+
+def _count(args: argparse.Namespace) -> int:
+    seeds = count_by_suite(args.seeds)
+    trees = Counter()
+    header = ["Suite", "Seeds"]
+    if args.trees is not None:
+        trees = Counter(
+            suite_of(p.name) for p in args.trees.iterdir() if p.is_file()
+        )
+        header.append("Trees")
+    rows = []
+    for name in sorted(set(seeds) | set(trees)):
+        row = [name, str(seeds[name])]
+        if args.trees is not None:
+            row.append(str(trees[name]))
+        rows.append(row)
+    total = ["total", str(sum(seeds.values()))]
+    if args.trees is not None:
+        total.append(str(sum(trees.values())))
+    print(_table(header, rows + [total]))
+    return 0
+
+
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description="Turn engine test suites into JavaScript seeds.")
+    parser = argparse.ArgumentParser(
+        description="Turn engine test suites into JavaScript seeds."
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     fetch = sub.add_parser("fetch", help="download the suites, select seeds")
     fetch.add_argument("dest", type=Path, help="working folder")
+    filt = sub.add_parser("filter", help="keep seeds that an engine runs")
+    filt.add_argument(
+        "--cmd",
+        required=True,
+        help="engine command; {shims} and {seed} are placeholders",
+    )
+    filt.add_argument("--shims", type=Path, help="default: SEEDS/../shims.js")
+    filt.add_argument(
+        "--timeout", type=float, default=DEFAULT_TIMEOUT_S, metavar="S"
+    )
+    filt.add_argument(
+        "-j", "--jobs", type=int, default=os.cpu_count() or 1, metavar="N"
+    )
+    filt.add_argument("seeds", type=Path, help="folder of seeds")
+    filt.add_argument("out", type=Path, help="empty folder for kept seeds")
+    count = sub.add_parser("count", help="count seeds for each suite")
+    count.add_argument("seeds", type=Path, help="folder of seeds")
+    count.add_argument("trees", type=Path, nargs="?", help="folder of trees")
     args = parser.parse_args(argv)
-    # Each later subcommand adds a branch here.
+    if args.command == "filter":
+        return _filter(args)
+    if args.command == "count":
+        return _count(args)
     return _fetch(args.dest)
 
 
