@@ -18,6 +18,7 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import string
 import sys
 import tempfile
 import unittest
@@ -102,9 +103,10 @@ class ReportTest(unittest.TestCase):
         out = self.render()
         self.assertIn("| ruby | 0 | 131 | 3 | 9.0 | 1.0 | – | 2.1 | 0.5 |", out)
         self.assertIn("| ruby | 244 | 344 | 175 | 4,641 | 5.7 | 15 | 6.5 | 5.7 |", out)
-        self.assertIn("| javascript | a.js | 635 | 19 | 31 | 7.8 | 23 | 69 | 10 |", out)
+        js_row = "| javascript | a.js | 635 | 19 | 31 | 7.8 | 23 | 69 | 10 |"
+        self.assertIn(js_row, out)
         # one table for all grammars: the javascript row comes first
-        self.assertLess(out.index("| javascript | a.js | 635"), out.index("| ruby | 0 | 131"))
+        self.assertLess(out.index(js_row), out.index("| ruby | 0 | 131"))
 
     def test_missing_stage_and_elapsed(self) -> None:
         out = self.render()
@@ -381,6 +383,8 @@ class ReportTest(unittest.TestCase):
         )
         self.assertLess(out.index("## Runs"), out.index("Warning:"))
         self.assertLess(out.index("Warning:"), out.index("## Time per output"))
+        self.assertIn("optimization.\n\n## Time per output", out)
+        self.assertNotIn("\n\n\n", out)
 
     def test_help_and_unknown_option(self) -> None:
         out = io.StringIO()
@@ -420,6 +424,7 @@ class ReportTest(unittest.TestCase):
         (self.dir / "ruby-digest.txt").unlink()
         out = self.render()
         self.assertIn("## Digests\n\nNo digest in this result.\n", out)
+        self.assertNotIn("\n\n\n", out)
         for name in ("ruby-run.txt", "javascript-run.txt"):
             (self.dir / name).unlink()
         write(self.dir, "ruby-digest.txt", RUBY_DIGEST)
@@ -427,18 +432,38 @@ class ReportTest(unittest.TestCase):
         for heading in ("Time per output", "Duplicates", "Memory"):
             self.assertIn(f"## {heading}\n", out)
         self.assertEqual(out.count("No run in this result."), 3)
+        self.assertNotIn("\n\n\n", out)
+        # the Runs table still lists the digest
+        self.assertIn("| ruby | digest | `-n 200 -t 20` | 300 | 300 | – |", out)
+
+    def test_mixed_grammars(self) -> None:
+        # javascript has only a digest, ruby has a run and a digest
+        (self.dir / "javascript-run.txt").unlink()
+        js_digest = RUBY_DIGEST.replace("grammar=ruby", "grammar=javascript")
+        write(self.dir, "javascript-digest.txt", js_digest)
+        out = self.render()
+        self.assertIn("| javascript | digest | `-n 200 -t 20` |", out)
+        self.assertIn("| javascript | `-n 200 -t 20` | 1,613,412 |", out)
+        times = out[out.index("## Time per output") : out.index("## Duplicates")]
+        memory = out[out.index("## Memory") : out.index("## Digests")]
+        self.assertNotIn("| javascript |", times)
+        self.assertNotIn("| javascript |", memory)
+        self.assertIn("| ruby | 0 | 131 |", times)
+        self.assertNotIn("\n\n\n", out)
 
     def test_template_has_only_named_fields(self) -> None:
-        import string
-
         names = [f[1] for f in string.Formatter().parse(report.REPORT) if f[1]]
-        self.assertEqual(
-            sorted(names),
-            sorted(
-                ["platform", "runs", "warnings", "times", "rates", "memory",
-                 "digests", "note"]
-            ),
-        )
+        expected = [
+            "platform",
+            "runs",
+            "warnings",
+            "times",
+            "rates",
+            "memory",
+            "digests",
+            "note",
+        ]
+        self.assertEqual(sorted(names), sorted(expected))
 
     def test_usage(self) -> None:
         self.assertEqual(run_main([]), 2)
