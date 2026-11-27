@@ -16,6 +16,8 @@
 
  */
 
+#include <errno.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -54,6 +56,40 @@ static const char *grammar_name(const char *argv0) {
   if (strncmp(base, prefix, sizeof(prefix) - 1) != 0) return "unknown";
   base += sizeof(prefix) - 1;
   return *base ? base : "unknown";
+
+}
+
+// The signal that asked the program to stop, or 0. The handler restores the
+// default action, so that a second signal stops the program at once.
+static volatile sig_atomic_t stop_signal = 0;
+
+static void on_signal(int sig) {
+
+  stop_signal = sig;
+  signal(sig, SIG_DFL);
+
+}
+
+static void install_signal_handlers(void) {
+
+  struct sigaction action;
+  memset(&action, 0, sizeof(action));
+  action.sa_handler = on_signal;
+  sigemptyset(&action.sa_mask);
+  sigaction(SIGINT, &action, NULL);
+  sigaction(SIGTERM, &action, NULL);
+
+}
+
+static bool stopped(void) {
+
+  return stop_signal != 0;
+
+}
+
+static void no_memory(void) {
+
+  fprintf(stderr, "Out of memory\n");
 
 }
 
@@ -162,12 +198,14 @@ static int mode_parse(int argc, char **argv) {
   int status = 0;
   for (int i = 0; i < argc; ++i) {
 
-    size_t   len = 0;
+    size_t len = 0;
+    errno = 0;
     uint8_t *buf = read_file(argv[i], &len);
     printf("parse file=");
     print_value(stdout, argv[i]);
     if (!buf) {
 
+      fprintf(stderr, "%s: %s\n", argv[i], strerror(errno ? errno : ENOMEM));
       printf(" bytes=0 nodes=0 us=0.0 result=error\n");
       status = 1;
       continue;
@@ -210,10 +248,27 @@ static bool parse_options(int argc, char **argv, bool with_entries,
   opt->trims = 1000;
   *dir = NULL;
   int i = 0;
-  for (; i < argc && argv[i][0] == '-' && argv[i][1] != '\0'; i += 2) {
+  while (i < argc) {
 
+    if (strcmp(argv[i], "--") == 0) {
+
+      ++i;
+      break;
+
+    }
+
+    if (argv[i][0] != '-' || argv[i][1] == '\0') break;
     char flag = argv[i][1];
-    if (argv[i][2] != '\0' || i + 1 >= argc) return false;
+    // The value is attached to the flag (-n200) or the next argument
+    const char *text = argv[i] + 2;
+    ++i;
+    if (*text == '\0') {
+
+      if (i >= argc) return false;
+      text = argv[i++];
+
+    }
+
     uint64_t *target = NULL;
     uint64_t  min = 0;
     if (flag == 's')
@@ -227,8 +282,7 @@ static bool parse_options(int argc, char **argv, bool with_entries,
     else
       return false;
     uint64_t value;
-    if (!parse_count(argv[i + 1], UINT32_MAX, &value) || value < min)
-      return false;
+    if (!parse_count(text, UINT32_MAX, &value) || value < min) return false;
     *target = value;
 
   }
@@ -262,12 +316,19 @@ static int compare_names(const void *a, const void *b) {
 
 }
 
-// Join a folder and a name. Return NULL if there is no memory.
+// Join a folder and a name. Return NULL (with a message) if there is no memory.
 static char *join_path(const char *dir, const char *name) {
 
   size_t len = strlen(dir) + strlen(name) + 2;
   char  *path = malloc(len);
-  if (path) snprintf(path, len, "%s/%s", dir, name);
+  if (!path) {
+
+    no_memory();
+    return NULL;
+
+  }
+
+  snprintf(path, len, "%s/%s", dir, name);
   return path;
 
 }
@@ -304,6 +365,7 @@ static bool seed_list_load(const char *dir, seed_list_t *list) {
       char **bigger = realloc(list->names, cap * sizeof(char *));
       if (!bigger) {
 
+        no_memory();
         ok = false;
         break;
 
@@ -316,6 +378,7 @@ static bool seed_list_load(const char *dir, seed_list_t *list) {
     char *name = strdup(entry->d_name);
     if (!name) {
 
+      no_memory();
       ok = false;
       break;
 
@@ -339,6 +402,17 @@ static bool seed_list_load(const char *dir, seed_list_t *list) {
 
 }
 
+// Write a whole file. Return false on an error.
+static bool write_file(const char *path, const uint8_t *buf, size_t len) {
+
+  FILE *fp = fopen(path, "wb");
+  if (!fp) return false;
+  bool ok = fwrite(buf, 1, len, fp) == len;
+  if (fclose(fp) != 0) ok = false;
+  return ok;
+
+}
+
 // Make the work folder and copy the seeds to its queue folder. Return the path
 // of the work folder, or NULL on an error. The caller removes the folder.
 static char *work_create(const char *seed_dir, const seed_list_t *seeds) {
@@ -347,7 +421,13 @@ static char *work_create(const char *seed_dir, const seed_list_t *seeds) {
   if (!tmp || !*tmp) tmp = "/tmp";
   size_t len = strlen(tmp) + sizeof("/benchmark.XXXXXX");
   char  *work = malloc(len);
-  if (!work) return NULL;
+  if (!work) {
+
+    no_memory();
+    return NULL;
+
+  }
+
   snprintf(work, len, "%s/benchmark.XXXXXX", tmp);
   if (!mkdtemp(work)) {
 
@@ -365,9 +445,7 @@ static char *work_create(const char *seed_dir, const seed_list_t *seeds) {
     char    *to = join_path(queue, seeds->names[i]);
     size_t   size = 0;
     uint8_t *buf = from ? read_file(from, &size) : NULL;
-    FILE    *fp = (buf && to) ? fopen(to, "wb") : NULL;
-    ok = fp && fwrite(buf, 1, size, fp) == size;
-    if (fp && fclose(fp) != 0) ok = false;
+    ok = buf && to && write_file(to, buf, size);
     if (!ok) fprintf(stderr, "Cannot copy the seed %s\n", seeds->names[i]);
     free(buf);
     free(from);
@@ -453,6 +531,28 @@ static long peak_rss_kb(void) {
 
 }
 
+// The mutator keeps the pointer of the last path in filename_cur. The path
+// stays alive until the next queue_get call or until bench_close.
+static char *kept_path;
+
+// Call afl_custom_queue_get with a copy of the path. Return 0 on an error.
+static uint8_t queue_get(my_mutator_t *data, const char *path) {
+
+  char *copy = strdup(path);
+  if (!copy) {
+
+    no_memory();
+    return 0;
+
+  }
+
+  uint8_t result = afl_custom_queue_get(data, (const uint8_t *)copy);
+  free(kept_path);
+  kept_path = copy;
+  return result;
+
+}
+
 // Say if a trim step is a success. It gets the output of the trim step.
 typedef bool (*trim_rule_t)(void *ctx, size_t step, const uint8_t *out,
                             size_t len);
@@ -469,6 +569,7 @@ static bool trim_entry(my_mutator_t *data, trim_rule_t rule, void *ctx,
   int32_t cur = 0;
   while (cur < max) {
 
+    if (stopped()) return false;
     uint8_t *out = NULL;
     double   begin = now_us();
     size_t   len = afl_custom_trim(data, &out);
@@ -503,6 +604,78 @@ typedef struct {
 static const char *const stage_names[] = {"rules", "random", "recursive",
                                           "splice"};
 
+// Run the planned fuzz calls of the current entry and print one stage record
+// for each stage with planned steps. Every output counts toward the stage that
+// the mutator has before the call. For an output that is not NULL, this is the
+// stage of afl_custom_describe. A NULL output has no other stage to count
+// toward. After the last stage (the rules stage ended early), the output counts
+// toward the last stage. Return false on an error.
+static bool measure_stages(my_mutator_t *data, const char *name,
+                           uint32_t planned, const size_t steps[4],
+                           uint64_t same) {
+
+  hash_set_t *sets[4] = {NULL};
+  bool        ok = true;
+  for (int i = 0; i < 4; ++i) {
+
+    sets[i] = hash_set_create();
+    if (!sets[i]) {
+
+      no_memory();
+      ok = false;
+
+    }
+
+  }
+
+  size_t outputs[4] = {0}, total_bytes[4] = {0}, dups[4] = {0}, sames[4] = {0};
+  double us[4] = {0};
+  for (uint32_t k = 0; ok && k < planned; ++k) {
+
+    if (stopped()) {
+
+      ok = false;
+      break;
+
+    }
+
+    uint8_t stage = data->cur_fuzzing_stage;
+    if (stage > 3) stage = 3;
+    uint8_t *out = NULL;
+    double   begin = now_us();
+    size_t   out_len = afl_custom_fuzz(data, NULL, 0, &out, NULL, 0, 1 << 20);
+    double   elapsed = now_us() - begin;
+    if (!out) out_len = 0;
+    uint64_t hash = hash_bytes(out ? (const void *)out : "", out_len);
+    ++outputs[stage];
+    us[stage] += elapsed;
+    total_bytes[stage] += out_len;
+    if (!hash_set_add(sets[stage], hash)) ++dups[stage];
+    if (hash == same) ++sames[stage];
+
+  }
+
+  for (int i = 0; ok && i < 4; ++i) {
+
+    if (steps[i] == 0) continue;
+    size_t n = outputs[i] > 0 ? outputs[i] : 1;
+    printf("stage entry=");
+    print_value(stdout, name);
+    printf(
+        " stage=%s steps=%zu us_per_output=%.1f avg_bytes=%zu "
+        "dup_pct=%.1f same_pct=%.1f\n",
+        stage_names[i], steps[i], us[i] / (double)n, total_bytes[i] / n,
+        (double)dups[i] * 100.0 / (double)n,
+        (double)sames[i] * 100.0 / (double)n);
+
+  }
+
+  for (int i = 0; i < 4; ++i)
+    if (sets[i]) hash_set_free(sets[i]);
+  return ok;
+
+}
+
 // Measure one entry: print the entry, stage, and trim records
 static bool measure_entry(my_mutator_t *data, const char *queue,
                           const char *name) {
@@ -522,8 +695,11 @@ static bool measure_entry(my_mutator_t *data, const char *queue,
   uint64_t same = hash_bytes(bytes, len);
   free(bytes);
 
+  // Pick the entry once untimed. Then the timed pick frees the tree of this
+  // entry, not the last seed, so repick_us follows the size of the entry.
+  queue_get(data, path);
   double begin = now_us();
-  afl_custom_queue_get(data, (const uint8_t *)path);
+  queue_get(data, path);
   double repick_us = now_us() - begin;
   free(path);
   size_t nodes = 0;
@@ -545,67 +721,23 @@ static bool measure_entry(my_mutator_t *data, const char *queue,
   begin = now_us();
   uint32_t planned = afl_custom_fuzz_count(data, NULL, 0);
   double   count_us = now_us() - begin;
-  size_t   steps[4] = {data->total_rules_mutation_steps,
-                       data->total_random_mutation_steps,
-                       data->total_random_recursive_mutation_steps,
-                       data->total_splicing_mutation_steps};
+  // With no planned output, the counts of the previous entry are stale
+  size_t steps[4] = {0};
+  if (planned > 0) {
+
+    steps[0] = data->total_rules_mutation_steps;
+    steps[1] = data->total_random_mutation_steps;
+    steps[2] = data->total_random_recursive_mutation_steps;
+    steps[3] = data->total_splicing_mutation_steps;
+
+  }
 
   printf("entry name=");
   print_value(stdout, name);
   printf(" bytes=%zu nodes=%zu rules_pairs=%zu repick_us=%.1f count_us=%.1f\n",
          len, nodes, rules_pairs, repick_us, count_us);
 
-  hash_set_t *sets[4] = {NULL};
-  for (int i = 0; i < 4; ++i)
-    sets[i] = hash_set_create();
-  double outputs[4] = {0}, us[4] = {0}, total_bytes[4] = {0};
-  double dups[4] = {0}, sames[4] = {0};
-  bool   ok = true;
-  for (int i = 0; i < 4; ++i)
-    if (!sets[i]) ok = false;
-  for (uint32_t k = 0; ok && k < planned; ++k) {
-
-    uint8_t *out = NULL;
-    begin = now_us();
-    size_t  out_len = afl_custom_fuzz(data, NULL, 0, &out, NULL, 0, 1 << 20);
-    double  elapsed = now_us() - begin;
-    uint8_t stage = data->described_stage;
-    if (stage > 3) {
-
-      fprintf(stderr, "An output has no stage\n");
-      ok = false;
-      break;
-
-    }
-
-    if (!out) out_len = 0;
-    uint64_t hash = hash_bytes(out ? (const void *)out : "", out_len);
-    outputs[stage] += 1;
-    us[stage] += elapsed;
-    total_bytes[stage] += (double)out_len;
-    if (!hash_set_add(sets[stage], hash)) dups[stage] += 1;
-    if (hash == same) sames[stage] += 1;
-
-  }
-
-  for (int i = 0; ok && i < 4; ++i) {
-
-    if (steps[i] == 0) continue;
-    double n = outputs[i] > 0 ? outputs[i] : 1;
-    printf("stage entry=");
-    print_value(stdout, name);
-    printf(
-        " stage=%s steps=%zu us_per_output=%.1f avg_bytes=%llu "
-        "dup_pct=%.1f same_pct=%.1f\n",
-        stage_names[i], steps[i], us[i] / n,
-        (unsigned long long)(total_bytes[i] / n), dups[i] * 100.0 / n,
-        sames[i] * 100.0 / n);
-
-  }
-
-  for (int i = 0; i < 4; ++i)
-    if (sets[i]) hash_set_free(sets[i]);
-  if (!ok) return false;
+  if (!measure_stages(data, name, planned, steps, same)) return false;
 
   size_t trim_steps;
   double trim_us;
@@ -618,7 +750,8 @@ static bool measure_entry(my_mutator_t *data, const char *queue,
 
 }
 
-// The ranks of the entries to measure: sorted by (bytes, name)
+// The seed names and sizes that compare_by_size reads. The qsort call has no
+// argument for them. The entries are ranked by (bytes, name).
 static const seed_list_t *sort_seeds;
 static const seed_info_t *sort_infos;
 
@@ -667,10 +800,13 @@ static int bench_open(bench_ctx_t *ctx, const char *prog, bool with_entries,
 
   ctx->work = work_create(ctx->seed_dir, &ctx->seeds);
   if (!ctx->work) return 1;
+  // From here, a signal ends the run through the cleanup of the work folder
+  install_signal_handlers();
   ctx->queue = join_path(ctx->work, "queue");
   if (!ctx->queue) return 1;
   set_step_variables(ctx->opt.steps, ctx->opt.trims);
   ctx->data = afl_custom_init(NULL, (unsigned)ctx->opt.seed);
+  if (!ctx->data) fprintf(stderr, "Cannot start the mutator\n");
   return ctx->data ? 0 : 1;
 
 }
@@ -679,6 +815,8 @@ static int bench_open(bench_ctx_t *ctx, const char *prog, bool with_entries,
 static void bench_close(bench_ctx_t *ctx) {
 
   if (ctx->data) afl_custom_deinit(ctx->data);
+  free(kept_path);
+  kept_path = NULL;
   free(ctx->queue);
   if (ctx->work) remove_directory(ctx->work);
   free(ctx->work);
@@ -706,18 +844,24 @@ static int mode_run(const char *prog, int argc, char **argv) {
   status = 1;
   seed_info_t *infos = calloc(seeds.count, sizeof(seed_info_t));
   size_t      *order = calloc(seeds.count, sizeof(size_t));
-  if (!infos || !order) goto done;
+  if (!infos || !order) {
+
+    no_memory();
+    goto done;
+
+  }
 
   size_t trees = 0;
   double fill_us = 0;
   for (size_t i = 0; i < seeds.count; ++i) {
 
+    if (stopped()) goto done;
     char       *path = join_path(queue, seeds.names[i]);
     struct stat st;
     if (!path) goto done;
     infos[i].bytes = stat(path, &st) == 0 ? (size_t)st.st_size : 0;
     double begin = now_us();
-    afl_custom_queue_get(data, (const uint8_t *)path);
+    queue_get(data, path);
     infos[i].us = now_us() - begin;
     infos[i].tree = data->tree_cur != NULL;
     fill_us += infos[i].us;
@@ -753,6 +897,13 @@ static int mode_run(const char *prog, int argc, char **argv) {
   size_t last_rank = SIZE_MAX;
   status = 0;
   for (size_t i = 0; i < wanted && status == 0; ++i) {
+
+    if (stopped()) {
+
+      status = 1;
+      break;
+
+    }
 
     size_t rank =
         wanted == 1 ? trees - 1
@@ -826,12 +977,25 @@ static bool digest_entry(my_mutator_t *data, const char *work,
                          const char *entry_file, bool is_seed,
                          digest_t *digest) {
 
-  afl_custom_queue_get(data, (const uint8_t *)entry_file);
+  if (!queue_get(data, entry_file)) {
+
+    fprintf(stderr, "Cannot get the entry %s\n", entry_file);
+    return false;
+
+  }
+
   uint32_t planned = afl_custom_fuzz_count(data, NULL, 0);
   uint8_t *last = NULL;
   size_t   last_len = 0;
   bool     ok = true;
   for (uint32_t k = 0; k < planned; ++k) {
+
+    if (stopped()) {
+
+      ok = false;
+      break;
+
+    }
 
     uint8_t *out = NULL;
     size_t   len = afl_custom_fuzz(data, NULL, 0, &out, NULL, 0, 1 << 20);
@@ -849,6 +1013,7 @@ static bool digest_entry(my_mutator_t *data, const char *work,
       uint8_t *copy = realloc(last, len);
       if (!copy) {
 
+        no_memory();
         ok = false;
         break;
 
@@ -865,18 +1030,20 @@ static bool digest_entry(my_mutator_t *data, const char *work,
   if (ok && last && is_seed) {
 
     char name[32];
-    snprintf(name, sizeof(name), "queue/new_%06zu", digest->new_entries);
+    snprintf(name, sizeof(name), "queue/.new_%06zu", digest->new_entries);
     char *new_file = join_path(work, name);
-    FILE *fp = new_file ? fopen(new_file, "wb") : NULL;
-    ok = fp && fwrite(last, 1, last_len, fp) == last_len;
-    if (fp && fclose(fp) != 0) ok = false;
+    ok = new_file && write_file(new_file, last, last_len);
     if (ok) {
 
+      // The return value says that the file changed (AFL++ API), not an
+      // error, so it is not checked. The last output can be NULL or empty,
+      // so mutated_tree may not be the tree of these bytes. Then the mutator
+      // compares the bytes and parses the file.
       afl_custom_queue_new_entry(data, (const uint8_t *)new_file,
                                  (const uint8_t *)entry_file);
       ++digest->new_entries;
 
-    } else {
+    } else if (new_file) {
 
       fprintf(stderr, "Cannot write the new entry\n");
 
@@ -918,9 +1085,17 @@ static int mode_digest(const char *prog, int argc, char **argv) {
   size_t   trees = 0;
   for (size_t i = 0; i < seeds.count; ++i) {
 
+    if (stopped()) goto done;
     char *path = join_path(queue, seeds.names[i]);
     if (!path) goto done;
-    afl_custom_queue_get(data, (const uint8_t *)path);
+    if (!queue_get(data, path)) {
+
+      fprintf(stderr, "Cannot get the entry %s\n", path);
+      free(path);
+      goto done;
+
+    }
+
     if (!data->tree_cur) {
 
       mix_text(&digest.hash, seeds.names[i]);
@@ -948,7 +1123,7 @@ static int mode_digest(const char *prog, int argc, char **argv) {
   for (size_t i = 0; i < seed_entries; ++i) {
 
     char name[32];
-    snprintf(name, sizeof(name), "queue/new_%06zu", i);
+    snprintf(name, sizeof(name), "queue/.new_%06zu", i);
     char *path = join_path(work, name);
     if (!path) goto done;
     bool ok = digest_entry(data, work, path, false, &digest);
@@ -971,7 +1146,26 @@ done:
 
 }
 
+static int run_mode(int argc, char **argv);
+
 int main(int argc, char **argv) {
+
+  int status = run_mode(argc, argv);
+  if (stopped()) {
+
+    // The mode did its cleanup. Stop with the signal, so that the shell sees
+    // it. The handler restored the default action.
+    fflush(stdout);
+    fprintf(stderr, "Stopped by signal %d\n", (int)stop_signal);
+    raise((int)stop_signal);
+
+  }
+
+  return status;
+
+}
+
+static int run_mode(int argc, char **argv) {
 
   if (argc < 2) return usage(argv[0]);
   const char *mode = argv[1];

@@ -34,6 +34,15 @@ fail() {
   exit 1
 }
 
+# Run a command. Keep its output in the file $1 and its error text in $1.err.
+# The exit status goes to the variable "status".
+capture() {
+  capture_out=$1
+  shift
+  status=0
+  "$@" > "$capture_out" 2> "$capture_out.err" || status=$?
+}
+
 "$gen" 20 1000 "$work/seeds" "$work/trees" 1 > /dev/null
 
 # parse mode: one record for each seed file, each one ok
@@ -44,16 +53,28 @@ count=$(ls "$work/seeds" | wc -l)
 if grep '^parse ' "$work/parse.txt" | grep -v ' result=ok$' > /dev/null; then
   fail "parse: a seed does not give result=ok"
 fi
-grep -Eq '^parse file=[^ ]+ bytes=[0-9]+ nodes=[0-9]+ us=[0-9]+\.[0-9] result=ok$' \
-  "$work/parse.txt" || fail "parse: bad record format"
+# each record: bytes is the size of the file, nodes is more than 0
+while IFS= read -r line; do
+  echo "$line" | grep -Eq '^parse file=[^ ]+ bytes=[0-9]+ nodes=[0-9]+ us=[0-9]+\.[0-9] result=ok$' ||
+    fail "parse: bad record format: $line"
+  file=${line#parse file=}
+  file=${file%% *}
+  bytes=${line#*' bytes='}
+  bytes=${bytes%% *}
+  nodes=${line#*' nodes='}
+  nodes=${nodes%% *}
+  [ "$bytes" -eq "$(wc -c < "$file")" ] || fail "parse: wrong bytes: $line"
+  [ "$nodes" -gt 0 ] || fail "parse: no nodes: $line"
+done < "$work/parse.txt"
 echo "[+] parse prints one ok record for each seed"
 
 # parse mode: an unreadable file gives result=error and exit 1
-status=0
-"$bench" parse "$work/no-such-file" \
-  "$work/seeds/$(ls "$work/seeds" | head -1)" > "$work/parse2.txt" || status=$?
+capture "$work/parse2.txt" "$bench" parse "$work/no-such-file" \
+  "$work/seeds/$(ls "$work/seeds" | head -1)"
 [ "$status" -eq 1 ] || fail "parse: expected exit 1, got $status"
 grep -q ' result=error$' "$work/parse2.txt" || fail "parse: no result=error"
+grep -q "no-such-file: " "$work/parse2.txt.err" ||
+  fail "parse: no reason on stderr for the unreadable file"
 grep -q ' result=ok$' "$work/parse2.txt" || fail "parse: other file not printed"
 echo "[+] parse reports an unreadable file and goes on"
 
@@ -72,8 +93,8 @@ mkdir "$work/seeds/sub"
 echo x > "$work/seeds/sub/a"
 echo x > "$work/seeds/.hidden"
 find "$work/seeds" -type f -exec cksum {} + | sort > "$work/before.txt"
-"$bench" run -e 3 -n 50 -t 20 "$work/seeds" > "$work/run.txt" ||
-  fail "run: nonzero exit"
+capture "$work/run.txt" "$bench" run -e 3 -n 50 -t 20 "$work/seeds"
+[ "$status" -eq 0 ] || fail "run: exit $status"
 grep -Eq '^benchmark version=[^ ]+ grammar='"$name"' system=[^ ]+ machine=[^ ]+ optimized=[01] mode=run seed=0 entries=3 steps=50 trims=20 parse_budget_ms=0 seeds=20 trees=20$' \
   "$work/run.txt" || fail "run: bad header"
 [ "$(grep -c '^seed ' "$work/run.txt")" -eq 20 ] || fail "run: seed records"
@@ -86,13 +107,94 @@ for s in rules random splice; do
 done
 [ "$(grep -c '^trim ' "$work/run.txt")" -eq 3 ] || fail "run: trim records"
 grep -q '^peak rss_kb=[1-9]' "$work/run.txt" || fail "run: peak record"
+# field order and number formats of the records
+num='[0-9]+'
+tm='[0-9]+\.[0-9]'
+grep '^seed ' "$work/run.txt" |
+  grep -Evq "^seed name=[^ ]+ bytes=$num parse_us=$tm tree=[01]\$" &&
+  fail "run: bad seed record"
+grep '^entry ' "$work/run.txt" |
+  grep -Evq "^entry name=[^ ]+ bytes=$num nodes=$num rules_pairs=$num repick_us=$tm count_us=$tm\$" &&
+  fail "run: bad entry record"
+grep '^stage ' "$work/run.txt" |
+  grep -Evq "^stage entry=[^ ]+ stage=(rules|random|recursive|splice) steps=$num us_per_output=$tm avg_bytes=$num dup_pct=$tm same_pct=$tm\$" &&
+  fail "run: bad stage record"
+grep '^trim ' "$work/run.txt" |
+  grep -Evq "^trim entry=[^ ]+ steps=$num us_per_step=$tm\$" &&
+  fail "run: bad trim record"
 find "$work/seeds" -type f -exec cksum {} + | sort | cmp - "$work/before.txt" ||
   fail "run: the seed folder changed"
 echo "[+] run prints the records and leaves the seeds alone"
 
+# run mode: the entries are the smallest, the middle, and the largest seed by
+# bytes (ties by name), as the rank formula (2 * i * (n - 1) + (e - 1)) /
+# (2 * (e - 1)) says. The names are in ascending order of size.
+for file in "$work"/seeds/*; do
+  [ -f "$file" ] && echo "$(wc -c < "$file" | tr -d ' ') ${file##*/}"
+done | LC_ALL=C sort -k1,1n -k2,2 > "$work/sizes.txt"
+awk 'NR == 1 || NR == 11 || NR == 20 { print $2 }' "$work/sizes.txt" \
+  > "$work/expected-entries.txt"
+sed -n 's/^entry name=\([^ ]*\) .*/\1/p' "$work/run.txt" \
+  > "$work/actual-entries.txt"
+cmp "$work/expected-entries.txt" "$work/actual-entries.txt" ||
+  fail "run: -e 3 must pick the smallest, middle, and largest seed"
+echo "[+] run picks the smallest, middle, and largest seed"
+
+# an option value can be attached to its flag, and -- ends the options
+capture "$work/attached.txt" "$bench" run -e3 -n50 -t20 "$work/seeds"
+[ "$status" -eq 0 ] || fail "run -e3 -n50 -t20: exit $status"
+[ "$(grep '^benchmark ' "$work/attached.txt")" = \
+  "$(grep '^benchmark ' "$work/run.txt")" ] ||
+  fail "run: attached values must give the same header"
+capture "$work/dashdash.txt" "$bench" run -e 1 -n 5 -t 5 -- "$work/seeds"
+[ "$status" -eq 0 ] || fail "run -- DIR: exit $status"
+[ "$(grep -c '^entry ' "$work/dashdash.txt")" -eq 1 ] ||
+  fail "run -- DIR: expected one entry"
+echo "[+] run accepts attached option values and --"
+
+# a signal stops the program, removes the work folder, and keeps the signal
+# as the exit status
+mkdir "$work/tmp-int" "$work/tmp-term"
+TMPDIR="$work/tmp-int" "$bench" run -n 1000000 -t 1 -e 1 "$work/seeds" \
+  > /dev/null 2> "$work/int.err" &
+pid_int=$!
+TMPDIR="$work/tmp-term" "$bench" run -n 1000000 -t 1 -e 1 "$work/seeds" \
+  > /dev/null 2> "$work/term.err" &
+pid_term=$!
+sleep 1
+kill -INT "$pid_int"
+kill -TERM "$pid_term"
+status_int=0
+wait "$pid_int" || status_int=$?
+status_term=0
+wait "$pid_term" || status_term=$?
+[ "$status_int" -gt 128 ] || fail "SIGINT: expected a status above 128, got $status_int"
+[ "$status_term" -gt 128 ] || fail "SIGTERM: expected a status above 128, got $status_term"
+[ -s "$work/int.err" ] || fail "SIGINT: no message on stderr"
+[ -s "$work/term.err" ] || fail "SIGTERM: no message on stderr"
+[ -z "$(ls -A "$work/tmp-int")" ] || fail "SIGINT left a work folder behind"
+[ -z "$(ls -A "$work/tmp-term")" ] || fail "SIGTERM left a work folder behind"
+echo "[+] SIGINT and SIGTERM remove the work folder"
+
 # run mode: -e larger than the trees measures each tree once
-[ "$("$bench" run -e 50 -n 5 -t 5 "$work/seeds" | grep -c '^entry ')" -eq 20 ] ||
+capture "$work/many.txt" "$bench" run -e 50 -n 5 -t 5 "$work/seeds"
+[ "$status" -eq 0 ] || fail "run -e 50: exit $status"
+[ "$(grep -c '^entry ' "$work/many.txt")" -eq 20 ] ||
   fail "run: -e 50 must give each tree once"
+
+# zero steps and zero trims
+capture "$work/n0.txt" "$bench" run -e 1 -n 0 -t 5 "$work/seeds"
+[ "$status" -eq 0 ] || fail "run -n 0: exit $status"
+if grep -q '^stage ' "$work/n0.txt"; then fail "run -n 0: a stage record"; fi
+[ "$(grep -c '^trim ' "$work/n0.txt")" -eq 1 ] || fail "run -n 0: no trim record"
+capture "$work/t0.txt" "$bench" run -e 1 -n 5 -t 0 "$work/seeds"
+[ "$status" -eq 0 ] || fail "run -t 0: exit $status"
+grep -Eq '^trim entry=[^ ]+ steps=0 ' "$work/t0.txt" ||
+  fail "run -t 0: expected trim steps=0"
+capture "$work/d0.txt" "$bench" digest -n 0 -t 0 "$work/seeds"
+[ "$status" -eq 0 ] || fail "digest -n 0 -t 0: exit $status"
+# A NULL or empty last output cannot be made with ruby.json, so no test here
+# runs the NULL branches of the digest and run modes.
 echo "[+] run measures each tree once if -e is large"
 
 # run mode: bad input
@@ -100,8 +202,9 @@ for args in "run -e 0 $work/seeds" "run -n abc $work/seeds" "run" \
   "nosuchmode $work/seeds"; do
   status=0
   # shellcheck disable=SC2086
-  "$bench" $args > /dev/null 2>&1 || status=$?
+  "$bench" $args > /dev/null 2> "$work/err.txt" || status=$?
   [ "$status" -eq 2 ] || fail "'$args': expected exit 2, got $status"
+  grep -q '^Usage:' "$work/err.txt" || fail "'$args': no usage text"
 done
 mkdir "$work/empty"
 status=0
@@ -115,20 +218,43 @@ echo "[+] run rejects bad input and leaves no work folder"
 
 # digest mode: the same input gives the same hash, in another work folder
 rm -rf "$work/seeds/sub" "$work/seeds/.hidden"
-d1=$("$bench" digest -n 50 -t 10 "$work/seeds") || fail "digest: nonzero exit"
+capture "$work/d1.txt" "$bench" digest -n 50 -t 10 "$work/seeds"
+[ "$status" -eq 0 ] || fail "digest: exit $status"
 mkdir "$work/tmp2"
-d2=$(TMPDIR="$work/tmp2" "$bench" digest -n 50 -t 10 "$work/seeds")
-echo "$d1" | grep -Eq '^benchmark .* mode=digest seed=0 steps=50 trims=10 parse_budget_ms=0 seeds=20 trees=20$' ||
-  fail "digest: bad header"
-echo "$d1" | grep -Eq '^digest outputs=[1-9][0-9]* new_entries=20 trims=[1-9][0-9]* hash=[0-9a-f]{16}$' ||
-  fail "digest: bad record"
-[ "$(echo "$d1" | grep '^digest ')" = "$(echo "$d2" | grep '^digest ')" ] ||
+TMPDIR="$work/tmp2" capture "$work/d2.txt" "$bench" digest -n 50 -t 10 "$work/seeds"
+[ "$status" -eq 0 ] || fail "digest in another work folder: exit $status"
+grep -Eq '^benchmark .* mode=digest seed=0 steps=50 trims=10 parse_budget_ms=0 seeds=20 trees=20$' \
+  "$work/d1.txt" || fail "digest: bad header"
+grep -Eq '^digest outputs=[1-9][0-9]* new_entries=20 trims=[1-9][0-9]* hash=[0-9a-f]{16}$' \
+  "$work/d1.txt" || fail "digest: bad record"
+d1=$(grep '^digest ' "$work/d1.txt")
+[ "$d1" = "$(grep '^digest ' "$work/d2.txt")" ] ||
   fail "digest: the hash depends on the work folder"
 # another random seed gives another hash
-d3=$("$bench" digest -n 50 -t 10 -s 1 "$work/seeds" | grep '^digest ' |
-  sed 's/.*hash=//')
-[ "$d3" != "$(echo "$d1" | grep '^digest ' | sed 's/.*hash=//')" ] ||
+capture "$work/d3.txt" "$bench" digest -n 50 -t 10 -s 1 "$work/seeds"
+[ "$status" -eq 0 ] || fail "digest -s 1: exit $status"
+[ "$(grep '^digest ' "$work/d3.txt")" != "$d1" ] ||
   fail "digest: another random seed gives the same hash"
+# a new entry never replaces a seed, also if a seed has the name of an entry.
+# The names "9" and "zz9" sort last in the same way, so the content in the
+# same order must give the same record.
+mkdir "$work/shadow-a" "$work/shadow-b"
+for file in "$work"/seeds/*; do
+  base=${file##*/}
+  if [ "$base" = 9 ]; then
+    cp "$file" "$work/shadow-a/new_000000"
+    cp "$file" "$work/shadow-b/zz9"
+  else
+    cp "$file" "$work/shadow-a/$base"
+    cp "$file" "$work/shadow-b/$base"
+  fi
+done
+capture "$work/sa.txt" "$bench" digest -n 50 -t 10 "$work/shadow-a"
+[ "$status" -eq 0 ] || fail "digest shadow-a: exit $status"
+capture "$work/sb.txt" "$bench" digest -n 50 -t 10 "$work/shadow-b"
+[ "$status" -eq 0 ] || fail "digest shadow-b: exit $status"
+[ "$(grep '^digest ' "$work/sa.txt")" = "$(grep '^digest ' "$work/sb.txt")" ] ||
+  fail "digest: a seed named new_000000 changed the digest"
 # -e is not a digest option
 status=0
 "$bench" digest -e 3 "$work/seeds" > /dev/null 2>&1 || status=$?
@@ -165,10 +291,10 @@ echo "[+] run and digest reject seeds without a tree"
 mkdir "$work/mixed"
 cp "$work"/seeds/* "$work/mixed/"
 printf '\377' > "$work/mixed/zz-bad"
-dm=$("$bench" digest -n 50 -t 10 "$work/mixed") || fail "digest mixed: exit"
-echo "$dm" | grep '^benchmark ' | grep -q ' seeds=21 trees=20$' ||
+capture "$work/dm.txt" "$bench" digest -n 50 -t 10 "$work/mixed"
+[ "$status" -eq 0 ] || fail "digest mixed: exit $status"
+grep '^benchmark ' "$work/dm.txt" | grep -q ' seeds=21 trees=20$' ||
   fail "digest mixed: expected seeds=21 trees=20"
-[ "$(echo "$dm" | grep '^digest ' | sed 's/.*hash=//')" != \
-  "$(echo "$d1" | grep '^digest ' | sed 's/.*hash=//')" ] ||
+[ "$(grep '^digest ' "$work/dm.txt")" != "$d1" ] ||
   fail "digest: a seed without a tree must change the hash"
 echo "[+] digest counts a seed without a tree"
