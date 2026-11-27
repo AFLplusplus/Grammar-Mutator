@@ -30,6 +30,7 @@
 
 #include "custom_mutator.h"
 #include "chunk_store_internal.h"
+#include "node_stack.h"
 #include "tree.h"
 #include "tree_mutation.h"
 #include "utils.h"
@@ -68,13 +69,24 @@ static void print_value(FILE *out, const char *s) {
 
 }
 
-// The number of all nodes in a subtree
-static size_t count_nodes(const node_t *node) {
+// The number of all nodes in a tree. It walks with a stack, so a deep tree is
+// safe. Return false if the stack cannot grow.
+static bool count_nodes(node_t *root, size_t *out) {
 
-  size_t count = 1;
-  for (uint32_t i = 0; i < node->subnode_count; ++i)
-    count += count_nodes(node->subnodes[i]);
-  return count;
+  node_stack_t stack = {0};
+  size_t       count = 0;
+  bool         ok = node_stack_push(&stack, root, 0, 0);
+  while (ok && stack.len > 0) {
+
+    node_frame_t frame = node_stack_pop(&stack);
+    ++count;
+    ok = node_stack_push_children(&stack, frame.node, 0);
+
+  }
+
+  node_stack_free(&stack);
+  if (ok) *out = count;
+  return ok;
 
 }
 
@@ -165,9 +177,13 @@ static int mode_parse(int argc, char **argv) {
     double  begin = now_us();
     tree_t *tree = tree_from_buf(buf, len);
     double  elapsed = now_us() - begin;
-    size_t  nodes = tree ? count_nodes(tree->root) : 0;
+    size_t  nodes = 0;
+    bool    counted = !tree || count_nodes(tree->root, &nodes);
     printf(" bytes=%zu nodes=%zu us=%.1f result=%s\n", len, nodes, elapsed,
-           tree ? "ok" : "fail");
+           !counted ? "error"
+           : tree   ? "ok"
+                    : "fail");
+    if (!counted) status = 1;
     if (tree) tree_free(tree);
     free(buf);
 
@@ -386,7 +402,8 @@ static void set_step_variables(uint64_t steps, uint64_t trims) {
     setenv(names[i], value, 1);
   snprintf(value, sizeof(value), "%llu", (unsigned long long)trims);
   setenv("TRIMMING_STEPS", value, 1);
-  setenv("PARSE_TIME_BUDGET_MS", "0", 0);
+  const char *budget = getenv("PARSE_TIME_BUDGET_MS");
+  if (!budget || !*budget) setenv("PARSE_TIME_BUDGET_MS", "0", 1);
 
 }
 
@@ -416,10 +433,10 @@ static void print_header(FILE *out, const char *grammar, const char *mode,
   if (strcmp(mode, "run") == 0)
     fprintf(out, " entries=%llu", (unsigned long long)opt->entries);
   const char *budget = getenv("PARSE_TIME_BUDGET_MS");
-  fprintf(out,
-          " steps=%llu trims=%llu parse_budget_ms=%s seeds=%zu trees=%zu\n",
-          (unsigned long long)opt->steps, (unsigned long long)opt->trims,
-          budget ? budget : "", seeds, trees);
+  fprintf(out, " steps=%llu trims=%llu parse_budget_ms=",
+          (unsigned long long)opt->steps, (unsigned long long)opt->trims);
+  print_value(out, budget ? budget : "");
+  fprintf(out, " seeds=%zu trees=%zu\n", seeds, trees);
 
 }
 
@@ -509,6 +526,21 @@ static bool measure_entry(my_mutator_t *data, const char *queue,
   afl_custom_queue_get(data, (const uint8_t *)path);
   double repick_us = now_us() - begin;
   free(path);
+  size_t nodes = 0;
+  if (!data->tree_cur) {
+
+    fprintf(stderr, "No tree for %s\n", name);
+    return false;
+
+  }
+
+  if (!count_nodes(data->tree_cur->root, &nodes)) {
+
+    fprintf(stderr, "Cannot count the nodes of %s\n", name);
+    return false;
+
+  }
+
   size_t rules_pairs = rules_mutation_count(data->tree_cur);
   begin = now_us();
   uint32_t planned = afl_custom_fuzz_count(data, NULL, 0);
@@ -521,8 +553,7 @@ static bool measure_entry(my_mutator_t *data, const char *queue,
   printf("entry name=");
   print_value(stdout, name);
   printf(" bytes=%zu nodes=%zu rules_pairs=%zu repick_us=%.1f count_us=%.1f\n",
-         len, count_nodes(data->tree_cur->root), rules_pairs, repick_us,
-         count_us);
+         len, nodes, rules_pairs, repick_us, count_us);
 
   hash_set_t *sets[4] = {NULL};
   for (int i = 0; i < 4; ++i)
