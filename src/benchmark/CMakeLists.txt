@@ -19,10 +19,10 @@
 add_executable(benchmark
   benchmark.c)
 target_link_libraries(benchmark
-  PRIVATE grammarmutator
-  PRIVATE -lm)
+  PRIVATE grammarmutator)
 target_include_directories(benchmark
-  PUBLIC ${CMAKE_BINARY_DIR}/f1/include
-  PUBLIC ${CMAKE_SOURCE_DIR}/include)
+  PRIVATE ${CMAKE_SOURCE_DIR}/include
+  PRIVATE ${CMAKE_SOURCE_DIR}/src
+  PRIVATE ${CMAKE_SOURCE_DIR}/third_party/rxi_map)
 set_target_properties(benchmark
   PROPERTIES OUTPUT_NAME "benchmark-${GRAMMAR_FILENAME}")

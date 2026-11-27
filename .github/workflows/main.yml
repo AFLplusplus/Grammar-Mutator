@@ -188,6 +188,14 @@ jobs:
       run: |
         cd ./build
         make test
+    - name: Benchmark program
+      run: BUILD_DIR=build tests/benchmark/test_benchmark.sh ruby
+    - name: Benchmark program under Valgrind
+      run: |
+        build/src/grammar_generator-ruby 20 1000 bench-seeds bench-trees 1
+        valgrind --leak-check=full --errors-for-leak-kinds=definite \
+          --error-exitcode=99 build/src/benchmark/benchmark-ruby digest \
+          -n 20 -t 10 bench-seeds
     - name: Valgrind memcheck on unit testing
       run: |
         cd ./build
@@ -234,6 +242,8 @@ jobs:
     - name: Unit testing
       run: |
         make -f GNUmakefile test
+    - name: Benchmark program
+      run: tests/benchmark/test_benchmark.sh ruby
     - name: Valgrind memcheck on unit testing
       run: |
         make -f GNUmakefile test_memcheck

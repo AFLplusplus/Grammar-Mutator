@@ -5,6 +5,7 @@ test_*
 !python/test_*.py
 !g4/test_*.sh
 !json/test_*.sh
+!benchmark/test_*.sh
 
 # Ignore Valgrind logs
 valgrind_logs/**
