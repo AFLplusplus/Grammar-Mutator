@@ -285,6 +285,22 @@ class BuildSeedsTest(unittest.TestCase):
         self.assertEqual(summary.seeds["mjsunit"], 0)
         self.assertEqual(summary.dropped["mjsunit"], Counter({"slow-parse": 1}))
 
+    def test_exclude_entries_name_suite_files(self) -> None:
+        # A wrong entry excludes nothing and gives no error, so check each
+        # entry against the suite folders.
+        folders = {s.name: s.folders for s in get_seeds.SUITES}
+        for entry in get_seeds.EXCLUDE:
+            suite, _, rel = entry.partition("/")
+            self.assertIn(suite, folders, entry)
+            self.assertTrue(rel.endswith(".js"), entry)
+            self.assertTrue(
+                any(
+                    f == "." or rel.startswith(f + "/")
+                    for f in folders[suite]
+                ),
+                entry,
+            )
+
     def test_write_summary(self) -> None:
         summary = get_seeds.BuildSummary(
             files=Counter({"test262": 3}),
@@ -448,6 +464,103 @@ RUNNER = (
     "vm.runInThisContext(fs.readFileSync(f, 'utf8')); });"
 )
 
+# A seed for each name that the filter run with JerryScript added to
+# shims.js. The seed throws if the shim is missing or does not do its job.
+# A check that needs a newer engine feature runs only if the feature exists.
+_HAS_RAB = 'typeof ArrayBuffer.prototype.resize === "function"'
+ADDED_NAMES = {
+    # test262 harness.
+    "isConstructor": "if (isConstructor(Array) !== true) throw 0;"
+    "if (isConstructor(Math.max) !== false) throw 0;"
+    "if (isConstructor(1) !== false) throw 0;",
+    "fnGlobalObject": "if (fnGlobalObject() !== globalThis) throw 0;",
+    "decimalToPercentHexString":
+    'if (decimalToPercentHexString(10) !== "%0A") throw 0;'
+    'if (decimalToPercentHexString(255) !== "%FF") throw 0;'
+    "decimalToPercentHexString(null);",
+    "testLenientAndStrict":
+    'testLenientAndStrict("globalThis.n = (globalThis.n || 0) + 1");'
+    "if (globalThis.n !== 2) throw 0;",
+    "allowProxyTraps":
+    "var h = allowProxyTraps({get: function () { return 5; }});"
+    "if (new Proxy({}, h).x !== 5) throw 0;"
+    "new Proxy({}, allowProxyTraps());",
+    "$MAX_ITERATIONS": "if (!($MAX_ITERATIONS > 0)) throw 0;",
+    "TemporalHelpers":
+    "TemporalHelpers.assertDuration(1, 2); TemporalHelpers.ISO.plainDate();",
+    "ctors": "if (ctors.indexOf(Int8Array) < 0) throw 0;"
+    "if (ctors.indexOf(BigInt64Array) < 0) throw 0;",
+    "anyTypedArrayConstructors":
+    "if (anyTypedArrayConstructors.indexOf(Float64Array) < 0) throw 0;"
+    "if (anyTypedArrayConstructors.indexOf(BigUint64Array) < 0) throw 0;",
+    "floatArrayConstructors":
+    "if (floatArrayConstructors.indexOf(Float32Array) < 0) throw 0;"
+    "if (floatArrayConstructors.indexOf(Int8Array) >= 0) throw 0;",
+    "typedArrayConstructors":
+    "if (typedArrayConstructors.indexOf(Uint8Array) < 0) throw 0;"
+    "if (typedArrayConstructors.indexOf(BigInt64Array) >= 0) throw 0;",
+    "TypedArray":
+    "if (TypedArray !== Object.getPrototypeOf(Int8Array)) throw 0;",
+    "testWithIntlConstructors":
+    "var n = 0; testWithIntlConstructors(function (C) { n++; });"
+    'if (typeof Intl === "object" && n === 0) throw 0;',
+    "$": 'if ($ !== $262) throw 0; $.agent.start("x"); $.clearKeptObjects();',
+    "$DETACHBUFFER": "var ab = new ArrayBuffer(8); $DETACHBUFFER(ab);"
+    "$DETACHBUFFER(1);"
+    'if (typeof ab.transfer === "function" && ab.byteLength !== 0) throw 0;',
+    "assertThrowsValue":
+    "assertThrowsValue(function () { globalThis.r = 1; }, 1);"
+    "if (globalThis.r !== 1) throw 0;",
+    "CreateResizableArrayBuffer":
+    "var b = CreateResizableArrayBuffer(4, 8);"
+    "if (%s && (b.byteLength !== 4 || b.maxByteLength !== 8)) throw 0;"
+    % _HAS_RAB,
+    "CreateRabForTest": "var b = CreateRabForTest(Int16Array);"
+    "if (%s && (b.byteLength !== 8 || b.maxByteLength !== 16)) throw 0;"
+    "CreateRabForTest({get BYTES_PER_ELEMENT() { throw 1; }});" % _HAS_RAB,
+    "MayNeedBigInt":
+    "if (MayNeedBigInt(new BigInt64Array(1), 2) !== BigInt(2)) throw 0;"
+    "if (MayNeedBigInt(new Int8Array(1), 2) !== 2) throw 0;",
+    "ToNumbers": "var a = ToNumbers([BigInt(1), 2]);"
+    "if (a[0] !== 1 || a[1] !== 2) throw 0; ToNumbers(null);",
+    "CollectValuesAndResize": "var v = [];"
+    "if (CollectValuesAndResize(1, v, null, 9, 9) !== true) throw 0;"
+    "if (v[0] !== 1) throw 0; CollectValuesAndResize(1, null);"
+    "if (%s) { var b = new ArrayBuffer(4, {maxByteLength: 8});"
+    " CollectValuesAndResize(2, v, b, 2, 8);"
+    " if (b.byteLength !== 8) throw 0; }" % _HAS_RAB,
+    # mjsunit and d8.
+    "assertMaglevved": "assertMaglevved(function () {});",
+    "assertNotMaglevved": "assertNotMaglevved(function () {});",
+    "Sandbox": "Sandbox.getAddressOf({});",
+    "Worker": 'var w = new Worker("x", {type: "string"});'
+    "w.postMessage(1); w.getMessage(); w.terminate();",
+    # JSTests: jsc, ChakraCore, Mozilla, and LayoutTests files.
+    "assertToStringOrNativeFunction": "assertToStringOrNativeFunction(1, 2);",
+    "reportCompare": "reportCompare(1, 2, 3);",
+    "testRegExp": "testRegExp([], [], [], [], []);",
+    "shouldBeTrue":
+    'shouldBeTrue("globalThis.s = 1"); if (globalThis.s !== 1) throw 0;',
+    "fiatInt52": "if (fiatInt52(3) !== 3) throw 0;",
+    "createGlobalObject":
+    "if (createGlobalObject() !== globalThis) throw 0;",
+    "runString": 'var o = runString("globalThis.q = 1");'
+    "if (o !== globalThis || globalThis.q !== 1) throw 0;",
+    "testRunner": "testRunner.dumpAsText(); testRunner.waitUntilDone();",
+    "WScript": 'WScript.Echo(1); WScript.LoadScriptFile("x");'
+    "if (WScript.Arguments.length !== 0) throw 0;"
+    'if (WScript.LoadScript("globalThis.w = 1") !== globalThis) throw 0;'
+    "if (globalThis.w !== 1) throw 0; WScript.Quit();",
+    "tc": "var t = []; t[tc++] = 1; if (t[0] !== 1) throw 0;",
+    "TestCase": 'new TestCase("s", "d", 1, 2);',
+}
+for _name in ("description", "startTest", "inSection", "enterFunc",
+              "printBugNumber", "writeHeaderToLog", "printStatus",
+              "AddTestCase", "writeTestCaseResult", "test", "debug",
+              "stopTest", "exitFunc"):
+    ADDED_NAMES[_name] = "%s(1, 2); globalThis.after = 1;" \
+        "if (globalThis.after !== 1) throw 0;" % _name
+
 
 @unittest.skipIf(shutil.which("node") is None, "node is not installed")
 class ShimsTest(unittest.TestCase):
@@ -595,6 +708,66 @@ class ShimsTest(unittest.TestCase):
                 "if (globalThis.message !== undefined) throw 0;"
             ),
             0,
+        )
+
+    def test_added_names(self):
+        # One case for each name that the filter run with JerryScript added.
+        # Each seed throws if the shim does not do its job.
+        for name, seed in ADDED_NAMES.items():
+            with self.subTest(name=name):
+                self.assertEqual(self.run_seed(seed), 0)
+
+    def test_added_asserts_always_replaced(self):
+        for name in ("assertMaglevved", "assertNotMaglevved",
+                     "assertToStringOrNativeFunction", "reportCompare",
+                     "testRegExp"):
+            with self.subTest(name=name):
+                pre = "globalThis.%s = function () { throw 1; };" % name
+                self.assertEqual(self.run_seed("%s(1, 2);" % name, pre), 0)
+
+    def test_nested_sink(self):
+        self.assertEqual(
+            self.run_seed(
+                'd8.file.execute("x.js"); $vm.a.b.c(1);'
+                'new Sandbox.MemoryView(0, 8); console.log.call(null, "");'
+                'if ($vm.a() !== undefined) throw 0;'
+            ),
+            0,
+        )
+
+    def test_console_if_missing(self):
+        self.assertEqual(
+            self.run_seed(
+                'console.log("x"); console.error(1);',
+                "delete globalThis.console;",
+            ),
+            0,
+        )
+
+    def test_create_realm_with_engine_realm(self):
+        pre = (
+            "globalThis.createRealm = function () {"
+            ' return {marker: 1, eval: function (s) { return "E:" + s; }};'
+            " };"
+        )
+        seed = (
+            "var r = $262.createRealm();"
+            "if (r.global.marker !== 1) throw 0;"
+            'if (r.evalScript("x") !== "E:x") throw 0;'
+            'if ($262.evalScript("1 + 1") !== 2) throw 0;'
+            "if (createGlobalObject().marker !== 1) throw 0;"
+        )
+        self.assertEqual(self.run_seed(seed, pre), 0)
+
+    def test_wscript_timeout_runs_callback(self):
+        result = self.run_full(
+            'WScript.SetTimeout(function () { console.log("W-RAN"); });'
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("W-RAN", result.stdout)
+        pre = "globalThis.setTimeout = function () { throw 1; };"
+        self.assertEqual(
+            self.run_seed("WScript.SetTimeout(function () {});", pre), 0
         )
 
 
