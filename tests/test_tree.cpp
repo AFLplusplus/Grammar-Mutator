@@ -761,7 +761,7 @@ TEST_F(TreeTest, MissingTestCaseFileKeepsStatus) {
 
 }
 
-TEST_F(TreeTest, ParserCacheStatesGrowWithAParse) {
+TEST_F(TreeTest, ParserCacheStatesAreStableOnReparse) {
 
   tree_t *gen = gen_init__(0);
   tree_to_buf(gen);

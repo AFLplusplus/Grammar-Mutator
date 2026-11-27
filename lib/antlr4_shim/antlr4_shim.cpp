@@ -171,10 +171,10 @@ bool tree_parser_cache_states(size_t *parser_states, size_t *lexer_states) {
   if (!parser_states || !lexer_states) return false;
 
   try {
-    // A lexer and a parser on an empty input. Their simulators refer to the
+    // Make a lexer and a parser on an empty input. Their simulators refer to the
     // shared static caches. This changes no cache.
-    ANTLRInputStream input("");
-    GrammarLexer     lexer(&input);
+    ANTLRInputStream  input("");
+    GrammarLexer      lexer(&input);
     CommonTokenStream tokens(&lexer);
     GrammarParser     parser(&tokens);
 
@@ -189,7 +189,8 @@ bool tree_parser_cache_states(size_t *parser_states, size_t *lexer_states) {
                          ->_decisionToDFA)
       count += dfa.states.size();
     *lexer_states = count;
-  } catch (std::exception &) {
+  } catch (...) {
+    // No exception may cross the C frames of the caller
     return false;
   }
 

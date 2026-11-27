@@ -45,14 +45,12 @@ bool tree_parser_cache_states(size_t *parser_states, size_t *lexer_states) {
 
   try {
 
-    // A lexer and a parser on an empty input. Their simulators refer to the
+    // Make a lexer and a parser on an empty input. Their simulators refer to the
     // shared static caches. This changes no cache.
     antlr4::ANTLRInputStream input("");
     auto lexer = g4build::grammar.make_lexer(&input);
-    if (!lexer) return false;
     antlr4::CommonTokenStream tokens(lexer.get());
     auto parser = g4build::grammar.make_parser(&tokens);
-    if (!parser) return false;
 
     size_t count = 0;
     for (auto &dfa :
@@ -68,8 +66,9 @@ bool tree_parser_cache_states(size_t *parser_states, size_t *lexer_states) {
       count += dfa.states.size();
     *lexer_states = count;
 
-  } catch (std::exception &) {
+  } catch (...) {
 
+    // No exception may cross the C frames of the caller
     return false;
 
   }
