@@ -134,14 +134,19 @@ NO_SEED = "No seed record in this result."
 NO_DIGEST = "No digest in this result."
 NO_CACHE = "No cache run in this result."
 
-# The record of the cache mode counts only up. The growth line feeds the
-# decision on clearing the cache.
+# The parser states and the lexer states of a cache record only grow. The heap
+# and the peak memory can go down. The growth line feeds the decision on
+# clearing the cache.
 CACHE_NOTE = (
     "The parser states and the lexer states only grow. "
     "The heap in use is the memory in use after each tree is freed. "
     "The growth line feeds the decision on clearing the cache. "
-    "– means that the heap size is not known."
+    "In the seeds row, – means that there is no row before it. "
+    "In other rows, – means that the value is not known."
 )
+
+CACHE_WINDOW_QUARTER = "over the last quarter of the mutants"
+CACHE_WINDOW_FALLBACK = "over the last two records"
 
 USAGE = "usage: report.py RESULT_DIR [--check]\n       report.py -h | --help"
 
@@ -713,8 +718,8 @@ def cache_rows(caches: list) -> list:
     return rows
 
 
-def cache_growth(cache: Cache) -> int | None:
-    """The heap growth in KB per 10,000 parses over the last quarter of the mutants.
+def cache_window(cache: Cache) -> tuple:
+    """The records of the growth window and the label of the window.
 
     The window is the mutant records at or after seeds + 0.75 * mutants.
     With fewer than two of them, the window is the last two mutant records.
@@ -722,8 +727,14 @@ def cache_growth(cache: Cache) -> int | None:
     mutants = [r for r in cache.records if r.phase == "mutants"]
     start = cache.seeds + 0.75 * cache.mutants
     window = [r for r in mutants if r.parses >= start]
-    if len(window) < 2:
-        window = mutants[-2:]
+    if len(window) >= 2:
+        return window, CACHE_WINDOW_QUARTER
+    return mutants[-2:], CACHE_WINDOW_FALLBACK
+
+
+def cache_growth(cache: Cache) -> int | None:
+    """The heap growth in KB per 10,000 parses over the growth window."""
+    window = cache_window(cache)[0]
     if len(window) < 2 or any(r.heap_kb is None for r in window):
         return None
     first, last = window[0], window[-1]
@@ -742,8 +753,8 @@ def render_cache(caches: list) -> str:
     for cache in caches:
         growth = cache_growth(cache)
         lines.append(
-            f"- {cache.grammar}: heap growth over the last quarter of the mutants: "
-            + ("–" if growth is None else f"{growth:,} KB per 10,000 parses.")
+            f"- {cache.grammar}: heap growth {cache_window(cache)[1]}: "
+            + ("–." if growth is None else f"{growth:,} KB per 10,000 parses.")
         )
     return "\n\n".join(
         [table(header, cache_rows(caches)), "\n".join(lines), CACHE_NOTE]

@@ -588,11 +588,17 @@ class ReportTest(unittest.TestCase):
         text = text.replace("heap_kb=1500", "heap_kb=1450")
         text = text.replace("mutants=400", "mutants=1000")
         write(self.dir, "ruby-cache.txt", text)
-        self.assertIn("15,000 KB per 10,000 parses", self.render())
+        out = self.render()
+        self.assertIn("15,000 KB per 10,000 parses", out)
+        self.assertIn(
+            "- ruby: heap growth over the last two records: 15,000 KB per 10,000 parses.",
+            out,
+        )
+        self.assertNotIn("last quarter", out)
         # one mutant record only: no number
         one = "\n".join(RUBY_CACHE.splitlines()[:3]) + "\n"
         write(self.dir, "ruby-cache.txt", one)
-        self.assertIn("- ruby: heap growth over the last quarter of the mutants: –", self.render())
+        self.assertIn("heap growth over the last two records: –.\n", self.render())
 
     def test_cache_runs_row(self) -> None:
         write(self.dir, "ruby-cache.txt", RUBY_CACHE)
@@ -621,7 +627,51 @@ class ReportTest(unittest.TestCase):
         out = self.render()
         self.assertIn("| 26 | 1 | 515 | – | – | 7,248 KB |", out)
         self.assertIn("| 26 | 0 | 538 | 1,600 KB | – | 7,344 KB |", out)
-        self.assertIn("- ruby: heap growth over the last quarter of the mutants: –", out)
+        self.assertIn("heap growth over the last quarter of the mutants: –.\n", out)
+
+    def test_cache_seeds_only(self) -> None:
+        seeds = "\n".join(RUBY_CACHE.splitlines()[:2]) + "\n"
+        write(self.dir, "ruby-cache.txt", seeds)
+        out = self.render()
+        self.assertIn(
+            "| ruby | seeds | 20 | 25 | – | 422 | 1,000 KB | – | 6,336 KB"
+            " | 105 | 20 | 0 | 0 |",
+            out,
+        )
+        self.assertIn("heap growth over the last two records: –.\n", out)
+
+    def test_cache_heap_unknown_outside_window(self) -> None:
+        # the first record of the seeds phase has no heap; the window is fine
+        text = RUBY_CACHE.replace("heap_kb=1000", "heap_kb=-1")
+        write(self.dir, "ruby-cache.txt", text)
+        out = self.render()
+        self.assertIn("| ruby | seeds | 20 | 25 | – | 422 | – | – |", out)
+        self.assertIn("| ruby | mutants | 120 | 25 | 0 | 495 | 1,200 KB | – |", out)
+        self.assertIn("heap growth over the last quarter of the mutants: 10,000 KB", out)
+
+    def test_cache_bad_records(self) -> None:
+        lines = RUBY_CACHE.splitlines()
+        cases = {
+            "missing field": (
+                RUBY_CACHE.replace(" rss_kb=7120", ""),
+                "ruby-cache.txt:3: no 'rss_kb' in the cache record",
+            ),
+            "repeated elapsed": (
+                RUBY_CACHE + "elapsed wall_ms=1.0\nelapsed wall_ms=2.0\n",
+                "the elapsed record is there more than once",
+            ),
+            "unknown phase": (
+                RUBY_CACHE.replace("phase=mutants", "phase=later", 1),
+                "ruby-cache.txt:3: unknown phase 'later'",
+            ),
+        }
+        self.assertGreater(len(lines), 3)
+        for label, (text, message) in cases.items():
+            with self.subTest(label):
+                write(self.dir, "ruby-cache.txt", text)
+                with self.assertRaises(report.ReportError) as ctx:
+                    report.load_result(self.dir)
+                self.assertIn(message, str(ctx.exception))
 
     def test_no_cache_line(self) -> None:
         self.assertIn("## Parse cache\n\nNo cache run in this result.\n\n## Time", self.render())
