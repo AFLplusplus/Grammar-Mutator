@@ -165,8 +165,9 @@ def rewrite_natives(text: str) -> str:
 
 # AFL++ skips a file that is larger than this (MAX_FILE).
 MAX_SEED_BYTES = 1048576
-# The longest file name that common file systems allow.
-MAX_NAME_BYTES = 255
+# The longest seed name. AFL++ puts `id:000000,time:0,execs:0,orig:` before
+# the name of an input file, and a file name can have at most 255 bytes.
+MAX_NAME_BYTES = 200
 
 
 @dataclass(frozen=True)
@@ -323,7 +324,7 @@ def unique_names(names: list[str]) -> list[str]:
     """Make every name unique.
 
     A repeated name gets `_2`, `_3`, ... before `.js`. A name stays within
-    255 bytes: the code cuts the stem before it adds the suffix.
+    MAX_NAME_BYTES: the code cuts the stem before it adds the suffix.
     """
     seen: set[str] = set()
     counts: Counter = Counter()
@@ -369,14 +370,19 @@ def _suite_files(root: Path, folders: tuple[str, ...]) -> list[str]:
     return sorted(rels)
 
 
+def _check_empty(folder: Path) -> None:
+    """Stop with a CliError if `folder` exists and is not an empty folder."""
+    if folder.exists() and (not folder.is_dir() or any(folder.iterdir())):
+        raise CliError("[-] %s is not an empty folder" % folder)
+
+
 def build_seeds(
     roots: dict[str, Path],
     seeds_dir: Path,
     exclude: frozenset[str] = frozenset(),
 ) -> BuildSummary:
     """Write the seeds of the suites in `roots` to `seeds_dir/<suite>/`."""
-    if seeds_dir.exists() and any(seeds_dir.iterdir()):
-        raise SystemExit("seeds folder is not empty: %s" % seeds_dir)
+    _check_empty(seeds_dir)
     folders = {s.name: s.folders for s in SUITES}
     summary = BuildSummary(Counter(), Counter(), {})
     for suite in sorted(roots):
@@ -538,6 +544,7 @@ def _sparse_paths(suite: Suite) -> list[str]:
 
 
 def _fetch(dest: Path) -> int:
+    _check_empty(dest / "seeds")
     roots: dict[str, Path] = {}
     for suite in SUITES:
         print("[*] fetching %s at %s" % (suite.name, suite.commit))
@@ -583,10 +590,15 @@ class CliError(SystemExit):
 def _check_folders(seeds_dir: Path, out_dir: Path) -> None:
     if not seeds_dir.is_dir():
         raise CliError("[-] %s is not a folder" % seeds_dir)
-    if out_dir.exists() and (
-        not out_dir.is_dir() or any(out_dir.iterdir())
-    ):
-        raise CliError("[-] %s is not an empty folder" % out_dir)
+    _check_empty(out_dir)
+
+
+def _visible(path: Path, folder: Path) -> bool:
+    """Return False for a path below `folder` with a part that starts with
+    `.`, such as `.DS_Store`. Such a file is not a seed."""
+    return not any(
+        part.startswith(".") for part in path.relative_to(folder).parts
+    )
 
 
 def _run_one(argv: list[str], timeout: float) -> str:
@@ -612,7 +624,9 @@ def _run_one(argv: list[str], timeout: float) -> str:
             pass
         proc.communicate()
         return "timeout"
-    # Stop the children that are still alive.
+    # Stop the children that are still alive. communicate() has reaped the
+    # engine, so in theory the system can give its group ID to a new group
+    # before this call. The window is very small.
     try:
         os.killpg(proc.pid, signal.SIGKILL)
     except OSError:
@@ -642,7 +656,11 @@ def run_filter(
     arguments become the shims path and the seed path.
     """
     _check_folders(seeds_dir, out_dir)
-    files = sorted(p for p in seeds_dir.rglob("*") if p.is_file())
+    files = sorted(
+        p
+        for p in seeds_dir.rglob("*")
+        if p.is_file() and _visible(p, seeds_dir)
+    )
 
     stop: list[bool] = []
 
@@ -663,6 +681,8 @@ def run_filter(
     summary = FilterSummary(
         Counter(), Counter(), Counter(), Counter(), {}
     )
+    # If a run raises (an engine error or Ctrl-C), map() cancels the queued
+    # runs.
     with ThreadPoolExecutor(max(1, jobs)) as pool:
         results = list(pool.map(work, files))
     for path, result in zip(files, results):
@@ -689,7 +709,7 @@ def count_by_suite(folder: Path) -> Counter:
         raise CliError("[-] %s is not a folder" % folder)
     counts: Counter = Counter()
     for path in folder.rglob("*"):
-        if path.is_file():
+        if path.is_file() and _visible(path, folder):
             counts[suite_of(path.name)] += 1
     return counts
 
@@ -711,9 +731,16 @@ def _table(header: list[str], rows: list[list[str]]) -> str:
 
 def _filter(args: argparse.Namespace) -> int:
     _check_folders(args.seeds, args.out)
-    template = shlex.split(args.cmd)
+    try:
+        template = shlex.split(args.cmd)
+    except ValueError as err:
+        print("[-] Cannot split --cmd: %s" % err, file=sys.stderr)
+        return 2
     if not template:
         print("[-] Empty --cmd", file=sys.stderr)
+        return 2
+    if not any("{seed}" in arg for arg in template):
+        print("[-] --cmd has no {seed}", file=sys.stderr)
         return 2
     engine = template[0]
     if shutil.which(engine) is None:
@@ -770,7 +797,9 @@ def _count(args: argparse.Namespace) -> int:
     header = ["Suite", "Seeds"]
     if args.trees is not None:
         trees = Counter(
-            suite_of(p.name) for p in args.trees.iterdir() if p.is_file()
+            suite_of(p.name)
+            for p in args.trees.iterdir()
+            if p.is_file() and not p.name.startswith(".")
         )
         header.append("Trees")
     rows = []
@@ -825,6 +854,9 @@ def main(argv: list[str]) -> int:
     except CliError as err:
         print(err.message, file=sys.stderr)
         return 2
+    except KeyboardInterrupt:
+        print("[-] Interrupted", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":

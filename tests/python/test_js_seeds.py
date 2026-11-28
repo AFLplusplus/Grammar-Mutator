@@ -201,20 +201,30 @@ class SeedNameTest(unittest.TestCase):
         a = get_seeds.seed_name("test262", "a" * 300 + "/x.js")
         b = get_seeds.seed_name("test262", "a" * 300 + "/y.js")
         for n in (a, b):
-            self.assertLessEqual(len(n.encode()), 255)
+            self.assertLessEqual(len(n.encode()), get_seeds.MAX_NAME_BYTES)
             self.assertTrue(n.endswith(".js"))
         self.assertNotEqual(a, b)
         rel = "a" * 300 + "/x.js"
         digest = hashlib.sha1(rel.encode("utf-8", "surrogateescape"))
         self.assertTrue(a.endswith("_%s.js" % digest.hexdigest()[:8]))
 
+    def test_name_limit(self) -> None:
+        # AFL++ adds about 31 bytes to an input name, so the limit is 200.
+        self.assertEqual(get_seeds.MAX_NAME_BYTES, 200)
+        rel = "a" * (200 - len("jstests_") - 3) + ".js"
+        self.assertEqual(
+            get_seeds.seed_name("jstests", rel), "jstests_" + rel
+        )
+        longer = get_seeds.seed_name("jstests", "b" + rel)
+        self.assertEqual(len(longer), 200)
+        self.assertNotEqual(longer, "jstests_b" + rel)
+
     def test_unique_long(self) -> None:
-        name = "x" * 252 + ".js"
-        self.assertEqual(len(name), 255)
+        name = "x" * (get_seeds.MAX_NAME_BYTES - 3) + ".js"
         names = get_seeds.unique_names([name, name, name])
         self.assertEqual(len(set(names)), 3)
         for n in names:
-            self.assertLessEqual(len(n.encode()), 255)
+            self.assertLessEqual(len(n.encode()), get_seeds.MAX_NAME_BYTES)
             self.assertTrue(n.endswith(".js"))
 
     def test_unique(self) -> None:
@@ -271,9 +281,10 @@ class BuildSeedsTest(unittest.TestCase):
         out = self.tmp / "seeds"
         out.mkdir()
         (out / "x").write_bytes(b"")
-        with self.assertRaises(SystemExit) as ctx:
+        with self.assertRaises(get_seeds.CliError) as ctx:
             get_seeds.build_seeds({"mjsunit": self.tmp / "mj"}, out)
-        self.assertIn(str(out), str(ctx.exception))
+        self.assertIn(str(out), ctx.exception.message)
+        self.assertTrue(ctx.exception.message.startswith("[-]"))
 
     def test_deterministic(self) -> None:
         self.write("jt", "stress/a b.js", b"var a;")
@@ -486,6 +497,20 @@ class FetchRepoTest(unittest.TestCase):
         self.assertIn("local", (dest / "summary.txt").read_text())
         self.assertIn("local", out.getvalue())
 
+    def test_main_fetch_non_empty_seeds(self) -> None:
+        dest = self.tmp / "dest2"
+        (dest / "seeds").mkdir(parents=True)
+        (dest / "seeds" / "x").write_text("x")
+        err = io.StringIO()
+        with mock.patch.object(get_seeds, "fetch_repo") as fetch:
+            with contextlib.redirect_stderr(err):
+                code = get_seeds.main(["fetch", str(dest)])
+        fetch.assert_not_called()
+        self.assertEqual(code, 2)
+        lines = err.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0].startswith("[-]"))
+
 
 SHIMS = SEEDS_DIR / "shims.js"
 RUNNER = (
@@ -593,6 +618,12 @@ for _name in ("description", "startTest", "inSection", "enterFunc",
         "if (globalThis.after !== 1) throw 0;" % _name
 
 
+class ShimsFileTest(unittest.TestCase):
+    def test_size(self):
+        # The limit is 10 KiB, because the engine parses the file each run.
+        self.assertLess(len(SHIMS.read_bytes()), 10240)
+
+
 @unittest.skipIf(shutil.which("node") is None, "node is not installed")
 class ShimsTest(unittest.TestCase):
     def run_full(self, source: str, pre: str = ""):
@@ -613,9 +644,6 @@ class ShimsTest(unittest.TestCase):
 
     def run_seed(self, source: str, pre: str = "") -> int:
         return self.run_full(source, pre).returncode
-
-    def test_size(self):
-        self.assertLess(len(SHIMS.read_bytes()), 10240)
 
     def test_test262(self):
         self.assertEqual(
@@ -916,7 +944,6 @@ class FilterTest(unittest.TestCase):
         self.assertTrue(lines[0].startswith("[-]"))
         self.assertNotIn("Traceback", err.getvalue())
 
-
     def run_main(self, argv):
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
@@ -943,6 +970,75 @@ class FilterTest(unittest.TestCase):
             ]
         )
         self.assert_one_line_error(code, text)
+
+    def test_cmd_without_seed(self):
+        # Without {seed}, each run gets no seed, and each seed is "kept".
+        code, text = self.run_main(
+            ["filter", "--cmd", "sh -c true {shims}", str(self.seeds),
+             str(self.tmp / "OUT5")]
+        )
+        self.assert_one_line_error(code, text)
+        self.assertFalse((self.tmp / "OUT5").exists())
+
+    def test_cmd_with_open_quote(self):
+        code, text = self.run_main(
+            ["filter", "--cmd", "sh 'x {seed}", str(self.seeds),
+             str(self.tmp / "OUT6")]
+        )
+        self.assert_one_line_error(code, text)
+        self.assertNotIn("Traceback", text)
+
+    def test_engine_with_exec_format_error(self):
+        # A file with the exec bit, but no "#!" line and no binary format.
+        # execve() fails with ENOEXEC on macOS and on Linux. Python does not
+        # run such a file through /bin/sh, so Popen raises OSError.
+        engine = self.tmp / "notascript"
+        engine.write_text("not a script\n")
+        engine.chmod(0o755)
+        code, text = self.run_main(
+            ["filter", "--cmd", "%s {seed}" % engine, str(self.seeds),
+             str(self.tmp / "OUT7")]
+        )
+        self.assert_one_line_error(code, text)
+        self.assertNotIn("Traceback", text)
+
+    def test_interrupt(self):
+        with mock.patch.object(
+            get_seeds, "run_filter", side_effect=KeyboardInterrupt
+        ):
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                code = get_seeds.main(
+                    ["filter", "--cmd", "sh {seed}", str(self.seeds),
+                     str(self.tmp / "OUT8")]
+                )
+        self.assertEqual(code, 130)
+        self.assertEqual(len(err.getvalue().splitlines()), 1)
+        self.assertNotIn("Traceback", err.getvalue())
+
+    def test_interrupt_stops_queued_runs(self):
+        calls = []
+
+        def fake_run(argv, timeout):
+            calls.append(argv)
+            raise KeyboardInterrupt
+
+        with mock.patch.object(get_seeds, "_run_one", side_effect=fake_run):
+            with self.assertRaises(KeyboardInterrupt):
+                get_seeds.run_filter(
+                    ["sh", "{seed}"], self.shims, self.seeds, self.out, 1.0, 1
+                )
+        self.assertEqual(len(calls), 1)
+
+    def test_dot_files_are_not_seeds(self):
+        (self.seeds / ".DS_Store").write_text("ok")
+        (self.seeds / "mjsunit" / ".DS_Store").write_text("ok")
+        summary = self.run_filter(
+            ["sh", str(self.fake), "{shims}", "{seed}"]
+        )
+        self.assertEqual(summary.seeds, Counter(mjsunit=3, jstests=2))
+        copied = [p.name for p in self.out.rglob("*") if p.is_file()]
+        self.assertNotIn(".DS_Store", copied)
 
     def test_non_empty_out_through_main(self):
         self.out.mkdir()
@@ -1064,6 +1160,17 @@ class CountTest(unittest.TestCase):
             get_seeds.count_by_suite(self.seeds),
             Counter(mjsunit=3, jstests=2),
         )
+
+    def test_count_skips_dot_files(self):
+        (self.seeds / "mjsunit" / ".DS_Store").write_text("x")
+        trees = self.tmp / "TREES2"
+        trees.mkdir()
+        (trees / ".DS_Store").write_text("x")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            get_seeds.main(["count", str(self.seeds), str(trees)])
+        rows = [line.split() for line in out.getvalue().splitlines()]
+        self.assertEqual(rows[-1], ["total", "5", "0"])
 
     def test_count_table(self):
         trees = self.tmp / "TREES"
