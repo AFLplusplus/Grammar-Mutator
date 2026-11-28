@@ -35,3 +35,10 @@ sudo apt install ruby-full
 ./minirake
 # Target: ./bin/mruby
 ```
+
+## JavaScript Seeds
+
+This document does not build a JavaScript engine. For the JavaScript grammar,
+[javascript-seeds.md](javascript-seeds.md) makes seeds from the test suites
+of JavaScript engines. It also gives the JerryScript v3.0.0 build that its
+filter uses.

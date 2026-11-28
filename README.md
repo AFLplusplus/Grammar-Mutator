@@ -163,6 +163,8 @@ What happens with a seed that the grammar does not cover depends on the kind of 
 
 For example, to use the test cases of the `mruby` project as seeds, clone it with `git clone https://github.com/mruby/mruby.git` and give `-i mruby/test/t` to `afl-fuzz`.
 
+For JavaScript, [javascript-seeds.md](doc/javascript-seeds.md) gives a recipe that makes seeds from the test suites of JavaScript engines (test262, V8, and WebKit).
+
 With a `.g4` grammar, you can parse the seeds before you fuzz.
 This makes the start of `afl-fuzz` faster:
 
