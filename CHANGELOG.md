@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.0 (2026-11-28)
+
+<!-- Release notes generated using configuration in .github/release.yml at stable -->
+
+## What's Changed
+* feat: replace the benchmark program with parse, run, and digest modes by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/83
+* docs: record the benchmark result of release 1.2.0 by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/85
+* feat: measure the ANTLR parse cache in the benchmark program by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/86
+* feat: add a JavaScript seed recipe from engine test suites by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/87
+* feat: write mutator statistics to a file in the AFL++ output folder by @h1994st in https://github.com/AFLplusplus/Grammar-Mutator/pull/88
+
+
+**Full Changelog**: https://github.com/AFLplusplus/Grammar-Mutator/compare/v1.2.0...v1.3.0
+
 ## 1.2.0 (2026-11-25)
 
 <!-- Release notes generated using configuration in .github/release.yml at stable -->
