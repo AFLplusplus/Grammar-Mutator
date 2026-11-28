@@ -229,6 +229,7 @@ The mutator reads these environment variables:
 | `RULES_MUTATION_STEPS` | The maximum number of rules mutations (default: no limit) |
 | `TRIMMING_STEPS` | The maximum number of trimming steps (default: no limit) |
 | `PARSE_TIME_BUDGET_MS` | The smallest time limit in ms for the parse of a test case (default 50). `0` removes the limit. See [Parse Time Limit and Ambiguous Grammars](doc/customizing-grammars.md#parse-time-limit-and-ambiguous-grammars). |
+| `GRAMMAR_MUTATOR_STATS_SECONDS` | Write a line of statistics every this many seconds (1 to 86400) to `grammar_mutator_stats` in the AFL++ output folder of the instance (default: no file). See [Statistics File](#statistics-file). |
 
 By default, the rules mutation tries every other rule at every nonterminal node of the tree.
 With `RULES_MUTATION_STEPS`, it tries at most that many of these node and rule pairs.
@@ -249,6 +250,35 @@ export AFL_CUSTOM_MUTATOR_LIBRARY=./libgrammarmutator-ruby.so
 export AFL_CUSTOM_MUTATOR_ONLY=1
 afl-fuzz -i seeds -o out -- /path/to/target @@
 ```
+
+### Statistics File
+
+The statistics file shows the parse cache and the heap of the mutator during a run.
+Set `GRAMMAR_MUTATOR_STATS_SECONDS` to turn it on.
+Each AFL++ instance writes its own file, `grammar_mutator_stats`, in its output folder (for example `out/default/`), next to the AFL++ `plot_data` file.
+
+The file starts with this header line:
+
+```
+# unix_time, parses, failed_parses, limit_parses, parser_states, lexer_states, heap_kb
+```
+
+Each line after it holds these values:
+
+| Value | Meaning |
+|---|---|
+| `unix_time` | The time of the line, in seconds since 1970 |
+| `parses` | The number of test cases that the mutator parsed. The mutator parses only a test case that has no tree file. |
+| `failed_parses` | The number of parses that gave no tree |
+| `limit_parses` | The number of parses that passed the time limit (see `PARSE_TIME_BUDGET_MS`) |
+| `parser_states` | The number of states in the prediction cache of the ANTLR parser |
+| `lexer_states` | The number of states in the prediction cache of the ANTLR lexer |
+| `heap_kb` | The heap in use of the whole `afl-fuzz` process, in KB |
+
+The mutator writes the first line when it gets the first queue entry.
+Then it writes a line each time the interval has passed, and a last line when AFL++ stops.
+`-1` means that the value is not known. For example, `heap_kb` is `-1` on a platform without malloc statistics.
+A resumed run adds its lines to the same file.
 
 ## Contact and Contributions
 

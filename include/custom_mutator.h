@@ -19,6 +19,7 @@
 #include "tree.h"
 #include "list.h"
 #include "parse_budget.h"
+#include "mutator_stats.h"
 #include "map.h"
 
 #ifdef __cplusplus
@@ -44,6 +45,8 @@ typedef struct my_mutator {
   // The entries that the parser rejected in this run. The keys are the entry
   // file names.
   map_int_t rejected;
+  // The statistics file. NULL if GRAMMAR_MUTATOR_STATS_SECONDS is not set.
+  mutator_stats_t *stats;
 
   const uint8_t *filename_cur;
   tree_t        *tree_cur;

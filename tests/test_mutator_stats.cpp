@@ -16,6 +16,8 @@
 
  */
 
+#include <unistd.h>
+
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -24,7 +26,10 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "custom_mutator.h"
+#include "f1_c_fuzz.h"
 #include "mutator_stats.h"
+#include "utils.h"
 
 namespace fs = std::filesystem;
 using std::string;
@@ -271,5 +276,174 @@ TEST_F(MutatorStatsFile, OpenFailureKeepsOff) {
 
   EXPECT_EQ(count_of(err, "cannot open the statistics file"), 1u);
   EXPECT_TRUE(fs::is_directory(stats_file(dir)));
+
+}
+
+// The mutator with the statistics file on or off. Each test starts the
+// mutator in the output folder of one AFL++ instance.
+class MutatorStatsMutator : public MutatorStatsFile {
+
+ protected:
+  my_mutator_t *data = nullptr;
+
+  // Set or unset the variable, make "<instance>/queue", and start the mutator
+  void start(const char *seconds, const fs::path &instance) {
+
+    if (seconds)
+      setenv(kVar, seconds, 1);
+    else
+      unsetenv(kVar);
+    fs::create_directories(instance / "queue");
+    data = afl_custom_init(nullptr, 0);  // fixed random seed
+    ASSERT_NE(data, nullptr);
+
+  }
+
+  void stop() {
+
+    if (data) afl_custom_deinit(data);
+    data = nullptr;
+
+  }
+
+  void TearDown() override {
+
+    stop();
+    MutatorStatsFile::TearDown();
+
+  }
+
+  // Write the test case "name" with "bytes" into "folder"
+  static string write_entry(const fs::path &folder, const char *name,
+                            const string &bytes) {
+
+    fs::path path = folder / name;
+    std::ofstream(path, std::ios::binary) << bytes;
+    return path.string();
+
+  }
+
+  uint8_t queue_get(const string &fn) {
+
+    return afl_custom_queue_get(data, (const uint8_t *)fn.c_str());
+
+  }
+
+};
+
+// A valid entry and an entry that is not UTF-8, so the parser rejects it
+static const string kValid = "puts 1\n";
+static const string kNotUtf8 = "\xff\xfe\n";
+
+// The bytes of a random tree of the grammar. The parser predicts the choices
+// of a small entry such as kValid without the cache, so the cache stays
+// empty. A tree of up to 1000 bytes fills it.
+static string generated_entry() {
+
+  tree_t *tree = gen_init__(1000);
+  tree_to_buf(tree);
+  string bytes((const char *)tree->data_buf, tree->data_len);
+  tree_free(tree);
+  return bytes;
+
+}
+
+TEST_F(MutatorStatsMutator, OffByDefault) {
+
+  fs::path instance = dir / "out" / "default";
+  start(nullptr, instance);
+  queue_get(write_entry(instance / "queue", "a", kValid));
+  stop();
+
+  EXPECT_FALSE(fs::exists(stats_file(instance)));
+
+}
+
+TEST_F(MutatorStatsMutator, NoFileOutsideQueue) {
+
+  fs::path instance = dir / "out" / "default";
+  start("3600", instance);
+  fs::create_directories(dir / "seeds");
+  queue_get(write_entry(dir / "seeds", "a", kValid));
+  stop();
+
+  for (const auto &entry : fs::recursive_directory_iterator(dir))
+    EXPECT_NE(entry.path().filename(), MUTATOR_STATS_FILE_NAME) << entry.path();
+
+}
+
+TEST_F(MutatorStatsMutator, CountsRealParses) {
+
+  fs::path instance = dir / "out" / "default";
+  start("3600", instance);
+  string a = write_entry(instance / "queue", "a", generated_entry());
+  string b = write_entry(instance / "queue", "b", kNotUtf8);
+  EXPECT_EQ(queue_get(a), 1);
+  queue_get(b);
+  queue_get(b);  // the rejected set skips the parse
+  stop();
+
+  vector<string> lines = read_lines(stats_file(instance));
+  ASSERT_EQ(lines.size(), 3u);
+  EXPECT_EQ(lines[0], kHeader);
+  vector<string> first = split_fields(lines[1]);
+  ASSERT_EQ(first.size(), 7u);
+  EXPECT_EQ(first[1], "0");
+
+  vector<string> last = split_fields(lines[2]);
+  ASSERT_EQ(last.size(), 7u);
+  EXPECT_EQ(last[1], "2");
+  EXPECT_EQ(last[2], "1");
+  EXPECT_EQ(last[3], "0");
+  EXPECT_GT(std::stoll(last[4]), 0);
+  EXPECT_GT(std::stoll(last[5]), 0);
+  EXPECT_NE(std::stoll(last[6]), 0);
+
+}
+
+TEST_F(MutatorStatsMutator, TicksFromFuzz) {
+
+  fs::path instance = dir / "out" / "default";
+  start("1", instance);
+  string a = write_entry(instance / "queue", "a", kValid);
+  ASSERT_EQ(queue_get(a), 1);
+  ASSERT_GT(afl_custom_fuzz_count(data, nullptr, 0), 0u);
+  EXPECT_EQ(read_lines(stats_file(instance)).size(), 2u);
+
+  usleep(1100000);
+  uint8_t *buf = nullptr;
+  afl_custom_fuzz(data, (uint8_t *)kValid.data(), kValid.size(), &buf, nullptr,
+                  0, 4096);
+  EXPECT_EQ(read_lines(stats_file(instance)).size(), 3u);
+
+}
+
+TEST_F(MutatorStatsMutator, SameOutputsWithStats) {
+
+  vector<uint64_t> hashes[2];
+  for (int run = 0; run < 2; ++run) {
+
+    fs::path instance = dir / ("out" + std::to_string(run)) / "default";
+    start(run ? "3600" : nullptr, instance);
+    string a = write_entry(instance / "queue", "a", kValid);
+    ASSERT_EQ(queue_get(a), 1);
+    uint32_t num = afl_custom_fuzz_count(data, nullptr, 0);
+    ASSERT_GT(num, 0u);
+    for (uint32_t i = 0; i < num && i < 200; ++i) {
+
+      uint8_t *buf = nullptr;
+      size_t   size = afl_custom_fuzz(data, (uint8_t *)kValid.data(),
+                                      kValid.size(), &buf, nullptr, 0, 4096);
+      hashes[run].push_back(hash_bytes(buf, size));
+
+    }
+
+    stop();
+
+  }
+
+  EXPECT_TRUE(fs::exists(stats_file(dir / "out1" / "default")));
+  EXPECT_EQ(hashes[0].size(), hashes[1].size());
+  EXPECT_EQ(hashes[0], hashes[1]);
 
 }
