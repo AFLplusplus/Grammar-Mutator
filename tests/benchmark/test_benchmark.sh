@@ -12,7 +12,8 @@ name=$1
 
 # Do not let the shell of the developer change the results
 unset PARSE_TIME_BUDGET_MS RULES_MUTATION_STEPS RANDOM_MUTATION_STEPS \
-  RANDOM_RECURSIVE_MUTATION_STEPS SPLICING_MUTATION_STEPS TRIMMING_STEPS
+  RANDOM_RECURSIVE_MUTATION_STEPS SPLICING_MUTATION_STEPS TRIMMING_STEPS \
+  GRAMMAR_MUTATOR_STATS_SECONDS
 
 bin=${BUILD_DIR:-.}/src
 bench=$bin/benchmark/benchmark-$name
@@ -289,6 +290,16 @@ capture "$work/d0.txt" "$bench" digest -n 0 -t 0 "$work/seeds"
 # A NULL or empty last output cannot be made with ruby.json, so no test here
 # runs the NULL branches of the digest and run modes.
 echo "[+] run measures each tree once if -e is large"
+
+# The benchmark does not write the statistics file of the mutator. A bad value
+# makes the mutator print a warning, so no warning means the variable is off.
+capture "$work/stats.txt" env GRAMMAR_MUTATOR_STATS_SECONDS=x \
+  "$bench" run -e 1 -n 5 -t 5 "$work/seeds"
+[ "$status" -eq 0 ] || fail "stats: exit status $status"
+if grep -q GRAMMAR_MUTATOR_STATS_SECONDS "$work/stats.txt.err"; then
+  fail "stats: the mutator read GRAMMAR_MUTATOR_STATS_SECONDS"
+fi
+echo "[+] the benchmark ignores GRAMMAR_MUTATOR_STATS_SECONDS"
 
 # run mode: bad input
 for args in "run -e 0 $work/seeds" "run -n abc $work/seeds" "run" \

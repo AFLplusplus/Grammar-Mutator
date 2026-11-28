@@ -99,6 +99,12 @@ bool hash_set_add(hash_set_t *set, uint64_t hash);
 
 size_t hash_set_size(const hash_set_t *set);
 
+// Memory
+
+// Return the heap in use of the process in KB, or -1 if it is not known. It
+// is not known if the platform has no malloc statistics, or under Valgrind.
+long heap_in_use_kb(void);
+
 #ifdef __cplusplus
 
 }

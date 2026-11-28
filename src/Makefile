@@ -42,7 +42,7 @@ ifdef G4_BUILD
 TARGETS += $(GRAMMAR_PARSER_PROM)
 endif
 
-LIB_SRC_FILES = chunk_store.c f1_c_fuzz.c grammar_mutator.c list.c parse_budget.c tree.c tree_mutation.c tree_trimming.c utils.c
+LIB_SRC_FILES = chunk_store.c f1_c_fuzz.c grammar_mutator.c list.c mutator_stats.c parse_budget.c tree.c tree_mutation.c tree_trimming.c utils.c
 GEN_SRC_FILES = grammar_generator.c
 PARSER_SRC_FILES = grammar_parser.c grammar_parser_files.c grammar_parser_work.c
 BENCHMARK_SRC_FILES = benchmark/benchmark.c benchmark/mutants.c

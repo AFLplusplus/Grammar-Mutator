@@ -29,11 +29,6 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
-#ifdef __APPLE__
-  #include <malloc/malloc.h>
-#elif defined(__GLIBC__)
-  #include <malloc.h>
-#endif
 
 #include "custom_mutator.h"
 #include "chunk_store_internal.h"
@@ -545,6 +540,8 @@ static void set_step_variables(uint64_t steps, uint64_t trims) {
   setenv("TRIMMING_STEPS", value, 1);
   const char *budget = getenv("PARSE_TIME_BUDGET_MS");
   if (!budget || !*budget) setenv("PARSE_TIME_BUDGET_MS", "0", 1);
+  // The benchmark writes no statistics file
+  unsetenv("GRAMMAR_MUTATOR_STATS_SECONDS");
 
 }
 
@@ -1249,30 +1246,6 @@ done:
 
 }
 
-// The heap in use in KB, or -1 if the platform has no malloc statistics
-static long heap_kb(void) {
-
-#ifdef __APPLE__
-  malloc_statistics_t st;
-  memset(&st, 0, sizeof(st));
-  malloc_zone_statistics(NULL, &st);
-  return (long)(st.size_in_use / 1024);
-#elif defined(__GLIBC__) && defined(__GLIBC_PREREQ)
-  #if __GLIBC_PREREQ(2, 33)
-  struct mallinfo2 info = mallinfo2();
-  size_t           total = (size_t)info.uordblks + (size_t)info.hblkhd;
-  // Under Valgrind, mallinfo2 gives 0. A real heap is never 0 after the
-  // seeds are loaded, so 0 means that the value is not known.
-  return total ? (long)(total / 1024) : -1;
-  #else
-  return -1;
-  #endif
-#else
-  return -1;
-#endif
-
-}
-
 // The counts and the time of the parses of the cache mode
 typedef struct {
 
@@ -1335,7 +1308,7 @@ static bool cache_record(const char *phase, cache_stats_t *stats) {
       "heap_kb=%ld rss_kb=%ld us_per_parse=%.1f trees=%llu not_utf8=%llu "
       "stopped=%llu\n",
       phase, (unsigned long long)stats->parses, parser_states, lexer_states,
-      heap_kb(), peak_rss_kb(),
+      heap_in_use_kb(), peak_rss_kb(),
       stats->timed ? stats->timed_us / (double)stats->timed : 0.0,
       (unsigned long long)stats->trees, (unsigned long long)stats->not_utf8,
       (unsigned long long)stats->stopped);

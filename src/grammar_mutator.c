@@ -113,6 +113,17 @@ my_mutator_t *afl_custom_init(afl_t *afl, unsigned int seed) {
 
   }
 
+  uint32_t stats_seconds = mutator_stats_seconds_from_env();
+  if (stats_seconds) {
+
+    data->stats = mutator_stats_create(stats_seconds);
+    if (!data->stats)
+      fprintf(stderr,
+              "[grammar mutator] warning: out of memory. The mutator writes no "
+              "statistics file.\n");
+
+  }
+
   return data;
 
 }
@@ -144,6 +155,7 @@ void afl_custom_deinit(my_mutator_t *data) {
 
   parse_budget_free(data->budget);
   map_deinit(&data->rejected);
+  mutator_stats_free(data->stats);
 
   free(data->fuzz_buf);
   free(data);
@@ -165,6 +177,9 @@ static tree_t *parse_entry(my_mutator_t *data, const char *fn) {
 
   parse_status_t status = PARSE_OK;
   tree_t        *tree = load_tree_from_test_case_ex(fn, data->budget, &status);
+  // NULL with PARSE_OK means that the file was not read, so no parse occurred
+  if (unlikely(data->stats) && (tree || status != PARSE_OK))
+    mutator_stats_count_parse(data->stats, tree != NULL, status);
   if (tree) return tree;
 
   // Print each warning once per run, not once per entry.
@@ -315,6 +330,25 @@ static bool get_tree_fn(const char *fn, char *tree_fn) {
 
 }
 
+/* Open the statistics file in the output folder of the AFL++ instance. The
+  tree file "tree_fn" of a queue entry is "<instance folder>/trees/<name>". An
+  empty "tree_fn" means that the entry is not in a queue folder. */
+static void stats_open_from_tree_fn(my_mutator_t *data, const char *tree_fn) {
+
+  if (likely(!data->stats) || !tree_fn[0]) return;
+
+  char  dir[PATH_MAX];
+  char *slash;
+  snprintf(dir, sizeof(dir), "%s", tree_fn);
+  // Remove "/<name>", and then "/trees"
+  if (!(slash = strrchr(dir, '/'))) return;
+  *slash = '\0';
+  if (!(slash = strrchr(dir, '/'))) return;
+  *slash = '\0';
+  mutator_stats_open(data->stats, dir, parse_budget_now_ns());
+
+}
+
 /* Get the tree of the queue entry "fn". Read the tree file "tree_fn". With
   "check_bytes", use the tree file only if its tree gives the bytes of the
   entry. Without a usable tree file, parse the entry and write its tree file.
@@ -352,6 +386,8 @@ static tree_t *load_entry_tree(my_mutator_t *data, const char *fn,
 uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
 
   const char *fn = (const char *)filename;
+  if (unlikely(data->stats))
+    mutator_stats_tick(data->stats, parse_budget_now_ns());
   data->filename_cur = filename;
   if (data->tree_cur) {
 
@@ -364,6 +400,7 @@ uint8_t afl_custom_queue_get(my_mutator_t *data, const uint8_t *filename) {
   data->described_stage = UINT8_MAX;
 
   if (!get_tree_fn(fn, data->tree_fn_cur)) return 0;
+  stats_open_from_tree_fn(data, data->tree_fn_cur);
 
   // Add the subtrees of the entry to the chunk store. If the parser rejected
   // the entry, keep it in the queue without a tree, so that the other AFL++
@@ -423,6 +460,9 @@ size_t afl_custom_trim(my_mutator_t *data, uint8_t **out_buf) {
   tree_t *trimmed_tree = NULL;
   size_t  trimmed_size = 0;
   tree_t *tree_cur = data->tree_cur;
+
+  if (unlikely(data->stats))
+    mutator_stats_tick(data->stats, parse_budget_now_ns());
 
   if (unlikely(!tree_cur)) {
 
@@ -780,6 +820,9 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
   tree_t *tree = NULL;
   size_t  mutated_size = 0;
 
+  if (unlikely(data->stats))
+    mutator_stats_tick(data->stats, parse_budget_now_ns());
+
   if (data->mutated_tree) {
 
     /* `data->mutated_tree` is not NULL, meaning that this is not an interesting
@@ -964,6 +1007,8 @@ uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
     `data->tree_cur`, because the fuzz stage or the trim loop can still use it
     (issue #57). It loads the new entry into a separate tree. */
   const char *fn = (const char *)filename_new_queue;
+  if (unlikely(data->stats))
+    mutator_stats_tick(data->stats, parse_budget_now_ns());
 
   /* `data->mutated_tree` is the last output of `afl_custom_fuzz`. It is the
     tree of the new entry only if it gives the bytes of the queued file.
@@ -985,6 +1030,8 @@ uint8_t afl_custom_queue_new_entry(my_mutator_t  *data,
     return 0;
 
   }
+
+  stats_open_from_tree_fn(data, data->new_tree_fn);
 
   if (tree) {
 

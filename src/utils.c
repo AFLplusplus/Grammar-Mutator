@@ -4,6 +4,11 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#ifdef __APPLE__
+  #include <malloc/malloc.h>
+#elif defined(__GLIBC__)
+  #include <malloc.h>
+#endif
 
 #include "helpers.h"
 #include "utils.h"
@@ -287,5 +292,28 @@ bool hash_set_add(hash_set_t *set, uint64_t hash) {
 size_t hash_set_size(const hash_set_t *set) {
 
   return set->count + (set->has_zero ? 1 : 0);
+
+}
+
+long heap_in_use_kb(void) {
+
+#ifdef __APPLE__
+  malloc_statistics_t st;
+  memset(&st, 0, sizeof(st));
+  malloc_zone_statistics(NULL, &st);
+  return (long)(st.size_in_use / 1024);
+#elif defined(__GLIBC__) && defined(__GLIBC_PREREQ)
+  #if __GLIBC_PREREQ(2, 33)
+  struct mallinfo2 info = mallinfo2();
+  size_t           total = (size_t)info.uordblks + (size_t)info.hblkhd;
+  // Under Valgrind, mallinfo2 gives 0. The heap of a running process is
+  // never 0, so 0 means that the value is not known.
+  return total ? (long)(total / 1024) : -1;
+  #else
+  return -1;
+  #endif
+#else
+  return -1;
+#endif
 
 }
