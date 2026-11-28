@@ -84,6 +84,11 @@ CHANGED = [
     ("\ufeff%F(1)", '\ufeff__v8native("F")(1)'),
     # A no-break space is white space in JavaScript.
     ("{\u00a0%F(1)}", '{\u00a0__v8native("F")(1)}'),
+    # A comment before the keyword does not hide the head.
+    ("// c\nif (x) %F(1)", '// c\nif (x) __v8native("F")(1)'),
+    ("/* c */ while (x) %F(1)", '/* c */ while (x) __v8native("F")(1)'),
+    # A `.` at the end of a comment on the line before is not a property dot.
+    ("x;  // a.\nreturn %F(1)", 'x;  // a.\nreturn __v8native("F")(1)'),
 ]
 
 UNCHANGED = [
@@ -111,7 +116,18 @@ UNCHANGED = [
     "if (x) y; (a) %F(1)",
     "a.if (x) %F(1)",
     "x.else %F(1)",
+    # A comment between the keyword and `(` makes the head unknown. The safe
+    # answer is to keep the text.
     "if /* c */ (x) %F(1)",
+    "if // c\n(x) %F(1)",
+    # A keyword in a comment or a string is not a head.
+    "// if\n(x) %F(1)",
+    "x // while\n(a) %F(1)",
+    "x = 'for'\n(a) %F(1)",
+    # A property name is not a keyword, also with white space after the dot.
+    "a . if (x) %F(1)",
+    "a ?. if (x) %F(1)",
+    "a . else %F(1)",
 ]
 
 

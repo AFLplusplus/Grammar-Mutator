@@ -62,23 +62,18 @@ _WORD_CHARS = frozenset(
 )
 
 
-def _word_before(text: str, end: int) -> tuple[str, int]:
-    """Return the word that ends at `end`, and its start."""
-    start = end
-    while start > 0 and text[start - 1] in _WORD_CHARS:
-        start -= 1
-    return text[start:end], start
-
-
 def _starts_call(
     text: str,
     pos: int,
-    control_closes: set[int] | frozenset[int] = frozenset(),
+    control_closes: set[int] | frozenset[int],
+    last: str | None,
+    member: bool,
 ) -> bool:
     """Return True if a runtime call can start at `pos` in `text`.
 
     `control_closes` holds the positions of the `)` that close the `(` of an
-    `if`, `while`, or `for` head.
+    `if`, `while`, or `for` head. `last` is the last code token before
+    `pos`, and `member` tells if it is a word after `.` or `?.`.
     """
     end = pos
     while end > 0 and text[end - 1] in _SPACE:
@@ -89,25 +84,8 @@ def _starts_call(
         return True
     if text[end - 1] == ")":
         return end - 1 in control_closes
-    word, start = _word_before(text, end)
-    return word in _PREFIX_WORDS and not (start and text[start - 1] == ".")
-
-
-def _opens_control(text: str, pos: int) -> bool:
-    """Return True if the `(` at `pos` follows `if`, `while`, or `for`."""
-    end = pos
-    while end > 0 and text[end - 1] in _SPACE_OR_LINE:
-        end -= 1
-    word, start = _word_before(text, end)
-    if word == "await":
-        # for await (...)
-        end = start
-        while end > 0 and text[end - 1] in _SPACE_OR_LINE:
-            end -= 1
-        word, start = _word_before(text, end)
-        if word != "for":
-            return False
-    return word in _CONTROL_WORDS and not (start and text[start - 1] == ".")
+    # A name after `.` or `?.` is a property, not a keyword.
+    return last in _PREFIX_WORDS and not member
 
 
 def rewrite_natives(text: str) -> str:
@@ -122,42 +100,63 @@ def rewrite_natives(text: str) -> str:
     length = len(text)
     opened: list[bool] = []  # for each open `(`: does it start a head?
     control_closes: set[int] = set()
+    # The last code token: a word, one other character, or None after a
+    # comment, a string, or a template (the token is then unknown).
+    last: str | None = None
+    member = False  # True if `last` is a word after `.` or `?.`
     i = 0
     while i < length:
         ch = text[i]
+        token = ch
         if ch in "'\"":
             j = i + 1
             while j < length and text[j] != ch:
                 j += 2 if text[j] == "\\" else 1
             j = min(j + 1, length)
+            token = None
         elif ch == "`":
             j = i + 1
             while j < length and text[j] != "`":
                 j += 2 if text[j] == "\\" else 1
             j = min(j + 1, length)
+            token = None
         elif text.startswith("//", i):
             j = text.find("\n", i)
             j = length if j < 0 else j
+            token = None
         elif text.startswith("/*", i):
             j = text.find("*/", i + 2)
             j = length if j < 0 else j + 2
+            token = None
         elif ch == "%":
             match = _NATIVE.match(text, i)
-            if match and _starts_call(text, i, control_closes):
+            if match and _starts_call(text, i, control_closes, last, member):
                 out.append('__v8native("%s")(' % match.group(1))
                 opened.append(False)
+                last, member = "(", False
                 i = match.end()
                 continue
             j = i + 1
         elif ch == "(":
-            opened.append(_opens_control(text, i))
+            opened.append(last in _CONTROL_WORDS and not member)
             j = i + 1
         elif ch == ")":
             if opened and opened.pop():
                 control_closes.add(i)
             j = i + 1
+        elif ch in _WORD_CHARS:
+            j = i + 1
+            while j < length and text[j] in _WORD_CHARS:
+                j += 1
+            token = text[i:j]
+            if token == "await" and last == "for" and not member:
+                token = "for"  # for await (...)
+            else:
+                member = last == "."
         else:
             j = i + 1
+        if ch not in _SPACE_OR_LINE:
+            last = token
         out.append(text[i:j])
         i = j
     return "".join(out)
@@ -681,8 +680,9 @@ def run_filter(
     summary = FilterSummary(
         Counter(), Counter(), Counter(), Counter(), {}
     )
-    # If a run raises (an engine error or Ctrl-C), map() cancels the queued
-    # runs.
+    # map() cancels the queued runs when its result loop stops: after an
+    # engine error from a run, or after Ctrl-C (KeyboardInterrupt) in the
+    # main thread, which waits in that loop.
     with ThreadPoolExecutor(max(1, jobs)) as pool:
         results = list(pool.map(work, files))
     for path, result in zip(files, results):
