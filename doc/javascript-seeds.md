@@ -39,7 +39,7 @@ functions and the harness functions of the three suites:
 - Four shims do not run their code: `new Worker(code)`,
   `Realm.eval(realm, code)`, `$262.agent.start(code)`, and
   `WScript.LoadModule(code)`. A real engine runs this code in another
-  thread, realm, or module. In the recorded result, 196 kept seeds use one
+  thread, realm, or module. In the recorded result, 197 kept seeds use one
   of them.
 - `shims.js` always replaces the assert functions. It defines each other name
   only if the engine has no value for it. So `d8` and `jsc` keep their own
@@ -47,6 +47,8 @@ functions and the harness functions of the three suites:
 - `shims.js` uses ES5 syntax only, so each engine can parse it. It declares
   nothing at the top level. A seed can declare the same name with `let`,
   `class`, or `function`.
+- The engine parses `shims.js` on each run, so the file stays smaller than
+  10 KiB (10,240 bytes).
 
 The tool `grammars/g4/javascript/seeds/get_seeds.py` does the steps of the
 recipe. It needs only Python 3 and `git`.
@@ -55,7 +57,7 @@ recipe. It needs only Python 3 and `git`.
 
 - `python3` (the standard library only).
 - `git` 2.27 or later, and a network connection.
-- About 3.2 GiB of disk space for the work folder (see
+- About 3.3 GiB of disk space for the work folder (see
   [Time and Disk Space](#time-and-disk-space)).
 - A `.g4` build of the JavaScript grammar, for the trees. A parse of one
   suite can use up to 7.1 GiB of memory.
@@ -85,7 +87,9 @@ DEST/summary.txt                        the pins, the counts, the drop reasons
 ```
 
 The suite names are `test262`, `mjsunit`, and `jstests`. The seed name is the
-path of the test file, with `/` and each unusual character changed to `_`.
+path of the test file, with `/` and each unusual character changed to `_`. A
+seed name has at most 200 bytes, because AFL++ adds about 31 bytes to the
+name of an input file. The tool cuts a longer name and adds a hash.
 
 The tool drops some files. `summary.txt` counts each reason for each suite:
 
@@ -104,7 +108,11 @@ The tool drops some files. `summary.txt` counts each reason for each suite:
 The tool changes the text of a test in two cases only:
 
 - A V8 runtime call, `%Name(`, becomes `__v8native("Name")(`. `shims.js`
-  defines `__v8native`. The arguments of the call still run.
+  defines `__v8native`. The arguments of the call still run. The tool
+  changes `%Name(` only where a call can start: at the start of a line,
+  after an operator or `(`, after a keyword such as `return` or `else`, or
+  after the `)` of an `if`, `while`, or `for` head. In other places `%` can
+  be the modulo operator, so the tool keeps the text.
 - A test262 test with the `onlyStrict` flag gets `"use strict";` at the top,
   as the test262 runners do.
 
@@ -135,7 +143,8 @@ python3 grammars/g4/javascript/seeds/get_seeds.py count DEST/seeds DEST/trees
 `grammar_parser` has no time limit. Some large JSTests files parse slowly
 when all the threads parse at the same time, because the threads share the
 parser cache. In the recorded run, `grammar_parser-javascript` writes no
-new tree for up to 69 s. Each of these files takes less than 15 s alone, and the run ends.
+new tree for up to 69 s. Each of these files takes less than 15 s alone,
+and the run ends.
 
 ### 3. Keep the Seeds That an Engine Runs
 
@@ -159,6 +168,9 @@ engine bug or a problem of `shims.js`.
   default time limit of AFL++.
 - `-j N` sets the number of engine runs at the same time. The default is the
   number of CPUs.
+
+With the default `-j` and the 1 s limit, a loaded machine gives some
+time-outs. So the kept count can change a little from one run to the next.
 
 Use the command line of your engine:
 
@@ -225,25 +237,25 @@ platform. The JerryScript column depends on the JerryScript build below.
 
 | Suite | Files | Dropped (reason: count) | Seeds | Trees | Kept by JerryScript |
 |---|---:|---|---:|---:|---:|
-| test262 | 53,999 | negative-parse: 4,680; module: 604; fixture: 294; negative-resolution: 34; too-large: 1 | 48,386 | 46,852 | 37,200 |
-| mjsunit | 9,995 | slow-parse: 3; harness: 1 | 9,991 | 9,735 | 7,089 |
-| jstests | 10,231 | resources: 196; harness: 26; too-large: 14; slow-parse: 2 | 9,993 | 9,787 | 6,781 |
-| total | 74,225 | 5,855 | 68,370 | 66,374 | 51,070 |
+| test262 | 53,999 | negative-parse: 4,680; module: 604; fixture: 294; negative-resolution: 34; too-large: 1 | 48,386 | 46,852 | 37,199 |
+| mjsunit | 9,995 | slow-parse: 3; harness: 1 | 9,991 | 9,872 | 7,192 |
+| jstests | 10,231 | resources: 196; harness: 26; too-large: 14; slow-parse: 2 | 9,993 | 9,787 | 6,775 |
+| total | 74,225 | 5,855 | 68,370 | 66,511 | 51,166 |
 
-The grammar parses 97.1% of the seeds (test262 96.8%, mjsunit 97.4%,
-jstests 97.9%). JerryScript keeps 74.7% of the seeds (test262 76.9%,
-mjsunit 71.0%, jstests 67.9%). The two columns are independent: 49,833 of the
-51,070 kept seeds also have a tree. A seed without a tree gets no grammar
+The grammar parses 97.3% of the seeds (test262 96.8%, mjsunit 98.8%,
+jstests 97.9%). JerryScript keeps 74.8% of the seeds (test262 76.9%,
+mjsunit 72.0%, jstests 67.8%). The two columns are independent: 49,929 of the
+51,166 kept seeds also have a tree. A seed without a tree gets no grammar
 mutations.
 
 The filter result for each suite:
 
 | Suite | Seeds | Kept | Failed | Timeout | Crash |
 |---|---:|---:|---:|---:|---:|
-| test262 | 48,386 | 37,200 | 11,164 | 19 | 3 |
-| mjsunit | 9,991 | 7,089 | 2,838 | 64 | 0 |
-| jstests | 9,993 | 6,781 | 2,987 | 217 | 8 |
-| total | 68,370 | 51,070 | 16,989 | 300 | 11 |
+| test262 | 48,386 | 37,199 | 11,163 | 21 | 3 |
+| mjsunit | 9,991 | 7,192 | 2,735 | 64 | 0 |
+| jstests | 9,993 | 6,775 | 2,987 | 223 | 8 |
+| total | 68,370 | 51,166 | 16,885 | 308 | 11 |
 
 The grammar rejects these main forms (counted from the file names):
 
@@ -251,7 +263,8 @@ The grammar rejects these main forms (counted from the file names):
   `import.source()`, `import.defer()`, and a second argument (217 files in
   `dynamic-import`), `using` declarations (132), trailing commas (142), and
   number literals such as `1..toString()`.
-- mjsunit: 256 files, most of them in `regress`, `compiler`, and `harmony`.
+- mjsunit: 119 files. The most common forms are `using` declarations (24
+  files) and private names (19 files).
 - jstests: 196 files with a syntax error and 10 files that are not UTF-8.
 
 The `slow-parse` files are `mjsunit` `es6/spread-array-misc.js`,
@@ -288,8 +301,8 @@ python3 grammars/g4/javascript/seeds/get_seeds.py filter \
 ### Time and Disk Space
 
 The machine is an Apple M4 (10 cores: 4 performance and 6 efficiency) with
-24 GiB of memory, on macOS 26.6.2. Other desktop programs were open. The load
-average was between 2.7 and 3.9 at the start of the parse runs.
+24 GiB of memory, on macOS 26.6.2. Other desktop programs also run on it. The
+load average is between 2.0 and 3.9 at the start of the parse runs.
 
 | Step | Time | Peak memory |
 |---|---:|---:|
@@ -297,14 +310,14 @@ average was between 2.7 and 3.9 at the start of the parse runs.
 | `fetch`, second run (no download) | 11.8 s | |
 | CMake build of the JavaScript grammar (`RelWithDebInfo`, 10 jobs) | 24.3 s | |
 | `grammar_parser-javascript`, test262 | 495.5 s | 3.4 GiB |
-| `grammar_parser-javascript`, mjsunit | 254.3 s | 6.5 GiB |
+| `grammar_parser-javascript`, mjsunit | 244.8 s | 5.7 GiB |
 | `grammar_parser-javascript`, jstests | 532.5 s | 7.1 GiB |
 | JerryScript build | 3.0 s | |
-| `filter` with JerryScript, all suites (10 jobs) | 150.1 s | |
+| `filter` with JerryScript, all suites (10 jobs) | 151.3 s | |
 
-The disk space of the work folder after all the steps is 3.2 GiB
+The disk space of the work folder after all the steps is 3.3 GiB
 (`du -sh`). `DEST/src` uses 574 MiB, `DEST/seeds` 326 MiB, `DEST/trees`
-2.1 GiB (66,374 files), and `DEST/jerry` 225 MiB.
+2.2 GiB (66,511 files), and `DEST/jerry` 226 MiB.
 
 ### Missing Names
 
@@ -316,7 +329,7 @@ the most dropped seeds miss after the filter run:
 |---|---:|---|
 | `Temporal` | 6,381 | a built-in |
 | `Intl` | 1,237 | a built-in |
-| `WasmModuleBuilder` | 1,184 | the V8 WebAssembly test library |
+| `WasmModuleBuilder` | 1,192 | the V8 WebAssembly test library |
 | `Iterator` | 605 | a built-in |
 | `SIMD` | 204 | a built-in of a withdrawn proposal |
 | `WebAssembly` | 138 | the WebAssembly API |
@@ -339,7 +352,7 @@ seeds miss, with these exceptions:
   `testCodePointRange` holds the test loop. A shim that does nothing hides
   that code.
 
-415 dropped seeds (247 jstests, 158 mjsunit, and 10 test262 seeds) end with
+415 dropped seeds (246 jstests, 159 mjsunit, and 10 test262 seeds) end with
 exit status 10. JerryScript uses this status when its heap of 512 KB is full.
 
 ### Crashes
