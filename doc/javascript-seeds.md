@@ -145,6 +145,11 @@ python3 grammars/g4/javascript/seeds/get_seeds.py count DEST/seeds DEST/trees
 
 `count` prints the number of seeds and trees for each suite.
 
+A campaign needs only the trees of the seeds that it uses. For a campaign,
+do step 3 first. Then parse the kept seeds (`DEST/jerry/$suite`), not all
+the seeds. In the recorded run, 16,582 of the 66,511 trees belong to dropped
+seeds. The parse is also shorter.
+
 `grammar_parser` has no time limit. Some large JSTests files parse slowly
 when all the threads parse at the same time, because the threads share the
 parser cache. In the recorded run, `grammar_parser-javascript` writes no
@@ -325,6 +330,30 @@ load average is between 2.0 and 3.9 at the start of the parse runs.
 The disk space of the work folder after all the steps is 3.3 GiB
 (`du -sh`). `DEST/src` uses 574 MiB, `DEST/seeds` 326 MiB, `DEST/trees`
 2.2 GiB (66,511 files), and `DEST/jerry` 226 MiB.
+
+### Why Seeds Fail the Filter
+
+A second run of the 17,204 dropped seeds, with the same build and time limit,
+records the error of each seed. Each seed counts once, in the first row that
+fits its error.
+
+| Error | Seeds | Main cause |
+|---|---:|---|
+| `ReferenceError` for a global that JerryScript does not have | 8,986 | Built-ins such as `Temporal` (6,381), `Intl` (1,237), and `Iterator` (605), and the `WebAssembly` API (138) |
+| `ReferenceError` for the V8 WebAssembly test library | 1,263 | `WasmModuleBuilder` and other names of this library |
+| `ReferenceError` for other names | 1,222 | Harness names that fewer than 20 seeds miss, and a few other errors |
+| `SyntaxError` | 1,966 | Regular expressions that the JerryScript regexp parser rejects (911), and `import.source()` or `import.defer()` (152) |
+| `TypeError` | 2,144 | 1,093 of them are `Expected a function` |
+| `RangeError` | 225 | A full stack (101), or no memory for an `ArrayBuffer` (48) or a `BigInt` (12) |
+| Another thrown value | 665 | A check of the seed fails, for example `Error: Test failed` (see [The Accepted Gap](#the-accepted-gap)) |
+| Exit status 10 | 415 | The heap of 512 KB is full |
+| Time-out | 297 | |
+| Crash | 11 | See [Crashes](#crashes) |
+| Exit status 0 | 10 | The seed passes in the second run |
+
+Most drops come from the engine, not from the recipe. test262 tests new parts
+of the language, and JerryScript v3.0.0 does not have many of them. An engine
+that has these parts can keep more seeds.
 
 ### Missing Names
 
