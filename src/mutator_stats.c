@@ -17,6 +17,7 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -130,12 +131,18 @@ void mutator_stats_open(mutator_stats_t *stats, const char *instance_dir,
   if (!stats->file) {
 
     fprintf(stderr,
-            "[grammar mutator] warning: cannot open the statistics file %s "
-            "(%s). The mutator writes no statistics file.\n",
-            path, strerror(errno));
+            "[grammar mutator] warning: cannot open the statistics file "
+            "%s/%s (%s). The mutator writes no statistics file.\n",
+            instance_dir, MUTATOR_STATS_FILE_NAME, strerror(errno));
     return;
 
   }
+
+  // AFL++ starts the fuzzed target after this open. Close the file in the
+  // target, so that the target cannot write to it.
+  int fd = fileno(stats->file);
+  int flags = fcntl(fd, F_GETFD);
+  if (flags != -1) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 
   // Write the header only into an empty file. A resumed run appends to the
   // file of the old run.

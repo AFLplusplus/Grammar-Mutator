@@ -16,6 +16,8 @@
 
  */
 
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cstdint>
@@ -27,7 +29,6 @@
 
 #include "gtest/gtest.h"
 #include "custom_mutator.h"
-#include "f1_c_fuzz.h"
 #include "mutator_stats.h"
 #include "utils.h"
 
@@ -279,6 +280,32 @@ TEST_F(MutatorStatsFile, OpenFailureKeepsOff) {
 
 }
 
+TEST_F(MutatorStatsFile, FileIsCloseOnExec) {
+
+  mutator_stats_t *stats = mutator_stats_create(60);
+  ASSERT_NE(stats, nullptr);
+  mutator_stats_open(stats, dir.c_str(), kSecond);
+
+  // Find the descriptor of the file. The fuzzed target must not get it.
+  struct stat want;
+  ASSERT_EQ(stat(stats_file(dir).c_str(), &want), 0);
+  int found = 0;
+  for (int fd = 3; fd < 1024; ++fd) {
+
+    struct stat got;
+    if (fstat(fd, &got) || got.st_dev != want.st_dev ||
+        got.st_ino != want.st_ino)
+      continue;
+    ++found;
+    EXPECT_TRUE(fcntl(fd, F_GETFD) & FD_CLOEXEC) << fd;
+
+  }
+
+  EXPECT_EQ(found, 1);
+  mutator_stats_free(stats);
+
+}
+
 // The mutator with the statistics file on or off. Each test starts the
 // mutator in the output folder of one AFL++ instance.
 class MutatorStatsMutator : public MutatorStatsFile {
@@ -335,23 +362,10 @@ class MutatorStatsMutator : public MutatorStatsFile {
 static const string kValid = "puts 1\n";
 static const string kNotUtf8 = "\xff\xfe\n";
 
-// The bytes of a random tree of the grammar. The parser predicts the choices
-// of a small entry such as kValid without the cache, so the cache stays
-// empty. A tree of up to 1000 bytes fills it.
-static string generated_entry() {
-
-  tree_t *tree = gen_init__(1000);
-  tree_to_buf(tree);
-  string bytes((const char *)tree->data_buf, tree->data_len);
-  tree_free(tree);
-  return bytes;
-
-}
-
 TEST_F(MutatorStatsMutator, OffByDefault) {
 
   fs::path instance = dir / "out" / "default";
-  start(nullptr, instance);
+  ASSERT_NO_FATAL_FAILURE(start(nullptr, instance));
   queue_get(write_entry(instance / "queue", "a", kValid));
   stop();
 
@@ -362,7 +376,7 @@ TEST_F(MutatorStatsMutator, OffByDefault) {
 TEST_F(MutatorStatsMutator, NoFileOutsideQueue) {
 
   fs::path instance = dir / "out" / "default";
-  start("3600", instance);
+  ASSERT_NO_FATAL_FAILURE(start("3600", instance));
   fs::create_directories(dir / "seeds");
   queue_get(write_entry(dir / "seeds", "a", kValid));
   stop();
@@ -375,13 +389,18 @@ TEST_F(MutatorStatsMutator, NoFileOutsideQueue) {
 TEST_F(MutatorStatsMutator, CountsRealParses) {
 
   fs::path instance = dir / "out" / "default";
-  start("3600", instance);
-  string a = write_entry(instance / "queue", "a", generated_entry());
+  ASSERT_NO_FATAL_FAILURE(start("3600", instance));
+  string a = write_entry(instance / "queue", "a", kValid);
   string b = write_entry(instance / "queue", "b", kNotUtf8);
   EXPECT_EQ(queue_get(a), 1);
   queue_get(b);
   queue_get(b);  // the rejected set skips the parse
+  queue_get((instance / "queue" / "missing").string());  // not read, no parse
   stop();
+
+  // The cache belongs to the process, and nothing parses after the last line
+  size_t parser_states = 0, lexer_states = 0;
+  ASSERT_TRUE(tree_parser_cache_states(&parser_states, &lexer_states));
 
   vector<string> lines = read_lines(stats_file(instance));
   ASSERT_EQ(lines.size(), 3u);
@@ -395,16 +414,34 @@ TEST_F(MutatorStatsMutator, CountsRealParses) {
   EXPECT_EQ(last[1], "2");
   EXPECT_EQ(last[2], "1");
   EXPECT_EQ(last[3], "0");
-  EXPECT_GT(std::stoll(last[4]), 0);
-  EXPECT_GT(std::stoll(last[5]), 0);
+  EXPECT_EQ(last[4], std::to_string(parser_states));
+  EXPECT_EQ(last[5], std::to_string(lexer_states));
+  EXPECT_GT(lexer_states, 0u);  // every parse uses the lexer cache
   EXPECT_NE(std::stoll(last[6]), 0);
+
+}
+
+TEST_F(MutatorStatsMutator, FirstOpenFromQueueNewEntry) {
+
+  // AFL++ calls afl_custom_queue_new_entry for each seed before it calls
+  // afl_custom_queue_get, so this call opens the file in a real run
+  fs::path instance = dir / "out" / "default";
+  ASSERT_NO_FATAL_FAILURE(start("3600", instance));
+  string x = write_entry(instance / "queue", "x", kValid);
+  afl_custom_queue_new_entry(data, (const uint8_t *)x.c_str(), nullptr);
+  stop();
+
+  vector<string> lines = read_lines(stats_file(instance));
+  ASSERT_EQ(lines.size(), 3u);
+  EXPECT_EQ(split_fields(lines[1])[1], "0");  // the line before the parse
+  EXPECT_EQ(split_fields(lines[2])[1], "1");
 
 }
 
 TEST_F(MutatorStatsMutator, TicksFromFuzz) {
 
   fs::path instance = dir / "out" / "default";
-  start("1", instance);
+  ASSERT_NO_FATAL_FAILURE(start("1", instance));
   string a = write_entry(instance / "queue", "a", kValid);
   ASSERT_EQ(queue_get(a), 1);
   ASSERT_GT(afl_custom_fuzz_count(data, nullptr, 0), 0u);
@@ -424,7 +461,7 @@ TEST_F(MutatorStatsMutator, SameOutputsWithStats) {
   for (int run = 0; run < 2; ++run) {
 
     fs::path instance = dir / ("out" + std::to_string(run)) / "default";
-    start(run ? "3600" : nullptr, instance);
+    ASSERT_NO_FATAL_FAILURE(start(run ? "3600" : nullptr, instance));
     string a = write_entry(instance / "queue", "a", kValid);
     ASSERT_EQ(queue_get(a), 1);
     uint32_t num = afl_custom_fuzz_count(data, nullptr, 0);

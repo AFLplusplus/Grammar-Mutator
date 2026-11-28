@@ -253,7 +253,7 @@ afl-fuzz -i seeds -o out -- /path/to/target @@
 
 ### Statistics File
 
-The statistics file shows the parse cache and the heap of the mutator during a run.
+The statistics file shows the parse counts, the parse cache, and the heap during a run.
 Set `GRAMMAR_MUTATOR_STATS_SECONDS` to turn it on.
 Each AFL++ instance writes its own file, `grammar_mutator_stats`, in its output folder (for example `out/default/`), next to the AFL++ `plot_data` file.
 
@@ -268,7 +268,7 @@ Each line after it holds these values:
 | Value | Meaning |
 |---|---|
 | `unix_time` | The time of the line, in seconds since 1970 |
-| `parses` | The number of test cases that the mutator parsed. The mutator parses only a test case that has no tree file. |
+| `parses` | The number of test cases that the mutator parsed. The mutator parses only a test case that has no usable tree file. |
 | `failed_parses` | The number of parses that gave no tree |
 | `limit_parses` | The number of parses that passed the time limit (see `PARSE_TIME_BUDGET_MS`) |
 | `parser_states` | The number of states in the prediction cache of the ANTLR parser |
@@ -276,9 +276,13 @@ Each line after it holds these values:
 | `heap_kb` | The heap in use of the whole `afl-fuzz` process, in KB |
 
 The mutator writes the first line when it gets the first queue entry.
-Then it writes a line each time the interval has passed, and a last line when AFL++ stops.
+Then it writes a line at the first mutator call after the interval, and a last line when AFL++ stops.
+A long stage outside the mutator can make a line late, so use `unix_time`, not the number of lines, as the time.
 `-1` means that the value is not known. For example, `heap_kb` is `-1` on a platform without malloc statistics.
+
 A resumed run adds its lines to the same file.
+A new run in an old output folder also adds its lines to the file. AFL++ does not remove this file.
+Each run is a new process, so the counts and the states start again from 0 in its first line.
 
 ## Contact and Contributions
 

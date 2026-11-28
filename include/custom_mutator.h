@@ -45,7 +45,8 @@ typedef struct my_mutator {
   // The entries that the parser rejected in this run. The keys are the entry
   // file names.
   map_int_t rejected;
-  // The statistics file. NULL if GRAMMAR_MUTATOR_STATS_SECONDS is not set.
+  // The statistics file. NULL if GRAMMAR_MUTATOR_STATS_SECONDS does not turn
+  // it on, or if the allocation failed.
   mutator_stats_t *stats;
 
   const uint8_t *filename_cur;

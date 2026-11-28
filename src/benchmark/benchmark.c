@@ -540,6 +540,8 @@ static void set_step_variables(uint64_t steps, uint64_t trims) {
   setenv("TRIMMING_STEPS", value, 1);
   const char *budget = getenv("PARSE_TIME_BUDGET_MS");
   if (!budget || !*budget) setenv("PARSE_TIME_BUDGET_MS", "0", 1);
+  // The benchmark writes no statistics file
+  unsetenv("GRAMMAR_MUTATOR_STATS_SECONDS");
 
 }
 
