@@ -18,6 +18,8 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 
 #include "gtest/gtest.h"
@@ -28,6 +30,20 @@ TEST(UtilsTest, HashBytesIsStableAndNotZero) {
   EXPECT_NE(hash_bytes("abc", 3), hash_bytes("abd", 3));
   EXPECT_NE(hash_bytes("abc", 3), hash_bytes("abc", 2));
   EXPECT_NE(hash_bytes("", 0), 0u);
+
+}
+
+TEST(UtilsTest, HeapInUseGrows) {
+
+  long before = heap_in_use_kb();
+  if (before < 0) GTEST_SKIP() << "no malloc statistics (or Valgrind)";
+
+  const size_t size = 16u << 20;
+  char        *p = (char *)malloc(size);
+  ASSERT_NE(p, nullptr);
+  memset(p, 1, size);
+  EXPECT_GE(heap_in_use_kb() - before, 15 * 1024);
+  free(p);
 
 }
 

@@ -175,3 +175,13 @@ target_link_libraries(test_parse_budget
 add_test(
   NAME test_parse_budget
   COMMAND test_parse_budget)
+
+# Test suite 11:
+# test the statistics file of the mutator
+add_executable(test_mutator_stats test_mutator_stats.cpp)
+target_link_libraries(test_mutator_stats
+  PRIVATE gtest_main
+  PRIVATE grammarmutator)
+add_test(
+  NAME test_mutator_stats
+  COMMAND test_mutator_stats)
