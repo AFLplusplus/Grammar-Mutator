@@ -109,10 +109,15 @@ The tool changes the text of a test in two cases only:
 
 - A V8 runtime call, `%Name(`, becomes `__v8native("Name")(`. `shims.js`
   defines `__v8native`. The arguments of the call still run. The tool
-  changes `%Name(` only where a call can start: at the start of a line,
-  after an operator or `(`, after a keyword such as `return` or `else`, or
-  after the `)` of an `if`, `while`, or `for` head. In other places `%` can
-  be the modulo operator, so the tool keeps the text.
+  changes `%Name(` only where a call can start:
+  - at the start of a line;
+  - after one of the characters `( , = ; { } [ ! & | ? : + - >`;
+  - after one of the keywords `return`, `typeof`, `void`, `throw`, `await`,
+    `case`, `in`, `of`, `new`, `delete`, `else`, and `do`;
+  - after the `)` of an `if`, `while`, or `for` head.
+
+  In other places, `%` can be the modulo operator. There, the tool keeps the
+  text.
 - A test262 test with the `onlyStrict` flag gets `"use strict";` at the top,
   as the test262 runners do.
 
@@ -257,7 +262,9 @@ The filter result for each suite:
 | jstests | 9,993 | 6,775 | 2,987 | 223 | 8 |
 | total | 68,370 | 51,166 | 16,885 | 308 | 11 |
 
-The grammar rejects these main forms (counted from the file names):
+The grammar rejects these main forms. The test262 counts come from words in
+the file names. The mjsunit counts come from a search of the file contents.
+The jstests counts come from the messages of `grammar_parser-javascript`.
 
 - test262: private names (`#x`, about 600 files), `import()` forms such as
   `import.source()`, `import.defer()`, and a second argument (217 files in
