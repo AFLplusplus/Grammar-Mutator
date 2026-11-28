@@ -39,31 +39,75 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# A runtime call follows one of these characters.
-_PREFIX_CHARS = frozenset("(,=;{}[!&|?:+-")
+# A runtime call follows one of these characters. After `>` (also in `=>`)
+# a `%` cannot be the modulo operator.
+_PREFIX_CHARS = frozenset("(,=;{}[!&|?:+->")
 # A runtime call also follows one of these keywords.
 _PREFIX_WORDS = frozenset(
-    "return typeof void throw await case in of new delete".split()
+    "return typeof void throw await case in of new delete else do".split()
 )
+# A `)` is a prefix only if it closes the `(` after one of these keywords.
+_CONTROL_WORDS = frozenset(("if", "while", "for"))
+# White space between a prefix and a runtime call: the WhiteSpace set of
+# JavaScript. It has U+FEFF (a byte order mark) and the Zs characters, such as
+# U+00A0 (no-break space).
+_SPACE = (
+    " \t\f\v\ufeff\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005"
+    "\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000"
+)
+_SPACE_OR_LINE = _SPACE + "\n\r"
 _NATIVE = re.compile(r"%([A-Za-z_$][A-Za-z0-9_$]*)\(")
 _WORD_CHARS = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$"
 )
 
 
-def _starts_call(text: str, pos: int) -> bool:
-    """Return True if a runtime call can start at `pos` in `text`."""
+def _word_before(text: str, end: int) -> tuple[str, int]:
+    """Return the word that ends at `end`, and its start."""
+    start = end
+    while start > 0 and text[start - 1] in _WORD_CHARS:
+        start -= 1
+    return text[start:end], start
+
+
+def _starts_call(
+    text: str,
+    pos: int,
+    control_closes: set[int] | frozenset[int] = frozenset(),
+) -> bool:
+    """Return True if a runtime call can start at `pos` in `text`.
+
+    `control_closes` holds the positions of the `)` that close the `(` of an
+    `if`, `while`, or `for` head.
+    """
     end = pos
-    while end > 0 and text[end - 1] in " \t\f\v":
+    while end > 0 and text[end - 1] in _SPACE:
         end -= 1
     if end == 0 or text[end - 1] in "\n\r":
         return True
     if text[end - 1] in _PREFIX_CHARS:
         return True
-    start = end
-    while start > 0 and text[start - 1] in _WORD_CHARS:
-        start -= 1
-    return text[start:end] in _PREFIX_WORDS
+    if text[end - 1] == ")":
+        return end - 1 in control_closes
+    word, start = _word_before(text, end)
+    return word in _PREFIX_WORDS and not (start and text[start - 1] == ".")
+
+
+def _opens_control(text: str, pos: int) -> bool:
+    """Return True if the `(` at `pos` follows `if`, `while`, or `for`."""
+    end = pos
+    while end > 0 and text[end - 1] in _SPACE_OR_LINE:
+        end -= 1
+    word, start = _word_before(text, end)
+    if word == "await":
+        # for await (...)
+        end = start
+        while end > 0 and text[end - 1] in _SPACE_OR_LINE:
+            end -= 1
+        word, start = _word_before(text, end)
+        if word != "for":
+            return False
+    return word in _CONTROL_WORDS and not (start and text[start - 1] == ".")
 
 
 def rewrite_natives(text: str) -> str:
@@ -71,9 +115,13 @@ def rewrite_natives(text: str) -> str:
 
     `%Name(` becomes `__v8native("Name")(`. The scan skips string literals,
     template literals, and comments. It does not track regular expressions.
+    It pairs the parentheses of the code, to find the end of an `if`,
+    `while`, or `for` head.
     """
     out: list[str] = []
     length = len(text)
+    opened: list[bool] = []  # for each open `(`: does it start a head?
+    control_closes: set[int] = set()
     i = 0
     while i < length:
         ch = text[i]
@@ -95,10 +143,18 @@ def rewrite_natives(text: str) -> str:
             j = length if j < 0 else j + 2
         elif ch == "%":
             match = _NATIVE.match(text, i)
-            if match and _starts_call(text, i):
+            if match and _starts_call(text, i, control_closes):
                 out.append('__v8native("%s")(' % match.group(1))
+                opened.append(False)
                 i = match.end()
                 continue
+            j = i + 1
+        elif ch == "(":
+            opened.append(_opens_control(text, i))
+            j = i + 1
+        elif ch == ")":
+            if opened and opened.pop():
+                control_closes.add(i)
             j = i + 1
         else:
             j = i + 1

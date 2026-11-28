@@ -63,6 +63,27 @@ CHANGED = [
     ("%A(1); %B(2);", '__v8native("A")(1); __v8native("B")(2);'),
     ("// c\n%Foo(x);", '// c\n__v8native("Foo")(x);'),
     ("\r%Foo(x)", '\r__v8native("Foo")(x)'),
+    # After the `)` of an `if`, `while`, or `for` head.
+    ("if (x) %F(1)", 'if (x) __v8native("F")(1)'),
+    ("while (x) %F(1)", 'while (x) __v8native("F")(1)'),
+    ("for (;;) %F(1)", 'for (;;) __v8native("F")(1)'),
+    ("for await (x of y) %F(1)", 'for await (x of y) __v8native("F")(1)'),
+    ("if (f(a)) %F(1)", 'if (f(a)) __v8native("F")(1)'),
+    (
+        "if (i%10 == 0) %F(s);",
+        'if (i%10 == 0) __v8native("F")(s);',
+    ),
+    ('if (")") %F(1)', 'if (")") __v8native("F")(1)'),
+    ("if (/* ) */ x) %F(1)", 'if (/* ) */ x) __v8native("F")(1)'),
+    # After `>` (also `=>`), `else`, and `do`.
+    ("x => %F(1)", 'x => __v8native("F")(1)'),
+    ("a > %F(1)", 'a > __v8native("F")(1)'),
+    ("if (a) {} else %F(1)", 'if (a) {} else __v8native("F")(1)'),
+    ("do %F(1); while (x);", 'do __v8native("F")(1); while (x);'),
+    # A byte order mark at the start of the file.
+    ("\ufeff%F(1)", '\ufeff__v8native("F")(1)'),
+    # A no-break space is white space in JavaScript.
+    ("{\u00a0%F(1)}", '{\u00a0__v8native("F")(1)}'),
 ]
 
 UNCHANGED = [
@@ -82,6 +103,15 @@ UNCHANGED = [
     "/* %Foo(",
     "myreturn %Foo(x)",
     "% Foo(x);",  # A space after % is not a runtime call.
+    # A `)` that does not close an `if`, `while`, or `for` head.
+    "(a) %F(1)",
+    "f(a) %F(1)",
+    'g(")") %F(1)',
+    'f("if (x)") %F(1)',
+    "if (x) y; (a) %F(1)",
+    "a.if (x) %F(1)",
+    "x.else %F(1)",
+    "if /* c */ (x) %F(1)",
 ]
 
 
